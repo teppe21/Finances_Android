@@ -9,7 +9,8 @@ permissions:
 jobs:
   release:
     name: Signed AAB and APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +21,11 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - name: Decode upload keystore
         env:
@@ -37,7 +43,7 @@ jobs:
           FINANCES_KEYSTORE_PASSWORD: ${{ secrets.FINANCES_KEYSTORE_PASSWORD }}
           FINANCES_KEY_ALIAS: ${{ secrets.FINANCES_KEY_ALIAS }}
           FINANCES_KEY_PASSWORD: ${{ secrets.FINANCES_KEY_PASSWORD }}
-        run: ./gradlew testReleaseUnitTest lintRelease bundleRelease assembleRelease --stacktrace
+        run: ./gradlew --no-daemon testReleaseUnitTest lintRelease bundleRelease assembleRelease --stacktrace
 
       - name: Check 16 KB alignment of native libraries
         run: ./scripts/check-16kb-alignment.sh app/build/outputs/apk/release/app-release.apk
