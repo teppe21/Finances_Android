@@ -60,7 +60,7 @@ object CsvParser {
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
         return try {
-            val text = utf8.decode(ByteBuffer.wrap(bytes)).toString().removePrefix("﻿")
+            val text = utf8.decode(ByteBuffer.wrap(bytes)).toString().removePrefix("\uFEFF")
             text to "UTF-8"
         } catch (e: CharacterCodingException) {
             String(bytes, Charset.forName("windows-1250")) to "windows-1250"
@@ -156,7 +156,7 @@ object CsvParser {
         charset: String = "UTF-8"
     ): CsvParseResult {
         val delimiter = detectDelimiter(text)
-        val records = records(text.removePrefix("﻿"), delimiter)
+        val records = records(text.removePrefix("\uFEFF"), delimiter)
         if (records.size < 2) return CsvParseResult(emptyList(), emptyMap(), charset)
 
         val mapping = mappingOverride ?: detectMapping(records.first().second)
