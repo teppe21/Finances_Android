@@ -1,0 +1,37 @@
+# Gradle / Android build output
+.gradle/
+build/
+**/build/
+.kotlin/
+local.properties
+.externalNativeBuild/
+.cxx/
+captures/
+output-metadata.json
+
+# Binaries
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Signing material and secrets (never commit)
+*.keystore
+*.jks
+*.p12
+*.key
+*.pem
+keystore.properties
+.env
+.env.*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
