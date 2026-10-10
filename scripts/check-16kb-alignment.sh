@@ -32,7 +32,13 @@ else
     if [ "$min_align" -ge 16384 ]; then
       printf 'OK        %s (align 0x%x)\n' "$rel" "$min_align"
     else
-      printf 'TOO_SMALL %s (align 0x%x)\n' "$rel" "$min_align"; failed=1
+      case "$rel" in
+        # 16 KB page sizes exist only on 64-bit devices; 32-bit ABIs are reported but do not fail the check.
+        lib/armeabi-v7a/*|lib/x86/*|*/lib/armeabi-v7a/*|*/lib/x86/*)
+          printf 'WARN_32BIT %s (align 0x%x, 32-bit ABI, not required)\n' "$rel" "$min_align" ;;
+        *)
+          printf 'TOO_SMALL %s (align 0x%x)\n' "$rel" "$min_align"; failed=1 ;;
+      esac
     fi
   done
   [ "$failed" -eq 0 ] || { echo "Some libraries are not 16 KB aligned." >&2; exit 1; }

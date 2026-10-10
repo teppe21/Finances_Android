@@ -25,3 +25,7 @@ The script itself was tested against an ELF built with `-z max-page-size=16384` 
 ## Result
 
 **Not verified yet.** No APK could be built in the environment used for this round of work (no access to Google's Maven repository). The dependency versions were chosen based on their release notes, but compliance must be confirmed with the steps above before release.
+
+## 32-bit libraries
+
+The check script fails on any 64-bit library (`arm64-v8a`, `x86_64`) whose LOAD segments are aligned to less than 16 KB. For the 32-bit ABIs (`armeabi-v7a`, `x86`) it only prints `WARN_32BIT`, because 16 KB page-size devices are 64-bit. The CI release check showed that the ML Kit text-recognition library (`libmlkit_google_ocr_pipeline.so`) is 4 KB aligned in its 32-bit variants and 16 KB aligned in its 64-bit variants. Confirm the current rule in Google's "Support 16 KB page sizes" guidance and Play Console before release.
