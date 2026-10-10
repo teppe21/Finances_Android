@@ -4,6 +4,8 @@ Finances is a personal finance app for Android, written in Kotlin with Jetpack C
 
 This repository contains only the Android app. It used to live in the `android-native/` folder of the [teppe21/finances](https://github.com/teppe21/finances) repository next to an older web dashboard; it was moved here so it can be built and released on its own.
 
+**Install:** [INSTALLATION.md](INSTALLATION.md) · **Develop:** [DEVELOPMENT.md](DEVELOPMENT.md)
+
 ## Overview
 
 All financial records live in a Room database in the app's private storage. There is no account system and no backend. The app talks to the network for two things only: exchange rates (currency codes only) and, if you add an API key, stock quotes. Android backup and device transfer are switched off for the app's data, so uninstalling it deletes everything.
@@ -100,20 +102,19 @@ Single-module app with a light layering: Compose screens and ViewModels in `feat
 
 ## Testing
 
-83 JVM unit tests in `app/src/test` cover notification recognition and rejection, the full notification pipeline including deduplication and account matching, exact money parsing, currency conversion and statistics, CSV and receipt parsing, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Two instrumented tests in `app/src/androidTest` cover the Room migration from schema 3 to 5 and the "delete financial data" behaviour. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has not been run yet.
+JVM unit tests in `app/src/test` cover notification recognition and rejection, the notification pipeline including deduplication and account matching, exact money parsing, currency conversion and statistics, CSV and receipt parsing, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. One instrumented test in `app/src/androidTest` covers the Room migration to the current schema. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has not been run yet.
 
-## Development
+## Build
 
-Requirements: JDK 17 and an Android SDK with platform 36.
+Requirements: JDK 17 and an Android SDK with platform 36. From the repository root:
 
 ```bash
 ./gradlew testDebugUnitTest      # JVM unit tests
 ./gradlew lint                   # Android lint
-./gradlew assembleDebug          # debug APK in app/build/outputs/apk/debug/
-./gradlew connectedDebugAndroidTest   # instrumented tests, needs a device or emulator
+./gradlew assembleDebug          # debug APK (testing only, not a release)
 ```
 
-Release builds need an upload keystore; without one the release tasks stop with an explanation instead of producing a debug-signed file. See [docs/RELEASE.md](docs/RELEASE.md).
+Instrumented tests (`./gradlew connectedDebugAndroidTest`) need a device or emulator. Release builds need your own upload keystore; without one the release tasks stop with an explanation instead of producing a debug-signed file. See [INSTALLATION.md](INSTALLATION.md), [DEVELOPMENT.md](DEVELOPMENT.md) and [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Google Play preparation
 
@@ -121,7 +122,7 @@ The repository contains the pieces that can be prepared in code: target SDK 36, 
 
 ## Current status
 
-The code in this repository has been type-checked and unit-tested on the JVM, but at the time of writing it has not been built with the Android Gradle Plugin, linted, or run on a device, because the environment used for this round of work could not reach Google's Maven repository. Treat it as unreleased until `./gradlew testDebugUnitTest lint assembleDebug` and the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) have been run. The supported-app list is short and recognition will miss notification formats it has not seen.
+Unreleased. The Android CI workflow (unit tests, lint, debug APK) is the authority on whether the project builds; see its latest run on GitHub. The R8 release build, instrumented tests, signature and 16 KB checks and the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) have not been run. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and existing transactions cannot be edited yet.
 
 ## Project background
 
