@@ -11,8 +11,13 @@ import java.math.RoundingMode
 object Money {
     const val STORAGE_SCALE = 2
 
-    fun toMinor(major: BigDecimal): Long =
-        major.setScale(STORAGE_SCALE, RoundingMode.HALF_UP).unscaledValue().longValueExact()
+    /** Throws ArithmeticException if the amount does not fit in a Long (never wraps silently). */
+    fun toMinor(major: BigDecimal): Long {
+        val unscaled = major.setScale(STORAGE_SCALE, RoundingMode.HALF_UP).unscaledValue()
+        // BigInteger.longValueExact() needs API 31; minSdk is 26.
+        if (unscaled.bitLength() > 63) throw ArithmeticException("BigInteger out of long range")
+        return unscaled.toLong()
+    }
 
     fun toMajor(minor: Long): BigDecimal = BigDecimal.valueOf(minor, STORAGE_SCALE)
 

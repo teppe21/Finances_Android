@@ -50,6 +50,12 @@ jobs:
       - name: Run lint
         run: ./gradlew --no-daemon lint --stacktrace
 
+      - name: Show lint problems
+        if: failure()
+        run: |
+          f=$(ls app/build/intermediates/lint_intermediate_text_report/*/*/lint-results-*.txt 2>/dev/null | head -1)
+          [ -n "$f" ] && grep -E "Error:|Warning:" -B1 "$f" | grep -E "^app/|Error:" | head -150 || echo "no lint text report found"
+
       - name: Assemble debug APK
         run: ./gradlew --no-daemon assembleDebug --stacktrace
 
