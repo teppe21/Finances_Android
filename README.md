@@ -5,6 +5,8 @@
 
 A privacy-first personal finance app for Android (Kotlin, Jetpack Compose) that keeps your data on the phone and can pick up card payments from supported banking notifications.
 
+*Co-developed with Claude Code (AI assistant); see [Built with AI assistance](#built-with-ai-assistance).*
+
 **[Download latest APK](https://github.com/teppe21/Finances-Android/releases/latest)** · [Installation guide / Telepítési útmutató](INSTALLATION.md) · [Development guide](DEVELOPMENT.md)
 
 > The Releases page has an APK only once the first signed release is published. Until then, build the app yourself ([DEVELOPMENT.md](DEVELOPMENT.md)).
@@ -19,7 +21,7 @@ Screenshots will be added here. See [docs/screenshots/](docs/screenshots/).
 
 ## Built with AI assistance
 
-This app was developed together with an AI assistant (Claude). The architecture, the design decisions and the review of the code are mine; the assistant helped write and test code and documentation under my direction.
+**This app was co-developed with Claude Code**, Anthropic's AI coding assistant. A large part of the code, tests and documentation was written by Claude working under my direction; I set the requirements, made the product and design decisions, and reviewed and tested the result. The commit history was cleaned up for publication and does not list Claude as an author, so this section is the authoritative statement of how the project was made.
 
 ## Overview
 
