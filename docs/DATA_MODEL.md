@@ -1,168 +1,38 @@
-# Data Model & Room SQLite Schema
+# Data model
 
-## 1. Overview & Room Architecture
+Room database `finances.db`, schema version **5**. Exported schemas live in `app/schemas/com.teppe21.finances.data.local.database.AppDatabase/`; `3.json` and `4.json` are committed and `5.json` is written by the first build (commit it).
 
-The application persistence layer is implemented via Android Jetpack Room (`AppDatabase`, version 3). The schema is formally exported to JSON schemas at:
-`android-native/app/schemas/com.teppe21.finances.data.local.database.AppDatabase/3.json`
+## Money
 
-### Core Schema Principles:
-1. **Integer Minor Units**: All monetary values (`amountMinor`, `openingBalanceMinor`, `currentBalanceMinor`, `monthlyLimitMinor`, `taxMinor`) are stored as 64-bit integers (`Long`), representing the currency's smallest sub-unit (cents, fillérs).
-2. **Deterministic Fingerprints**: Transactions have a unique cryptographic fingerprint preventing duplicate entries.
-3. **Optimized B-Tree Indices**: Composite and single-column indices support constant-time deduplication and responsive dashboard rendering.
+Every amount is a `Long` with two implied decimals, for every currency: 1,000 HUF is `100000`, 12.50 EUR is `1250`. The sign is the effect on the account: money leaving the account is negative. Display precision (HUF without decimals) is applied only when formatting. Parsing uses `BigDecimal`; no floating point is involved between text and storage.
 
----
+## Tables
 
-## 2. Entity-Relationship Model
+| Table | Purpose |
+| --- | --- |
+| `transactions` | All transactions. Unique index on `fingerprint`. `pending = 1` rows are excluded from balances and statistics; an empty `accountId` means "not assigned yet". `cardLast4` (v5) supports duplicate detection. |
+| `accounts` | Name, institution, type, currency, opening balance. The `currentBalanceMinor` column is legacy; balances are computed from transactions. |
+| `categories`, `category_rules` | Categories and keyword rules (`contains`, `exact`, `regex`), higher priority first. |
+| `notification_events` | Package, time, source name, status code, linked transaction id. No notification text (removed in v4). Pruned after 30 days. |
+| `receipts` | Merchant, date, totals, payment method. Image reference and OCR text are cleared (v5). |
+| `budgets` | Monthly limit per category; `currency` added in v5 (null = HUF for older rows). |
+| `recurring_rules` | Present in the schema; detection currently runs in memory. |
+| `exchange_rates` | EUR-based rates, `rateDate` = `latest` (fetched) or `manual`; `timestamp` = rate date from the provider. |
+| `watchlist`, `stock_quotes` | Stock feature only (v5). Never joined with finance tables. |
 
-```mermaid
-erDiagram
-    ACCOUNTS ||--o{ TRANSACTIONS : contains
-    CATEGORIES ||--o{ TRANSACTIONS : categorizes
-    CATEGORIES ||--o{ CATEGORY_RULES : defines
-    CATEGORIES ||--o{ BUDGETS : targets
-    RECEIPTS ||--o| TRANSACTIONS : generates
-    NOTIFICATION_EVENTS ||--o| TRANSACTIONS : generates
+## Migrations
 
-    ACCOUNTS {
-        string id PK
-        string name
-        string institution
-        string type
-        string currency
-        int64 openingBalanceMinor
-        int64 currentBalanceMinor
-        boolean isActive
-        int64 createdAt
-        int64 updatedAt
-    }
+| From | To | Change |
+| --- | --- | --- |
+| 1 | 2 | `exchange_rates` table |
+| 2 | 3 | indices on `externalId` and `(amountMinor, currency, date)` |
+| 3 | 4 | `notification_events` rebuilt without `title` and `text`, `reasonCode` added |
+| 4 | 5 | `transactions.cardLast4`, `budgets.currency`, `watchlist` and `stock_quotes` tables; descriptions of notification transactions replaced by the merchant (older versions copied raw notification text there); receipt `rawOcrText` and `imageUri` cleared |
 
-    TRANSACTIONS {
-        string id PK
-        string accountId
-        string date
-        int64 valueDate
-        int64 amountMinor
-        string currency
-        string direction
-        string description
-        string merchant
-        string categoryId
-        string source
-        string sourceAppPackage
-        string externalId
-        string fingerprint UK
-        string receiptId
-        string notificationEventId
-        string recurringRuleId
-        string transferId
-        string notes
-        boolean pending
-        float confidence
-        int64 importedAt
-        int64 createdAt
-        int64 updatedAt
-    }
+All migrations are additive or data-preserving. There is no destructive fallback: an unknown upgrade path fails instead of silently wiping data. The earlier `fallbackToDestructiveMigrationOnDowngrade` was also removed, so installing an older build over a newer one fails rather than deleting the database.
 
-    CATEGORIES {
-        string id PK
-        string name
-        string icon
-        string color
-        boolean isIncome
-        boolean isSystem
-        int64 createdAt
-        int64 updatedAt
-    }
+`MigrationTest` (instrumented) creates a version 3 database with an account, a notification transaction containing raw text, a manual transaction, a receipt with OCR text and a notification event, migrates to 5 with `runMigrationsAndValidate`, and checks the data and the scrubbing. Schemas 1 and 2 were never exported, so 1→5 and 2→5 are not covered by tests.
 
-    CATEGORY_RULES {
-        string id PK
-        string categoryId
-        string keyword
-        string matchType
-        int priority
-        boolean isActive
-        int64 createdAt
-    }
+## Preferences (DataStore)
 
-    NOTIFICATION_EVENTS {
-        string id PK
-        string packageName
-        string title
-        string text
-        int64 postedAt
-        string sourceBank
-        boolean processed
-        string parseStatus
-        string transactionId
-        string fingerprint
-    }
-
-    RECEIPTS {
-        string id PK
-        string photoUri
-        int64 scannedAt
-        int64 totalMinor
-        string currency
-        int64 taxMinor
-        string merchant
-        string paymentMethod
-        float confidence
-        string rawOcrText
-        boolean isProcessed
-        string transactionId
-    }
-
-    BUDGETS {
-        string id PK
-        string categoryId
-        int64 monthlyLimitMinor
-        string currency
-        string period
-        int64 createdAt
-        int64 updatedAt
-    }
-
-    EXCHANGE_RATES {
-        string baseCurrency PK
-        string targetCurrency PK
-        real rate
-        string rateDate PK
-        int64 timestamp
-        string provider
-    }
-```
-
----
-
-## 3. Database Indices & Performance Optimization
-
-### `transactions` Table
-| Index Name | Columns | Type | Purpose |
-|---|---|---|---|
-| `index_transactions_fingerprint` | `fingerprint` | UNIQUE | Deterministic idempotency check ($O(1)$) |
-| `index_transactions_externalId` | `externalId` | Non-unique | Bank transaction reference matching ($O(\log N)$) |
-| `index_transactions_amount_curr_date` | `amountMinor, currency, date` | Composite | Fast fuzzy duplicate matching across $\pm 2$ day window |
-| `index_transactions_accountId` | `accountId` | Non-unique | Account balance calculation and filtering |
-| `index_transactions_date` | `date` | Non-unique | Chronological range queries and analytics |
-| `index_transactions_categoryId` | `categoryId` | Non-unique | Category breakdown aggregation |
-
----
-
-## 4. Room Type Converters
-
-Defined in `Converters.kt`:
-- **`LocalDate` $\leftrightarrow$ `String`**: ISO-8601 formatted (`YYYY-MM-DD`).
-- **`Instant` $\leftrightarrow$ `Long`**: Epoch milliseconds.
-- **Enums $\leftrightarrow$ `String`**:
-  - `AccountType`: `BANK`, `SAVINGS`, `CASH`, `CARD`, `INVESTMENT`, `LOAN`
-  - `TransactionDirection`: `EXPENSE`, `INCOME`, `TRANSFER`, `REFUND`
-  - `TransactionSource`: `MANUAL`, `NOTIFICATION`, `RECEIPT`, `CSV`, `RECURRING`
-  - `PaymentMethod`: `CASH`, `CARD`, `TRANSFER`, `UNKNOWN`
-  - `NotificationParseStatus`: `PARSED`, `NEEDS_REVIEW`, `IGNORED`, `FAILED`
-
----
-
-## 5. Schema Evolution & Migrations
-
-- **Migration 1 $\rightarrow$ 2**: Added the `exchange_rates` table supporting offline multi-currency conversions and historical ECB rates.
-- **Migration 2 $\rightarrow$ 3**: Added `index_transactions_externalId` and the composite index `index_transactions_amountMinor_currency_date` on the `transactions` table to optimize deduplication queries.
+Theme, display currency, lock type, PIN verifier (`pbkdf2-sha256$...`), failed attempt count and lockout time, automatic rate fetching, notification consent, encrypted Finnhub key, and bank-to-account mappings (`bank_map_<institution>`).

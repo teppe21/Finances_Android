@@ -1,45 +1,38 @@
-# Google Play Financial Features Declaration & Regulatory Scope
+# Financial features declaration
 
-This document details the financial classification, feature scope, and regulatory positioning of **Finances** (`com.teppe21.finances`) for compliance with Google Play's Financial Services policy.
+Every app on Google Play, including apps in closed or open testing, must complete the Financial features declaration in Play Console (App content > Financial features), even to state that it offers none ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/13849271)). Google's Financial Services policy describes financial products and services as those related to the management or investment of money and cryptocurrencies, including personalized advice ([policy](https://support.google.com/googleplay/android-developer/answer/9876821)).
 
----
+## What the app does
 
-## 1. Application Classification
+| Capability | Present |
+| --- | --- |
+| Records the user's own income and expenses, budgets, categories | yes |
+| Reads notifications from banking apps to recognize the user's own card payments | yes |
+| Imports the user's own bank statements (CSV) | yes |
+| Shows currency exchange rates for conversion | yes |
+| Shows stock quotes and price history for a user-chosen watchlist, from the user's own Finnhub key | yes |
+| Holds, moves, lends or invests money; payments, transfers, wallets | no |
+| Connects to bank accounts or brokerages (credentials, open banking) | no |
+| Trading, order execution, crypto, CFDs | no |
+| Loans, credit, insurance, buy-now-pay-later | no |
+| Personalized investment advice, buy/sell signals | no |
 
-- **Category:** Personal Finance Management (PFM) / Personal Expense Tracker.
-- **Operating Model:** Standalone, on-device utility tool for expense tracking, budgeting, and analytics.
+## Recommended answer
 
----
+The app is a personal budgeting tool with read-only market information. It does not provide a regulated financial service. The likely appropriate answer is to declare that the app offers no financial products or services in the regulated categories (banking, loans, payments and transfers, trading, insurance, crypto), and, if the form offers a category for personal finance management, budgeting or financial information tools, to select that one.
 
-## 2. Explicit Non-Financial Scope Declarations
+The exact list of options in the form was not available when this was written and the wording changes, so the person submitting must:
 
-Finances **DOES NOT** provide, facilitate, or broker any of the following regulated financial services:
+1. Open the form in Play Console and read every option.
+2. Not select anything related to trading, investing services, payments, wallets, money transfer, loans or banking. The stock watchlist only displays third-party market data and cannot trade.
+3. Select a budgeting / personal finance management / financial information option if one exists.
+4. Keep a note of the choices made and the date.
 
-1. **No Money Transmission:** The app cannot transfer money, process card payments, or execute bank transactions.
-2. **No Banking or Deposit Taking:** The app does not hold, custody, or manage user funds.
-3. **No Lending or Credit Products:** The app does not offer personal loans, payday loans, peer-to-peer credit, mortgages, or buy-now-pay-later (BNPL) services.
-4. **No Investment or Brokerage Services:** The app does not buy, sell, trade, or hold securities, stocks, bonds, or commodities.
-5. **No Cryptocurrency or Virtual Asset Services:** The app does not manage crypto wallets, tokens, staking, or exchanges.
-6. **No Account Credential Access:** The app never requests, stores, or handles bank login credentials, internet banking passwords, PINs, or card CVVs.
+A third-party guide claims that apps declaring financial features must be published from an organization developer account. This could not be confirmed in Google's documentation; check the current requirements for the account type you use before submitting.
 
----
+## Related declarations
 
-## 3. Financial Features Within Scope
+- Data safety: see [PLAY_CONSOLE_COMPLIANCE.md](PLAY_CONSOLE_COMPLIANCE.md).
+- Notification access is not a restricted permission declaration on Play, but the app relies on a prominent disclosure and user consent, which reviewers may check; see [PLAY_REVIEW_INSTRUCTIONS.md](PLAY_REVIEW_INSTRUCTIONS.md).
 
-The application provides strictly read-only personal finance management capabilities:
-
-- **Manual Transaction Tracking:** Adding and editing personal cash and bank transactions.
-- **On-Device Receipt Scanning:** Photographing paper receipts for on-device OCR total extraction via Google ML Kit.
-- **Bank Notification Parsing:** Optional on-device listener detecting payment alert notifications from user-installed banking apps (OTP Bank, Revolut, Google Wallet, Erste, MBH, Wise) to automate local expense recording.
-- **Multi-Currency Analytics:** Displaying aggregate expense totals converted into the user's preferred display currency using public ECB reference exchange rates.
-- **Budgeting & Recurring Rules:** Setting monthly category budgets and auto-detecting recurring subscription patterns based on local transaction history.
-
----
-
-## 4. Privacy & Regulatory Alignment (GDPR)
-
-Because Finances operates entirely on-device, it inherently complies with major privacy frameworks:
-
-- **Article 17 (Right to Erasure):** A one-click "Delete All Financial Data" button in Settings immediately wipes the SQLite database.
-- **Article 20 (Right to Data Portability):** Users can export all recorded transactions to standard CSV format at any time.
-- **Zero Third-Party Data Transfer:** No user records, financial balances, or transaction histories are transferred to third parties or remote cloud infrastructure.
+Status: **not submitted.** This must be done manually in Play Console.

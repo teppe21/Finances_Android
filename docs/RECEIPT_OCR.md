@@ -1,44 +1,21 @@
-# Receipt Photography & On-Device OCR Pipeline
+# Receipt scanning
 
-## 1. Overview
-The Receipt OCR system allows users to capture cash or card paper receipts using a specialized camera framing UI, extract structured financial records using on-device optical character recognition (Google ML Kit), and review the result before persisting to SQLite.
+## Flow
 
----
+1. Scan receipt opens a full-screen camera view. If the camera permission is missing, the screen explains why it is needed and asks only when you tap "Allow camera". A gallery image can be used instead.
+2. CameraX captures a still image; ML Kit Text Recognition (bundled Latin model, `com.google.mlkit:text-recognition:16.0.1`) reads the text on the device.
+3. `ReceiptParser` looks for:
+   - the total after words such as `FIZETENDO`, `VEGOSSZEG`, `OSSZESEN`, `TOTAL`, `AMOUNT DUE`,
+   - VAT (`AFA`, `VAT`, `TAX`), payment method (`KESZPENZ`/`CASH`, `BANKKARTYA`/`CARD`), date, a known store chain or the first line as merchant, and simple item lines.
+   Amounts go through the same exact parser as CSV import, so `12.50 EUR` stays 12.50.
+4. A review sheet shows merchant, total, currency, date, payment method and account. Nothing is saved until you confirm. If the total was not recognized the field is empty.
+5. On save, a transaction is created and a receipt record with the merchant, date and amounts is stored. The image and the recognized text are not stored.
 
-## 2. On-Device OCR Architecture
-To protect user privacy and allow full offline functionality, OCR runs strictly on-device using Google ML Kit Text Recognition:
+## Errors
 
-```mermaid
-flowchart LR
-    Camera[Camera Viewfinder] --> Preprocessing[Image Normalization<br/>Bounds & Contrast]
-    Preprocessing --> MLKit[Google ML Kit Text Recognition<br/>Latin & Hungarian Accents]
-    MLKit --> SemanticParser[Semantic Receipt Parser<br/>hungarianSemantics.ts]
-    SemanticParser --> ReviewModal[Receipt Review Screen]
-    ReviewModal --> Ingestion[TransactionIngestionService]
-```
+If the camera cannot take a picture, or recognition fails, an error is shown. Earlier versions silently substituted a sample receipt in that case; that behaviour was removed. The sparkle button loads an explicitly labelled sample receipt for demonstrations, and transactions saved from it carry the note "Demo data".
 
----
+## Limitations
 
-## 3. Hungarian & English Semantic Patterns
-
-### Total Detection (Avoiding Subtotals and Change)
-The parser prioritizes semantic keywords over "largest number on receipt" to avoid mistaking amount tendered or change for the total:
-
-- **Total Keywords**: `FIZETENDŐ`, `FIZETENDO`, `FIZETEND0`, `VÉGÖSSZEG`, `ÖSSZESEN`, `TOTAL`, `AMOUNT DUE`
-- **Subtotal**: `RÉSZÖSSZEG`, `NETTO`
-- **Tax / VAT**: `ÁFA`, `AFA`, `ÁFA TARTALOM`, `VAT`
-- **Tendered & Change**: `FIZETETT`, `KÉSZPÉNZ`, `VISSZAJÁRÓ`, `CHANGE`
-
-### Payment Method Detection
-- **Cash (`KÉSZPÉNZ`, `KP`, `CASH`)**: Automatically selects the **Cash** account for the transaction.
-- **Card (`BANKKÁRTYA`, `CARD`, `VISA`, `MASTERCARD`)**: Selects the primary bank account.
-
-### Merchant Detection
-- Known supermarket, fuel, pharmacy, and restaurant chains (e.g. Lidl, Aldi, Spar, Tesco, Auchan, Mol, Shell, Rossmann, DM, Benu, McDonald's).
-- First prominent text line after discarding document headers (`NYUGTA`, `SZÁMLA`, `PÉNZTÁR`).
-
----
-
-## 4. Privacy & Image Storage Controls
-- **On-Device Only**: Receipts are never uploaded to third-party cloud OCR services.
-- **Separate Image Deletion**: The user can toggle **"Delete photo (keep transaction record)"** to delete the image file from storage while maintaining full financial accounting in SQLite.
+- Latin script only; Hungarian accents are handled, but faded thermal paper, glare and long receipts reduce accuracy.
+- The parser is heuristic. Always check the total before saving.

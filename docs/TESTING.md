@@ -1,53 +1,31 @@
-# Testing Strategy & Verification Suite
+# Testing
 
-## 1. Overview & Test Philosophy
+## Unit tests (JVM)
 
-Testing in **Finances** emphasizes absolute reliability in financial math, strict offline privacy boundaries, robust text parsing, and data integrity across database migrations.
+`./gradlew testDebugUnitTest` runs 83 tests in `app/src/test`. They need no device and no Android framework classes (the real `org.json` is a test dependency).
 
-The native Android test suite is located in `android-native/app/src/test/java/com/teppe21/finances/` and executes directly on the JVM without requiring an Android emulator or physical device.
+| Suite | Tests | Covers |
+| --- | --- | --- |
+| `NotificationRecognitionTest` | 15 | Revolut, Google Wallet and OTP payments; balance lines ignored; promotions, referrals, cashback; security and login messages; unknown packages; malformed amounts; ambiguous multi-amount messages; exact package routing |
+| `NotificationPipelineTest` | 17 | Same amount at different shops (two rows); wallet + bank merge; card-suffix merge and enrichment; different card suffix (no merge); weak overlap (review); same amount same day (no merge); re-delivered notification; identical purchases seconds apart (review); ambiguous account (pending, unassigned); explicit mapping; unknown card; raw text never persisted; unsupported packages leave no trace; CSV fingerprints; merchant matcher; sign normalization |
+| `MoneyParsingTest` | 5 | Separator styles, malformed input, `19.99` exactness, large values, money mentions in text, formatting precision |
+| `CurrencyAndStatsTest` | 11 | Same data in HUF, EUR and USD; missing rates excluded and counted; pending excluded; cross rates and rounding; manual overrides; trends and category breakdown use the same conversion; account balances; keyword word-start matching; Frankfurter and open.er-api parsing; transfers and refunds |
+| `CsvAndReceiptTest` | 8 | Hungarian semicolon CSV with quotes; US numbers with debit/credit columns; skipped rows by reason; Windows-1250; BOM and quoted newlines; date parser; Hungarian receipt; decimal receipt totals |
+| `SecurityTest` | 8 | PIN verifier accept/reject, random salt, no plaintext, Keystore-pepper requirement, malformed verifiers, iteration count, legacy hash migration, PIN policy, lockout schedule |
+| `StocksTest` | 19 | Finnhub parsing (quote, search, profile, candles, market status) incl. empty/null/zero/malformed data; HTTP 401/403/429/5xx, timeout, offline; key only in header; freshness labels; refresh policy; add/remove/reorder/duplicates/cap; persistence; missing key; live vs last close; rate-limit stop; stale cache; isolation from finance data |
 
----
+## Instrumented tests
 
-## 2. Test Suite Structure
+`./gradlew connectedDebugAndroidTest` (device or emulator) runs `MigrationTest`:
 
-| Test Class | Focus Area | Key Scenarios Tested |
-|---|---|---|
-| `FinancialMathTest` | Financial Arithmetic & Minor Units | - Exact integer minor-unit math (no floating-point errors)<br/>- Monthly income/expense/net total calculations<br/>- Savings rate percentage calculations<br/>- Handling zero income/expense without divide-by-zero crashes |
-| `CurrencyConversionTest` | Multi-Currency & FX Engine | - Conversion across HUF, EUR, USD, GBP, CHF<br/>- Original amount and currency preservation<br/>- Minor unit conversions with accurate decimal rounding<br/>- Fallback rate recovery when offline |
-| `CategorizationAndDedupTest` | Ingestion Logic & Rules | - Keyword rule matching against normalized merchant names<br/>- Automatic transfer and refund direction detection<br/>- Uncategorized fallback handling |
-| `ParsersTest` | On-Device Ingestion Parsers | - Hungarian supermarket OCR receipt parsing (Lidl, Spar)<br/>- Revolut Hungarian and English purchase notifications<br/>- OTP Bank card purchase alerts and card last-4 extraction<br/>- Erste Bank George transaction notifications<br/>- MBH Bank transaction notifications<br/>- Wise multi-currency notifications (`45.50 EUR`)<br/>- Immediate discard of 2FA and SMS security codes<br/>- Multi-column Hungarian and European CSV bank statements |
-| `DatabaseAndMatchingTest` | Deduplication & Room Database | - Exact SHA-256 fingerprint collision prevention<br/>- 2-day fuzzy duplicate detection window<br/>- Multi-tier account matching confidence (HIGH, MEDIUM, LOW)<br/>- Verification of Room migrations `1 -> 2` and `2 -> 3` |
+- `migrate3To5_keepsUserDataAndScrubsNotificationText`
+- `deletingFinancialDataKeepsWatchlistAndRestoresDefaults`
 
----
+## What has and has not been run
 
-## 3. Running Tests Locally
+During the October 2026 rework the build environment could not reach Google's Maven repository (`dl.google.com`), so the Android Gradle Plugin, AndroidX and the Android SDK were unavailable. What was run instead:
 
-From `android-native/`:
+1. All 83 unit tests, compiled and executed with Kotlin 2.0.21 on JDK 21 in a plain JVM Gradle project that uses the app's own `src/main` and `src/test` files: **83 passed, 0 failed**.
+2. A type check of the entire `src/main` source set (all screens and Android code) with the Kotlin 2.0.21 Compose compiler against JetBrains Compose 1.6.11 desktop libraries, Robolectric's `android-all` (API 34) and small stubs for Room, DataStore, CameraX, ML Kit, biometric, activity and navigation APIs: **compiles without errors**. This catches type and API errors but not Room's annotation processing, lint, resource linking or runtime behaviour.
 
-```bash
-# Run all unit tests for debug and release variants
-./gradlew test
-
-# Run a specific test class
-./gradlew test --tests "com.teppe21.finances.ParsersTest"
-
-# Run tests and open HTML report
-./gradlew test
-# Report located at: app/build/reports/tests/testDebugUnitTest/index.html
-```
-
----
-
-## 4. Continuous Integration (CI/CD)
-
-Automated testing is configured in `.github/workflows/android.yml`:
-- **Triggers**: Every pull request and push to the `main` branch.
-- **Environment**: Ubuntu Latest with Eclipse Temurin JDK 17.
-- **Pipeline Stages**:
-  1. Checkout repository
-  2. Setup JDK 17 with Gradle dependency caching
-  3. Execute `./gradlew testDebugUnitTest --stacktrace`
-  4. Run code quality validation `./gradlew lintDebug --stacktrace`
-  5. Compile `./gradlew assembleDebug`
-  6. Upload test reports and debug APK artifacts
-  7. Dedicated release workflow (`release.yml`) handles signed `bundleRelease` upon release dispatch.
+Not yet run: `./gradlew testDebugUnitTest`, `lint`, `assembleDebug`, release builds, the instrumented tests, and anything on a device. Run them before relying on this version, and work through [REAL_DEVICE_TEST_PLAN.md](REAL_DEVICE_TEST_PLAN.md).

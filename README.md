@@ -1,341 +1,152 @@
 # Finances
 
-A native Android personal finance app built with Kotlin and Jetpack Compose.
+Finances is a personal finance app for Android, written in Kotlin with Jetpack Compose. It keeps your transactions on the phone and tries to take some of the typing out of bookkeeping: it can pick up card payments from the notifications of a few banking apps, read the total from a paper receipt, and import bank statements in CSV format. It also has a small stock watchlist that shows market quotes from a provider you connect yourself.
 
-Finances is a personal project focused on making everyday expense tracking less manual. Instead of requiring every transaction to be entered by hand, the app can use Android notification access, receipt scanning, CSV imports, and automated categorization to reduce the friction of personal bookkeeping.
-
-The project is built on a local-first architecture. Transaction records, account balances, categorization rules, and scanned receipts remain stored on the physical device rather than being sent to a remote personal finance service.
-
----
+This repository contains only the Android app. It used to live in the `android-native/` folder of the [teppe21/finances](https://github.com/teppe21/finances) repository next to an older web dashboard; it was moved here so it can be built and released on its own.
 
 ## Overview
 
-Most mobile expense trackers fall into two categories: simple spreadsheet-like tools that require typing in every coffee and grocery receipt, or cloud aggregators that require sharing bank login credentials with third-party servers.
+All financial records live in a Room database in the app's private storage. There is no account system and no backend. The app talks to the network for two things only: exchange rates (currency codes only) and, if you add an API key, stock quotes. Android backup and device transfer are switched off for the app's data, so uninstalling it deletes everything.
 
-Finances looks for a practical middle ground on Android. By taking advantage of platform APIs such as `NotificationListenerService` and on-device text recognition, the app can capture expenses as they occur:
+Transactions reach the database through one ingestion pipeline whatever their source (manual entry, notification, receipt, CSV). The pipeline normalizes the sign of the amount, cleans the merchant name, checks for duplicates, applies category rules and writes the row without ever replacing an existing one.
 
-- Transactions can be created from supported bank and payment push notifications.
-- Physical paper receipts can be scanned with the camera using on-device optical character recognition (OCR).
-- Historical bank statements can be imported using standard CSV files.
-- Manual entry is available as a straightforward fallback.
+## Features
 
-All inputs feed into a single transaction pipeline that cleans merchant names, checks for duplicates, applies category rules, and writes to an on-device Room SQLite database.
+### Transaction tracking
 
----
-
-## Main Features
+Manual entry with decimal amounts in HUF, EUR, USD, GBP or CHF, accounts with their own currency and opening balance, and account balances computed from the opening balance plus every confirmed transaction. Transactions can be searched, filtered by period, category and recurrence, sorted, and deleted.
 
 ### Automatic transaction recognition
 
-When enabled, the app listens for push notifications from supported banking and wallet applications:
-- Revolut
-- Google Wallet / Google Pay
-- OTP Bank (SmartBank, MobilBank, Simple)
-- Erste Bank (George)
-- MBH Bank
-- Wise
+With Android notification access (granted only after an in-app disclosure and an explicit "Continue"), the app reads notifications from a fixed list of apps, matched by exact package name:
 
-Rather than treating any notification that happens to contain numbers as a financial transaction, the parser validates notifications against transaction-specific semantics (such as card payments, purchases, transfers, and ATM withdrawals).
+| App | Package | Status |
+| --- | --- | --- |
+| Revolut | `com.revolut.revolut` | Patterns tested with real notification text |
+| Google Wallet | `com.google.android.apps.walletnfcrel` | Patterns tested with real notification text |
+| OTP Bank | `hu.otpbank.smartbank`, `hu.otpbank.mobilbank` | Recognized transactions go to the review queue |
+| Wise | `com.transferwise.android` | Recognized transactions go to the review queue |
+| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank` | Recognized transactions go to the review queue |
+| MBH Bank | `hu.mbhbank.app`, `hu.takarek.mobilbank` | Recognized transactions go to the review queue |
 
-Promotional alerts (such as referral rewards or marketing campaigns) and security messages (such as two-factor authentication codes and one-time passwords) are detected and discarded. When a physical purchase triggers alerts from both a digital wallet (like Google Wallet) and the underlying card issuer (like Revolut), the engine correlates the two events within a short time window to avoid recording the expense twice.
+Notifications from every other app are dropped before their text is read. For supported apps, security messages (login codes, approval requests) and promotions (referral offers, cashback, rewards) are rejected, and a transaction is only created when the text contains source-specific payment wording plus a readable amount. Balance lines are never used as the amount. Raw notification text is not stored; only the recognized transaction and a sanitized status code (for example `REJECTED_PROMOTIONAL`) are kept, the status records for 30 days.
 
-### Receipt scanning
+When the target account is unclear (no account for that bank, or several), when a parse comes from a source without verified samples, or when the transaction may duplicate another notification, it is saved as pending and appears in a review queue. Pending transactions are not counted in balances or statistics until you confirm them.
 
-For cash purchases or paper receipts, the app includes a camera-based scanner built with CameraX and Google ML Kit's on-device text recognition.
-
-The OCR engine processes frames locally to identify merchant names, dates, amounts, and VAT details. It is tuned for common European and Hungarian receipt layouts, helping convert printed slips into transactions without manual typing. Like any vision-based OCR system, recognition quality depends on lighting and print clarity, but it serves as a practical shortcut for logging physical expenses.
-
-### Automatic categorization
-
-The categorization engine applies a combination of built-in keyword patterns and custom user rules.
-
-Incoming transactions are evaluated against merchant names and descriptions:
-- Common merchants and services are automatically mapped to default categories (groceries, dining, transport, utilities, subscriptions).
-- Internal transfers and peer-to-peer payments (such as Revolut, Wise, or Hungarian bank transfers) are flagged as transfers rather than regular expenses.
-- Custom rules created in the app take priority over built-in heuristics, allowing users to override default behavior for specific stores or recurring payments.
-
-### Multi-currency support
-
-Financial values are stored in the database as 64-bit integers representing minor units (cents or fillér) alongside their original currency code. Storing whole integers avoids the rounding drift common with floating-point calculations.
-
-Users can choose a preferred display currency (such as HUF, EUR, USD, GBP, or CHF). When viewing balances and analytics, amounts in other currencies are converted using cached exchange rates rather than simply replacing currency symbols.
-
-Exchange rates are cached locally in Room. By default, the app can refresh European Central Bank reference rates over an anonymous public API, or it can be switched to an entirely offline mode where only cached or manually entered rates are used.
-
-### Analytics
-
-The analytics section provides visual summaries of spending patterns over customizable time periods (current month, previous month, or custom ranges).
-
-It includes a breakdown of expenses by category, monthly cash flow trends, and a merchant leaderboard showing where the largest portions of the budget are spent.
-
-### CSV import
-
-The app includes a dedicated CSV parser for importing past account statements from supported banks (such as OTP Bank, Revolut, Erste, MBH, and Wise).
-
-The parser detects common European CSV variants, handles character encodings (including UTF-8 with BOM and ISO-8859-2), normalizes European number formats with comma decimals, and passes rows through the duplicate detection pipeline to avoid re-importing existing entries.
+Package names for the Hungarian banks and Wise come from the earlier version of the project and have not been checked against the Play Store listings; verify them on a device before relying on them.
 
 ### Duplicate detection
 
-Duplicate prevention runs at the ingestion boundary:
-- Deterministic fingerprinting: Generates a hash based on transaction date, amount, currency, and cleaned merchant information.
-- Short-window cross-source matching: Detects identical purchases reported simultaneously by payment wallets and card issuers within a 120-second window.
-- Sliding date window: Checks for possible duplicates within a two-day window to catch delayed postings, while preserving distinct transactions that share identical amounts at different merchants.
+A wallet tap often produces two notifications for one purchase: one from Google Wallet and one from the card's bank. The detector merges them only between compatible apps (a wallet and the bank that issued the card), within three minutes, and only with a matching merchant or card suffix and no conflicting signal. Two payments of the same amount at different shops, or with different card suffixes, stay separate. Weak overlaps are flagged for review instead of being merged. The same notification delivered twice is recognized by a hashed fingerprint. Equal amount and date alone never merge anything.
 
-### Demo data
+### Receipt scanning
 
-Clean installations initialize with zero balances across default accounts. For evaluation and demonstration purposes, a dedicated toggle in Settings can populate representative sample accounts, transactions, and categories, or wipe them back to zero.
+The camera is requested only when you open the scanner, after a short explanation. Text recognition runs on the device with Google ML Kit (Latin script). The parser looks for the total, VAT, payment method and date in common Hungarian and English receipt wording. You confirm or correct every value before saving; if the total cannot be read the field stays empty. The photo and the recognized text are not stored.
 
----
+### Automatic categorization
+
+Built-in keyword rules (for example `spar`, `wolt`, `netflix`) and your own rules map merchants to categories. Keywords match at word starts, so a rule for `ber` does not catch `Uber`. Your rules take precedence over the built-in ones.
+
+### Multi-currency support
+
+Amounts are stored as 64-bit integers with two implied decimals in their original currency. For the display currency the app converts with the latest European Central Bank reference rates (via the Frankfurter API, with open.er-api.com as fallback) or with manual rates you enter. If a rate is missing, the transaction is left out of totals and the screen says so; the number is never shown with the wrong currency symbol. Conversions use the latest rate, not the historical rate of each transaction date.
+
+### Analytics
+
+Month-by-month view with previous, next and current-month navigation, plus 3-month, 6-month, yearly and custom ranges. Income, expenses, net, average and largest expense, category breakdown, top merchants and a six-month trend, all in the display currency.
+
+### CSV import
+
+Semicolon, comma or tab separated files, quoted fields (including line breaks), UTF-8 or Windows-1250 encoding, Hungarian (`2026.03.28.`, `1 249,50`) and international (`2026-03-28`, `1,234.56`) formats, a single amount column or separate debit and credit columns. Rows with an unreadable date or amount, or an unsupported currency, are skipped and counted rather than guessed. Re-importing the same file into the same account does not create duplicates; two identical rows inside one file are both kept.
+
+### Budgets and recurring payments
+
+Monthly budgets per category in a currency of your choice, compared with this month's confirmed expenses. Recurring payments are detected from repeated payments to the same merchant about a month apart.
+
+### Stock watchlist
+
+A read-only watchlist of up to 25 symbols using [Finnhub](https://finnhub.io) market data with your own API key. Search by symbol or company name, a quote per row with daily change and percentage, a detail screen with open, high, low, previous close and a price chart for 1D, 1W, 1M, 3M and 1Y when your Finnhub plan includes historical data.
+
+Every quote is labelled from the provider's own timestamp: "Real-time" only when the price is at most two minutes old during an open US session, otherwise "Delayed", "Last close" or "Stale". Quotes refresh about once a minute only while the Stocks screen is visible and the US market is open, with back-off on errors and a pause when Finnhub reports its rate limit. If your plan does not include history for a symbol, the chart explains that instead of drawing anything. Watched stocks never touch accounts, transactions or balances, and the feature is market information only, not investment advice. See [docs/STOCKS.md](docs/STOCKS.md).
 
 ## Privacy
 
-Privacy is a core architectural priority of the project.
-
-- Local-first persistence: Accounts, transactions, notes, and receipts are stored in an on-device SQLite database. The project does not use a cloud database or personal finance server.
-- Sanitized notification metadata: Raw notification titles, notification text, and subtext are not stored in the database. The system records only structured metadata (timestamp, package name, amount, currency, merchant, and diagnostic reason codes) needed for ledger management.
-- Local OCR: Camera frames and receipt images are processed directly on the phone using ML Kit's on-device models. Photos and text snippets are not uploaded to cloud vision APIs.
-- Anonymous exchange rates: Network requests for exchange rates are simple HTTP GET queries for public currency pairs. They contain no user identifiers, transaction data, account names, or device tokens.
-- Offline mode: If the user disables exchange rate updates in Settings, the application makes no network calls of any kind.
-- No analytics SDKs: The application contains no advertising libraries, no tracking identifiers, and no behavioral analytics tools.
-- Data deletion: A one-click data wipe option in Settings allows users to permanently delete all financial records and reset the database to an empty state.
-
-For complete details on permissions and data handling, see [docs/privacy-policy.html](docs/privacy-policy.html) and [docs/PRIVACY.md](docs/PRIVACY.md).
-
----
+Personal financial data stays on the device. The network requests the app makes are listed in [docs/PRIVACY.md](docs/PRIVACY.md); the public policy text is in [docs/privacy-policy.html](docs/privacy-policy.html) and also inside the app (Settings > Privacy policy).
 
 ## Security
 
-Security measures in the project focus on local access control and safe data handling:
+- Optional app lock with a 4 to 8 digit PIN, stored as a PBKDF2-HMAC-SHA256 verifier (120,000 iterations, random salt) that is additionally passed through an HMAC with a non-exportable Android Keystore key. No default PIN exists.
+- Increasing lockouts after five wrong PINs, persisted across restarts.
+- Optional biometric unlock through AndroidX `BiometricPrompt`, with the PIN as fallback.
+- The app locks as soon as you leave it; pickers and settings screens the app opens itself do not lock it for up to five minutes. Screenshots and the Recents preview are blocked while the lock is on.
+- The Finnhub API key is encrypted with an Android Keystore AES key.
 
-- App lock: An optional security gate can be configured to protect the application on launch and when returning from the background.
-- Biometric authentication: Supports fingerprint and face unlock through AndroidX `BiometricPrompt`, relying on the device's hardware-backed keystore.
-- Salted PIN verification: When a 4-digit PIN is configured, it is stored as a SHA-256 hash combined with a randomly generated 16-character salt. Plaintext PINs are never stored.
-- Process isolation: Application data resides in Android's private internal storage (`/data/user/0/com.teppe21.finances`), isolated by Android OS Linux UID permissions and standard device file-based encryption (FBE).
-- Release signing enforcement: The Gradle release configuration requires explicit signing credentials and deliberately refuses to fall back to debug keys for release builds.
-
-Technical details and threat model considerations are documented in [docs/SECURITY.md](docs/SECURITY.md).
-
----
+Whether Keystore keys are hardware-backed depends on the phone; the app does not check or claim it. Details are in [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Technology
 
-The application is written in Kotlin for the Android platform:
-
-- Language: Kotlin 1.9.22
-- UI Toolkit: Jetpack Compose with Material 3
-- Architecture: MVVM with StateFlow and Kotlin Coroutines
-- Local Database: Room 2.6.1 (SQLite) with tracked schema exports (Version 4)
-- Camera & Vision: CameraX 1.3.2 with Google ML Kit On-Device Text Recognition
-- Preferences: Jetpack DataStore (Preferences)
-- System Integration: Android `NotificationListenerService` and `BiometricPrompt`
-- Build System: Gradle 8.9 with Android Gradle Plugin 8.7.2
-- Target Platform: Minimum SDK 26 (Android 8.0), Target SDK 36 (Android 16), Compile SDK 36
-
----
+| | |
+| --- | --- |
+| Language | Kotlin 2.0.21 |
+| UI | Jetpack Compose (BOM 2024.02.01), Material 3 |
+| Storage | Room 2.6.1 (schema version 5), DataStore Preferences |
+| Camera and OCR | CameraX 1.4.2, ML Kit Text Recognition 16.0.1 |
+| Build | Android Gradle Plugin 8.13.2, Gradle 8.14.3, KSP 2.0.21-1.0.28, JDK 17 |
+| SDK levels | minSdk 26, compileSdk 36, targetSdk 36 |
 
 ## Architecture
 
-The codebase is organized into layered packages within `android-native/`:
-
-- `core/`: Application theme, formatters (currency, dates), and text normalization utilities.
-- `data/`: Room SQLite database entities, DAOs, repositories, and preferences DataStore.
-- `domain/`: Business models and use cases (transaction ingestion, deduplication, categorization, recurring pattern detection, financial statistics).
-- `feature/`: Jetpack Compose screens and ViewModels (dashboard, transactions, accounts, analytics, categories, receipt scanner, notifications, settings).
-- `native/`: Android platform services, including the notification listener, bank parser implementations, and receipt OCR analyzers.
-
-Data flows through unidirectional streams: UI components collect state from ViewModels using `StateFlow`, while repository updates emit reactive updates from Room queries.
-
----
-
-## Notification Reliability
-
-Handling real-world Android notifications reliably requires balancing capture accuracy with noise filtering.
-
-During development, real device testing revealed edge cases where standard pattern matching fails:
-- Bank notifications that combine transaction amounts and account balances in the same message (e.g. `You spent HUF804` followed by `HUF balance: HUF42,285.97`). The parser isolates the transaction line so the account balance is not ingested as an expense.
-- Marketing alerts that mention monetary values (e.g. referral campaigns offering cash rewards). The parser uses negative pattern matching and requires positive transaction semantics before accepting a candidate.
-- Payment apps and banking apps alerting on the same purchase. When a card is charged via Google Wallet, both Google Wallet and the card issuer often fire alerts within seconds. Cross-source temporal deduplication identifies these pairs and prevents recording double expenses.
-- Security and authentication messages. Login codes, OTPs, and confirmation requests are filtered out before reaching the parser.
-
----
+Single-module app with a light layering: Compose screens and ViewModels in `feature/` and `stocks/ui/`, plain-Kotlin domain logic in `domain/`, `core/`, `native/` parsers and `stocks/domain/`, and Room/DataStore/network code in `data/` and `stocks/data/`. Dependencies are wired by hand in `FinancesApp`. The notification pipeline, deduplication, money parsing, currency conversion, PIN hashing and market-data parsing have no Android dependencies, which is what makes them unit-testable. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
 
 ## Testing
 
-The project contains 39 automated unit and regression tests covering core business logic and data integrity:
-
-- Parser validation: Verifies parsing of genuine transactions, rejection of promotional messages, and suppression of security codes across supported bank formats.
-- Deduplication logic: Tests exact fingerprint matches, fuzzy date window matching, and cross-source payment deduplication.
-- Database migrations: Validates sequential schema migrations (`MIGRATION_1_2`, `MIGRATION_2_3`, and `MIGRATION_3_4`) and schema exports.
-- Mathematical accuracy: Tests integer minor-unit conversions, balance calculations, and multi-currency exchange rate conversions.
-- Security verification: Tests salted PIN hashing, salt uniqueness, and verification checks.
-
-Automated tests can be executed with Gradle:
-
-```bash
-cd android-native
-./gradlew testDebugUnitTest
-```
-
-While unit tests verify parser regexes and algorithmic logic, they cannot fully simulate OEM background limits, battery management, or notification listener lifecycle quirks. For that reason, automated testing is complemented by hands-on physical device testing.
-
----
-
-## Google Play Preparation
-
-The application is being prepared for a future Google Play release. Hardening steps completed so far include:
-
-- Clean package namespace: `com.teppe21.finances`.
-- Modern platform targeting: Target SDK 36 (Android 16) and Compile SDK 36.
-- Strict release signing: Build tasks fail with clear error messages if signing keystores are missing, preventing unverified release artifacts.
-- ProGuard / R8 rules: Code shrinking, resource shrinking, and obfuscation configured for release builds.
-- Android Auto Backup: XML configuration rules to include database and settings while excluding temporary cache and camera images.
-- Store documentation: Prepared Data Safety responses, sensitive permission justifications (`BIND_NOTIFICATION_LISTENER_SERVICE`, `CAMERA`), and financial services declarations.
-
-See [docs/PLAY_CONSOLE_COMPLIANCE.md](docs/PLAY_CONSOLE_COMPLIANCE.md) and [docs/PLAY_FINANCIAL_FEATURES_DECLARATION.md](docs/PLAY_FINANCIAL_FEATURES_DECLARATION.md) for details.
-
----
-
-## Project Structure
-
-```text
-finances/
-├── finances-native.apk              # Installable debug APK for local hardware testing
-├── NATIVE_APP_GUIDE.md              # Sideloading and device installation guide
-├── android-native/                  # Primary native Android application
-│   ├── app/
-│   │   ├── src/main/java/com/teppe21/finances/
-│   │   │   ├── core/                # Theme, formatters, text normalization
-│   │   │   ├── data/                # Room entities, DAOs, repositories, DataStore
-│   │   │   ├── domain/              # Use cases (ingest, dedup, recurring, stats)
-│   │   │   ├── feature/             # Jetpack Compose screens and ViewModels
-│   │   │   ├── native/              # NotificationListenerService, bank parsers, OCR
-│   │   │   ├── FinancesApp.kt       # Application class
-│   │   │   └── MainActivity.kt      # FragmentActivity with LockGateScreen and navigation
-│   │   ├── src/test/java/           # Unit and regression test suite (39 tests)
-│   │   ├── schemas/                 # Exported Room database schemas (v1, v2, v3, v4)
-│   │   └── build.gradle.kts         # Target SDK 36, signing configuration, dependencies
-│   ├── gradlew                      # Gradle wrapper script
-│   └── settings.gradle.kts
-│
-├── docs/                            # Architecture, security, and compliance documentation
-│   ├── privacy-policy.html          # Public standalone HTML privacy policy
-│   ├── REAL_DEVICE_TEST_PLAN.md     # Real-device testing protocol
-│   ├── PLAY_CONSOLE_COMPLIANCE.md   # Google Play permissions and Data Safety answers
-│   ├── PLAY_FINANCIAL_FEATURES_DECLARATION.md # Financial category declaration
-│   ├── ARCHITECTURE.md              # System architecture and pipeline breakdown
-│   ├── SECURITY.md                  # Storage sandbox and threat model
-│   ├── BANK_INTEGRATION.md          # Bank packages, regex patterns, and OEM notes
-│   ├── DATA_MODEL.md                # Room schema, converters, and entity relationships
-│   ├── RELEASE.md                   # Keystore configuration and release procedures
-│   ├── TESTING.md                   # Testing approach and test structure
-│   └── PRIVACY.md                   # Data protection and air-gap principles
-│
-├── src/                             # Original React prototype (preserved for reference)
-├── .gitignore
-└── README.md
-```
-
----
+83 JVM unit tests in `app/src/test` cover notification recognition and rejection, the full notification pipeline including deduplication and account matching, exact money parsing, currency conversion and statistics, CSV and receipt parsing, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Two instrumented tests in `app/src/androidTest` cover the Room migration from schema 3 to 5 and the "delete financial data" behaviour. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has not been run yet.
 
 ## Development
 
-### Prerequisites
+Requirements: JDK 17 and an Android SDK with platform 36.
 
-- Java Development Kit: JDK 17
-- Android SDK: Platform API 36 with Build Tools 36.0.0
-- Gradle: 8.9 (handled by included wrapper)
-
-### Build Commands
-
-From the `android-native/` directory:
-
-Run unit tests:
 ```bash
-./gradlew testDebugUnitTest
+./gradlew testDebugUnitTest      # JVM unit tests
+./gradlew lint                   # Android lint
+./gradlew assembleDebug          # debug APK in app/build/outputs/apk/debug/
+./gradlew connectedDebugAndroidTest   # instrumented tests, needs a device or emulator
 ```
 
-Build debug APK:
-```bash
-./gradlew assembleDebug
-# Output: app/build/outputs/apk/debug/app-debug.apk
-```
+Release builds need an upload keystore; without one the release tasks stop with an explanation instead of producing a debug-signed file. See [docs/RELEASE.md](docs/RELEASE.md).
 
-Build release APK and Android App Bundle (requires signing environment variables or `local.properties`):
-```bash
-./gradlew assembleRelease bundleRelease
-# Outputs:
-# app/build/outputs/apk/release/app-release.apk
-# app/build/outputs/bundle/release/app-release.aab
-```
+## Google Play preparation
 
-Detailed signing setup instructions can be found in [docs/RELEASE.md](docs/RELEASE.md).
+The repository contains the pieces that can be prepared in code: target SDK 36, release signing without a debug fallback, R8 shrinking, no unused dangerous permissions, the notification disclosure, a privacy policy, 16 KB page-size work and reviewer instructions with synthetic data. Several steps can only be done in Play Console or with real credentials; they are listed in [docs/PLAY_CONSOLE_FINAL_CHECKLIST.md](docs/PLAY_CONSOLE_FINAL_CHECKLIST.md).
 
----
+## Current status
 
-## Current Status
+The code in this repository has been type-checked and unit-tested on the JVM, but at the time of writing it has not been built with the Android Gradle Plugin, linted, or run on a device, because the environment used for this round of work could not reach Google's Maven repository. Treat it as unreleased until `./gradlew testDebugUnitTest lint assembleDebug` and the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) have been run. The supported-app list is short and recognition will miss notification formats it has not seen.
 
-The core features of the native Android application are fully functional: transaction tracking, bank notification listening, receipt scanning, CSV imports, multi-currency conversion, and app locking are all working in code.
+## Project background
 
-The project is currently in an extended testing phase. Rather than publishing immediately, the application is being used on a daily basis on a physical Android device to verify reliability in real-world conditions.
-
----
-
-## Real Device Testing
-
-Real-device testing is planned for approximately one month before submitting the application to Google Play.
-
-This phase focuses on scenarios that cannot be adequately evaluated in emulators or unit tests:
-- Behavior across varied retail environments (grocery stores, restaurants, transit, online purchases).
-- Consistency of notification interception when the phone is locked, in battery-saver mode, or after device restarts.
-- Stability of cross-source deduplication when paying with Google Wallet.
-- Receipt OCR readability on crumpled, faded, or poorly lit physical receipts.
-- Lock gate behavior across long backgrounding intervals.
-- Battery impact of background notification listening over multiple weeks.
-
-The testing protocol and progress checklist are tracked in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md).
-
----
-
-## Project Background
-
-The project began as an experiment in building a personal finance dashboard with web technologies. The repository's root and `src/` directories still contain an earlier React and Tailwind prototype that was used to model data schemas, CSV parsing logic, and categorization rules.
-
-However, tracking personal expenses on a desktop computer has obvious limitations: receipts pile up, cash transactions are forgotten, and manual entry becomes a chore. Attempting to bring the web app to mobile using hybrid wrappers highlighted typical cross-platform trade-offs: high memory usage, sluggish UI rendering, and poor integration with Android system services.
-
-To solve the mobile logging problem properly, the project was rewritten as a native Android application using Kotlin and Jetpack Compose. This made it possible to integrate directly with CameraX, Google ML Kit, Android's `NotificationListenerService`, and biometric hardware.
-
----
-
-## What I Wanted to Build
-
-When starting this project, I had a clear set of goals:
-
-1. Reduce manual entry: Most people abandon expense trackers because typing in every transaction is tedious. I wanted an app that could capture purchases automatically from notifications and paper receipts.
-2. Keep data private: Financial data is personal. I wanted a system that works locally without requiring account creation, cloud logins, or third-party bank aggregators.
-3. Accurate multi-currency handling: Living and traveling in Europe often involves multiple currencies (HUF, EUR, USD, etc.). I wanted proper exchange-rate conversions rather than simply changing currency symbols on screen.
-4. Clean native engineering: I wanted to build a modern Android application using current recommended architecture, idiomatic Kotlin, Jetpack Compose, Room SQLite, and proper testing practices.
-
----
+The project started as a React web dashboard for personal finances and grew a native Android client, which became the main app. The web dashboard stays in the original repository; this repository continues the Android app only.
 
 ## Documentation
 
-Comprehensive technical documentation is maintained in the `docs/` directory:
-
-- [Privacy Policy (HTML)](docs/privacy-policy.html): Standalone HTML document for users and store compliance.
-- [30-Day Real Device Test Plan](docs/REAL_DEVICE_TEST_PLAN.md): Protocol for physical hardware testing.
-- [Google Play Console Compliance](docs/PLAY_CONSOLE_COMPLIANCE.md): Data Safety form answers and permission declarations.
-- [Financial Features Declaration](docs/PLAY_FINANCIAL_FEATURES_DECLARATION.md): Regulatory positioning and feature scope.
-- [Architecture](docs/ARCHITECTURE.md): Pipeline design, ingestion flow, and component breakdown.
-- [Security](docs/SECURITY.md): Storage sandbox, threat model, and cryptographic practices.
-- [Bank Integration](docs/BANK_INTEGRATION.md): Supported bank packages, parsing patterns, and OEM notes.
-- [Data Model](docs/DATA_MODEL.md): Room schema, converters, and entity relationships.
-- [Release Guide](docs/RELEASE.md): Keystore generation, signing verification, and build commands.
-- [Testing](docs/TESTING.md): Unit testing philosophy and test suite organization.
-- [Privacy](docs/PRIVACY.md): Air-gap principles, backup rules, and data handling details.
-- [Device Sideloading Guide](NATIVE_APP_GUIDE.md): Practical steps for installing and running the APK on your phone.
-
----
+- [Architecture](docs/ARCHITECTURE.md)
+- [Data model and migrations](docs/DATA_MODEL.md)
+- [Bank notification integration](docs/BANK_INTEGRATION.md)
+- [CSV import formats](docs/IMPORT_FORMATS.md)
+- [Receipt OCR](docs/RECEIPT_OCR.md)
+- [Stock watchlist and market data](docs/STOCKS.md)
+- [Privacy](docs/PRIVACY.md) and the [privacy policy](docs/privacy-policy.html)
+- [Security](docs/SECURITY.md)
+- [Testing](docs/TESTING.md)
+- [Real-device test plan](docs/REAL_DEVICE_TEST_PLAN.md)
+- [Release process](docs/RELEASE.md)
+- [16 KB page-size compatibility](docs/16KB_COMPATIBILITY.md)
+- [Play Console compliance notes](docs/PLAY_CONSOLE_COMPLIANCE.md)
+- [Financial features declaration](docs/PLAY_FINANCIAL_FEATURES_DECLARATION.md)
+- [Play Console final checklist](docs/PLAY_CONSOLE_FINAL_CHECKLIST.md)
+- [Play review instructions](docs/PLAY_REVIEW_INSTRUCTIONS.md)
+- [Play Store listing draft](docs/PLAY_STORE_LISTING.md)
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE) — feel free to inspect the code, adapt it, or build upon it.
+No license file has been chosen for this repository yet, so all rights are reserved by the author. Add a `LICENSE` file if you want to allow reuse.

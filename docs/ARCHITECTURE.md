@@ -1,126 +1,76 @@
-# Native Android Architecture & System Design
+# Architecture
 
-## 1. Executive Summary & Design Vision
+Finances is a single Gradle module (`:app`). The code is split by responsibility rather than by Gradle module, and the parts that hold the important logic avoid Android APIs so they can be tested on the JVM.
 
-**Finances** (`com.teppe21.finances`) is a production-grade, 100% native Android personal finance application built with modern Kotlin, Jetpack Compose, Material 3, and Room SQLite. It targets **Android 16 (API level 36)** with a `compileSdk` of 36 and `minSdk` of 26 (Android 8.0 Oreo).
+## Packages
 
-The application eliminates the friction of manual expense bookkeeping through two real-time on-device automation channels:
-1. **Real-Time Bank Transaction Ingestion**: A background `NotificationListenerService` (`BankNotificationListenerService`) captures transaction notifications from major European and Hungarian banking apps (Revolut, OTP Bank, Erste George, MBH Bank, Wise, and generic banking templates) directly into the database.
-2. **On-Device Receipt Scanning**: CameraX hardware integration combined with Google ML Kit On-Device Text Recognition extracts merchant names, total amounts, dates, VAT breakdown, and payment methods without transmitting receipt photos to any external cloud API.
+| Package | Contents | Android dependencies |
+| --- | --- | --- |
+| `core.money` | Exact amount parsing (`AmountParser`) and minor-unit helpers | none |
+| `core.utils` | Currency formatting, cross-rate conversion, text normalization | none |
+| `core.net` | Minimal HTTP client interface and `HttpURLConnection` implementation | none |
+| `core.ui` | Shared Compose components (transaction row, banners, cards) | Compose |
+| `domain.model` | Transactions, accounts, categories, notification status codes | none |
+| `domain.usecase` | Ingestion, duplicate detection, account matching, notification processing, statistics, categorization, recurring detection | none |
+| `domain.fx` | `RateTable`: exchange rates with their date, source and origin | none |
+| `native.notification.parsing` | Supported sources, security/promotional filters, source parsers, `NotificationRecognizer` | none |
+| `native.notification` | `NotificationListenerService` and settings intents | Android |
+| `native.csv`, `native.receipt` | CSV and receipt text parsers (ML Kit wrapper is separate) | none / ML Kit |
+| `security` | PIN verifier and policy (pure), Keystore helpers and lock controller (Android) | partly |
+| `stocks.domain` | Market data provider interface, freshness rules, watchlist repository | none |
+| `stocks.data` | Finnhub provider, Room-backed watchlist and quote cache | partly |
+| `data` | Room database, DAOs, DataStore preferences, repositories, exchange-rate providers | Android |
+| `feature.*`, `stocks.ui` | Compose screens and ViewModels | Android |
 
-Both automation feeds—together with CSV statement imports and manual entry—converge into a deterministic, unified ingestion pipeline that guarantees deduplication, automatic categorization, and transfer detection.
+Dependencies are created once in `FinancesApp` (a manual container). ViewModels read them from `FinancesApp.instance`.
 
----
+## Transaction ingestion
 
-## 2. Layered Architecture (Clean Architecture + MVVM)
-
-The project adheres strictly to Clean Architecture principles with unidirectional data flow (UDF) powered by Kotlin Coroutines and Kotlin Flow:
-
-```mermaid
-flowchart TD
-    subgraph UI["Presentation Layer (Jetpack Compose + Material 3)"]
-        Screens[Screens: Dashboard, Transactions, Accounts, Analytics, Notifications, Receipt, CSV, Settings]
-        VMs[ViewModels: StateFlow, UDF, Lifecycle-aware coroutineScope]
-        Screens <--> VMs
-    end
-
-    subgraph Domain["Domain Layer (Pure Business Logic & Use Cases)"]
-        IngestUC[IngestTransactionUseCase]
-        DedupUC[DeduplicateTransactionUseCase]
-        CatUC[CategorizeTransactionUseCase]
-        StatsUC[CalculateFinancialStatsUseCase]
-        RecurUC[DetectRecurringTransactionsUseCase]
-    end
-
-    subgraph Data["Data Layer (Repositories, Room SQLite, DataStore)"]
-        TxRepo[TransactionRepository]
-        AccRepo[AccountRepository]
-        CatRepo[CategoryRepository]
-        NotifRepo[NotificationRepository]
-        FxRepo[ExchangeRateRepository]
-        RoomDB[(Room SQLite: AppDatabase v3<br/>transactions, accounts, categories,<br/>exchange_rates, rules, events)]
-        DataStore[(Jetpack DataStore Preferences)]
-    end
-
-    subgraph Hardware["Platform & Hardware Integrations"]
-        NLS[BankNotificationListenerService]
-        CamX[CameraX + Google ML Kit OCR]
-        CSVParser[CSV Parser / Stream Parser]
-        Biometrics[AndroidX BiometricPrompt]
-    end
-
-    VMs --> IngestUC
-    VMs --> StatsUC
-    VMs --> RecurUC
-    NLS --> IngestUC
-    CamX --> IngestUC
-    CSVParser --> IngestUC
-
-    IngestUC --> DedupUC
-    IngestUC --> CatUC
-    IngestUC --> TxRepo
-    IngestUC --> CatRepo
-
-    TxRepo --> RoomDB
-    AccRepo --> RoomDB
-    CatRepo --> RoomDB
-    NotifRepo --> RoomDB
-    FxRepo --> RoomDB
-    FxRepo --> DataStore
+```
+Manual entry ─┐
+CSV import ───┤
+Receipt scan ─┼─> IngestTransactionUseCase ─> DuplicateDetector ─> categorize ─> TransactionStore.insertIfAbsent
+Notification ─┘        (sign + merchant normalization, fingerprints)
 ```
 
----
+`TransactionStore.insertIfAbsent` maps to a Room `@Insert(onConflict = IGNORE)`. Rows are never replaced, so a fingerprint collision can no longer delete an existing transaction (the old code used `REPLACE` with a unique fingerprint index).
 
-## 3. The Unified Ingestion Pipeline
+Fingerprints are source-specific: a random value for manual entries, the receipt id for receipts, a hash of account, date, amount, currency, description and occurrence index for CSV rows, and a hash of package, notification key, post time, amount, currency and direction for notifications.
 
-Every transaction entered into the system—regardless of whether it originated from a push notification, physical receipt, CSV statement, or manual entry—passes through `IngestTransactionUseCase`.
+## Notification pipeline
 
-### Step 1: Text Normalization & Merchant Cleaning
-Raw input strings (such as `LIDL BP DEAK TER 12`, `Fizetés a következőnek: SPAR`, or `POS PURCHASE 03/28 MCDONALDS`) are cleaned using `TextNormalizer`:
-- Common banking prefixes and stop words are stripped (`Fizetés:`, `Vásárlás:`, `POS:`, `Kártyás vásárlás:`, legal suffixes like `Kft.`, `Zrt.`, `Nyrt.`, `GmbH`, `LLC`).
-- Hungarian and accented characters are preserved for presentation but normalized for index searching.
+```
+StatusBarNotification
+  -> package allowlist (unsupported packages dropped, nothing recorded)
+  -> title / text / bigText only
+  -> SecurityFilter (codes, logins, approvals)
+  -> PromotionalFilter (strong cues)
+  -> source parser (positive payment wording + amount, balance lines ignored)
+  -> validation (sign matches direction, plausible size)
+  -> AccountMatcher (HIGH: user mapping, MEDIUM: single account for the bank, LOW: review)
+  -> IngestTransactionUseCase (duplicate detection)
+  -> NotificationEvent with a sanitized status code
+```
 
-### Step 2: Deterministic SHA-256 Fingerprinting
-To guarantee idempotency across multiple syncs or repeated imports, each transaction receives a deterministic cryptographic fingerprint:
-$$\text{Fingerprint} = \text{SHA-256}(\text{date} \parallel \text{amountMinor} \parallel \text{currency} \parallel \text{normalizedMerchant} \parallel \text{externalId})$$
+`BankNotificationListenerService` does the Android part and serializes processing with a mutex so a wallet and a bank notification arriving together are compared deterministically. Everything after text extraction is `ProcessNotificationUseCase`, which is unit-tested end to end with an in-memory store. Details: [BANK_INTEGRATION.md](BANK_INTEGRATION.md).
 
-### Step 3: High-Performance Indexed Deduplication
-Earlier versions performed an in-memory scan of all database records. The hardened architecture executes indexed, constant-time database queries:
-1. **Exact Fingerprint Lookup**: Queries `findByFingerprint(fingerprint)` via the unique B-Tree index on `transactions.fingerprint`. If found $\rightarrow$ flagged as `EXACT_DUPLICATE` and discarded.
-2. **External ID Lookup**: If provided (e.g. from bank statement references), queries `findByExternalId(externalId)` via index $\rightarrow$ flagged as `EXACT_DUPLICATE`.
-3. **Fuzzy 2-Day Match**: Queries `findPossibleDuplicates(amountMinor, currency, date - 2 days, date + 2 days)` using the composite index `(amountMinor, currency, date)`. If candidate exists $\rightarrow$ flagged as `POSSIBLE_DUPLICATE` and held for user review.
-4. **Unique**: Transaction passes forward for insertion.
+## Currency conversion
 
-### Step 4: Rule-Based Categorization & Transfer Detection
-1. **Transfer Recognition**: Phrases like `átutalás`, `átvezetés`, `pénzküldés`, `bank transfer`, or `transfer to` immediately classify the transaction as `TransactionDirection.TRANSFER` and assign the `transfers` category.
-2. **Keyword Rule Matching**: User-defined and built-in category keyword rules (`food`, `dining`, `transport`, `subscriptions`, `housing`, etc.) are evaluated against the cleaned merchant and description text.
-3. **Fallback**: If no rule matches, the transaction is marked as `other` (Uncategorized) for user review.
+`ExchangeRateRepository` publishes a `RateTable` (EUR-based quotes, each with provider, rate date and origin: fetched, cached or manual). Screens convert through the table; `convert` returns `null` when a rate is missing and the statistics use case then excludes and counts the transaction. There are no built-in default rates.
 
----
+## App lock
 
-## 4. Multi-Currency Engine & FX Architecture
+`AppLockController` lives in the `Application` so the unlocked state survives rotation but not process death. `MainActivity.onStop` locks unless the app itself just started an external activity (`expectExternalActivity()` before the document picker, gallery, system settings or browser); returning later than five minutes locks anyway. `MainActivity` renders nothing until preferences are loaded, so protected screens never flash before the lock gate.
 
-All financial calculations and storage use integer minor units (e.g., `Long` where `100` = `1.00 HUF` or `1.00 EUR`) to guarantee 100% mathematical precision with zero floating-point drift.
+## Stocks
 
-The app supports dynamic multi-currency display:
-- **Original Currency Preservation**: Every transaction permanently stores its original `amountMinor` and original ISO 4217 `currency`.
-- **Display Currency Conversion**: When the user changes their global display currency (e.g., from HUF to EUR or USD), balances and summaries are converted in real time using real exchange rates from `ExchangeRateRepository`.
-- **Offline-First Resilience**: Exchange rates are cached in Room SQLite table `exchange_rates`. If offline or air-gapped, the app relies on cached rates or hardcoded fallback reference rates.
-- **Manual Custom Rates**: Users can inspect and override exchange rates directly in Settings.
+```
+StocksScreen / StockDetailScreen
+  -> StocksViewModel (polls only while STARTED)
+  -> StockRepository
+       ├─ WatchlistStore (Room table `watchlist`)
+       ├─ QuoteCache (Room table `stock_quotes`)
+       └─ MarketDataProvider -> FinnhubProvider -> HttpClient
+```
 
----
-
-## 5. Technology Stack & Dependencies
-
-| Layer / Concern | Technology | Version | Purpose |
-|---|---|---|---|
-| **Language** | Kotlin | 1.9.22 | Strict type safety, coroutines, immutability |
-| **UI Toolkit** | Jetpack Compose (BOM) | 2024.02.01 | Declarative native Android UI |
-| **Design System** | Material Design 3 | 1.2.0 | Modern Android design language |
-| **Local Persistence** | Room Database | 2.6.1 | Type-safe SQLite ORM with schema export |
-| **Compiler Tool** | Google KSP | 1.9.22-1.0.17 | Kotlin Symbol Processing for Room DAOs |
-| **Preferences** | Jetpack DataStore | 1.0.0 | Asynchronous key-value settings storage |
-| **Camera Integration** | AndroidX CameraX | 1.3.2 | Device camera lifecycle and image analysis |
-| **On-Device OCR** | Google ML Kit Text Recognition | 16.0.0 | Pure on-device neural OCR (no cloud) |
-| **Security / Biometrics** | AndroidX Biometric | 1.1.0 | BiometricPrompt authentication |
-| **Unit Testing** | JUnit 4 + Coroutines Test | 4.13.2 / 1.7.3 | Regression suites, parsers, and migrations |
+The stock tables are separate from all financial tables and the repository has no access to transactions or accounts. See [STOCKS.md](STOCKS.md).

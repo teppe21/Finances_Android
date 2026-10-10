@@ -1,144 +1,91 @@
-# Finances Native Android — Real Device 30-Day Testing Plan
+# Real-device test plan
 
-This document serves as the operational testing protocol for actively daily-driving the production-hardened **Finances** native Android application (`com.teppe21.finances`) on a physical device for approximately one month prior to Google Play publication.
+Run on at least one recent Pixel or emulator image (Android 15/16) and one OEM device (Samsung One UI or Xiaomi HyperOS), with a 16 KB page-size emulator image for one pass. Use synthetic data (Settings > Add demo data) or a test account; nothing here requires real bank or brokerage accounts unless a step says "optional, real app".
 
----
+Record for each step: device, Android version, result, notes.
 
-## 1. Initial Deployment & Environment Setup
+## 1. First launch and financial basics
 
-### 1.1 Device Prerequisites
-- **OS Version:** Android 11 through Android 15 / 16 (API level 30 to 36).
-- **Installed Banking Apps:**
-  - Revolut (`com.revolut.revolut`)
-  - Google Wallet (`com.google.android.apps.walletnfcrel`)
-  - Hungarian Bank App (OTP, Erste George, MBH, or Wise)
-- **Biometrics:** At least one enrolled fingerprint or face unlock credential.
+| # | Step | Expected |
+| --- | --- | --- |
+| 1.1 | Fresh install, open | Dashboard with zero balances and the "No transactions yet" empty state; no sample numbers |
+| 1.2 | Add an expense of 1250 HUF and one of 12.50 EUR | Both listed with correct sign and currency; dashboard totals change |
+| 1.3 | Delete one transaction | Gone from list and totals |
+| 1.4 | Create a category and a keyword, add a matching transaction | Categorized automatically |
+| 1.5 | Add an account in EUR with an opening balance | Accounts shows balance = opening + transactions |
+| 1.6 | Switch display currency HUF → EUR → USD | Numbers change by the exchange rate, not only the symbol; with automatic rates off and no rates, a banner says amounts are excluded |
+| 1.7 | Analytics: previous / next / "This month" | Month title updates, next is disabled on the current month |
+| 1.8 | Budgets: add a monthly budget | Spent amount equals this month's confirmed expenses in that category |
 
-### 1.2 Installation Steps
-1. Transfer `finances-native.apk` from the repository root to your phone via USB (`adb install -r finances-native.apk`) or local file manager.
-2. Launch the app for the first time.
-3. **Verify Clean Install Baseline:**
-   - Accounts tab should display default accounts (Cash Wallet, OTP Current Account, Revolut, Savings) with exactly **0 HUF balance**.
-   - No mock or sample transactions should appear.
-   - If desired, test "Load Demo" in Settings, then "Clear Demo" to verify state reset.
+## 2. Notifications
 
----
+| # | Step | Expected |
+| --- | --- | --- |
+| 2.1 | More > Notification recognition > Set up | Disclosure dialog; "Not now" opens nothing and records nothing |
+| 2.2 | Continue | Android's notification access screen opens (or a fallback screen on OEM builds) |
+| 2.3 | Grant access, return | Status shows access yes, disclosure yes |
+| 2.4 | "Try it": Purchase / Promotion / Login code | Recognized with amount 4,590 Ft; rejected as promotion; rejected as security message; nothing saved |
+| 2.5 | Optional, real app: make a small Revolut card payment | One transaction with merchant and amount; status "Expense recorded" |
+| 2.6 | Optional, real app: pay contactless with Google Wallet using a Revolut card | One transaction, not two |
+| 2.7 | Optional, real app: two purchases of the same amount at different shops | Two transactions |
+| 2.8 | Receive a promotional or referral notification from a supported app | No transaction; "Promotion ignored" in recent results |
+| 2.9 | Receive a login code | No transaction; "Security message ignored" |
+| 2.10 | Message from WhatsApp containing "5000 Ft" | Nothing recorded at all |
+| 2.11 | Two accounts with institution "Revolut", then a Revolut payment | Appears in the review queue; confirming assigns it |
+| 2.12 | Restart the phone, make a payment | Still recognized (listener rebinds) |
+| 2.13 | Screen off and battery saver / OEM battery optimization on | Note whether notifications are still processed |
+| 2.14 | Stop using notifications, then revoke in Android settings | No further processing |
 
-## 2. Notification Listener & Bank Parsing Protocol
+## 3. Receipts and CSV
 
-### 2.1 Service Activation
-1. Navigate to **More &rarr; Notification Automation**.
-2. Click **"Enable in Settings"** &rarr; Verify the system Prominent Disclosure modal appears explaining that data remains 100% on-device.
-3. Grant notification listener permission in Android Settings.
-4. Return to Finances &rarr; Verify the permission status card turns green with **"Active"**.
+| # | Step | Expected |
+| --- | --- | --- |
+| 3.1 | Open Scan receipt without camera permission | Explanation first; permission prompt only after "Allow camera" |
+| 3.2 | Normal Hungarian receipt | Total, VAT, cash/card recognized; editable before saving |
+| 3.3 | Poor lighting / crumpled / long receipt | Total may be missing; field stays empty rather than guessed |
+| 3.4 | Foreign receipt in EUR | Currency selectable; decimal total kept |
+| 3.5 | Gallery image | Works; app does not lock on return |
+| 3.6 | CSV in UTF-8 with semicolons and Hungarian dates | Rows imported |
+| 3.7 | CSV in Windows-1250 | Accents correct |
+| 3.8 | Malformed CSV (bad dates, text amounts) | Skipped rows listed by reason |
+| 3.9 | Import the same CSV twice | Second import adds nothing |
 
-### 2.2 Live Banking Transaction Scenarios
+## 4. Security
 
-#### Scenario A: Genuine In-Store Physical Purchase (Revolut)
-- **Action:** Pay at a local grocery store (e.g. Coop, Lidl, Spar) with your physical Revolut card.
-- **Expected Notification:** `You spent HUF804` (with optional balance line).
-- **Verification:**
-  - Opens Finances &rarr; Transaction recorded as **-804 HUF**.
-  - Merchant extracted as grocery store name (e.g., "Coop").
-  - Direction: `EXPENSE`.
-  - Notification event recorded in SQLite with `reasonCode = "PARSED_SUCCESS"`.
-  - **Crucial:** Raw notification title and text are **NOT** stored in Room SQLite (`notification_events` table contains only sanitized metadata).
+| # | Step | Expected |
+| --- | --- | --- |
+| 4.1 | Set PIN 1234 | Refused as too simple |
+| 4.2 | Set a valid PIN, press Home, reopen | Lock screen; no financial data visible before it |
+| 4.3 | Wrong PIN five times | 30-second lockout; persists after force-stop |
+| 4.4 | Enable biometrics | Prompt on open; "Use PIN" works |
+| 4.5 | Rotate on lock screen and when unlocked | No unexpected lock or unlock |
+| 4.6 | Unlocked, open document picker / settings / browser from the app and return within 5 minutes | Not locked; picker result delivered |
+| 4.7 | Recents screen | Preview is blank while lock is on |
+| 4.8 | Developer options "Don't keep activities", or kill the process from Android Studio | Locked again on return |
+| 4.9 | Delete all financial data | Data gone; app lock still enabled; watchlist kept |
+| 4.10 | Forgot PIN > Erase everything | First-launch state |
 
-#### Scenario B: Contactless Google Wallet Payment with Revolut Card
-- **Action:** Pay at a physical NFC terminal using Google Wallet with a linked Revolut card.
-- **Trigger:** Phone receives **two** notifications within seconds:
-  1. Google Wallet: `"75. SZ. ABC ÁRUHÁZ" / "HUF804.00 with Revolut Mastercard ••1413"`
-  2. Revolut: `"Coop" / "You spent HUF804..."`
-- **Verification:**
-  - Finances records **only one single transaction** (-804 HUF).
-  - The second notification is automatically flagged as `DUPLICATE_CROSS_SOURCE_PAYMENT`.
-  - No duplicate expenses are created, preserving balance accuracy.
+## 5. Stocks
 
-#### Scenario C: Distinct Purchases at Different Merchants with Same Amount
-- **Action:** Purchase an item at Store A for 804 HUF, and then purchase an item at Store B for 804 HUF 1 minute later.
-- **Verification:**
-  - Because merchant names differ and it is not a Wallet+Bank pair for the same transaction, **both transactions are recorded as separate valid purchases**.
+| # | Step | Expected |
+| --- | --- | --- |
+| 5.1 | Open Stocks without a key | Setup prompt; rest of the app unaffected |
+| 5.2 | Enter an invalid key | "Finnhub rejected this key" |
+| 5.3 | Enter a valid free key, search "apple", add AAPL | Row with price, change, timestamp |
+| 5.4 | During US market hours | Label "Real-time" only if the timestamp is within 2 minutes; otherwise "Delayed" |
+| 5.5 | Outside market hours | "Last close"; no automatic polling (check with a network monitor) |
+| 5.6 | Leave the Stocks screen | No further requests |
+| 5.7 | Airplane mode, refresh | Offline message; cached quote kept with an aged label |
+| 5.8 | Open detail, choose 1M | Chart of real candles, or "not included in your plan" |
+| 5.9 | Add 25+ symbols | Cap message |
+| 5.10 | Restart app | Watchlist and order preserved |
+| 5.11 | Remove a stock | Removed; transactions unaffected |
 
-#### Scenario D: Marketing / Referral Notifications (Revolut)
-- **Action:** Wait for or simulate a promotional notification (e.g., *"7 days left to earn / Get HUF22,500 for each eligible friend you refer"*).
-- **Verification:**
-  - Notification is automatically dropped by `RevolutParser`.
-  - **No fake income or expense is created**.
-  - Recorded in history with `reasonCode = "IGNORED_PROMOTION_OR_NON_TRANSACTION"`.
+## 6. Platform
 
-#### Scenario E: Two-Factor Authentication / OTP Discard
-- **Action:** Request a login code or approval SMS from OTP or Revolut.
-- **Verification:**
-  - Notification containing security tokens (e.g. *"Az Ön belépési kódja: 981245"*) is dropped immediately at the listener boundary.
-  - Zero sensitive security codes are ever ingested.
-
----
-
-## 3. Real FX Conversion & Multi-Currency Testing
-
-1. **Display Currency Switching:**
-   - In Settings, switch display currency from `HUF` to `EUR`.
-   - **Verification:** Original transaction numeric value (e.g., 10,000 HUF) is **NOT** blindly swapped to 10,000 EUR. The app calculates real converted display amount: `~25 EUR`.
-   - Underlying database amount remains `1000000L` (10,000 HUF minor units).
-2. **Air-Gapped Offline Mode:**
-   - Toggle **"Automatic FX Rates Sync"** to `OFF`.
-   - Verify app makes zero outbound network requests.
-   - Click **"Edit Rates"** and enter a custom rate (e.g. 400 HUF / EUR).
-   - Verify dashboard balances recalculate immediately using the local custom rate.
-
----
-
-## 4. CameraX & ML Kit Receipt Scanning
-
-1. Open **Scan Receipt**.
-2. Capture paper receipts under:
-   - High daylight
-   - Low evening artificial lighting
-   - Crumpled / folded receipts
-3. **Verification:**
-   - Camera preview renders smoothly with continuous autofocus.
-   - Total amount, merchant, and tax are extracted on-device with confidence scoring.
-   - Confirming the receipt generates a valid transaction linked to `receiptId`.
-
----
-
-## 5. Security Gate & App Lock Protocol
-
-1. **PIN Setup:**
-   - Go to Settings &rarr; Security &rarr; Select **PIN**.
-   - Enter `4826`, confirm `4826`.
-   - Verify salted SHA-256 hash is created with random salt in DataStore.
-2. **Backgrounding & Lockout Verification:**
-   - Minimize the app or lock phone screen.
-   - Reopen Finances &rarr; Verify the full-screen **Lock Gate** appears blocking access.
-   - Enter wrong PIN &rarr; Shows "Incorrect PIN".
-   - Enter `4826` &rarr; Unlocks immediately to previous screen.
-3. **Biometric Unlock:**
-   - Select **Biometric** in Settings.
-   - Reopen app &rarr; System BiometricPrompt appears over the lock screen.
-   - Authenticate with fingerprint &rarr; Unlocks instantly.
-4. **Disabling Lock:**
-   - Select **Off** &rarr; Prompt demands current PIN before lock is disabled.
-
----
-
-## 6. Complete Data Deletion & Privacy Verification
-
-1. Go to Settings &rarr; Data Management &rarr; Click **"Delete All Financial Data"**.
-2. Confirm the destructive dialog.
-3. **Verification:**
-   - All transactions, receipts, custom categories, category rules, and notification events are wiped from SQLite.
-   - Account balances reset to 0 HUF.
-   - Preferences reset to defaults.
-   - No leftover orphaned rows remain in the database.
-
----
-
-## 7. Weekly Audit Checklist
-
-| Week | Target Feature | Status | Notes |
-|:---|:---|:---:|:---|
-| **Week 1** | Notification Ingestion & Wallet Dedup | [ ] | Monitor daily Revolut & Google Wallet alerts |
-| **Week 2** | Multi-Currency & Offline FX Caching | [ ] | Verify daily exchange rate stability & offline mode |
-| **Week 3** | Receipt OCR Scanning & Categorization | [ ] | Scan grocery receipts and verify auto-categorization |
-| **Week 4** | App Lock, Backup, and Store Readiness | [ ] | Stress test biometric gate and verify zero crash logs |
+| # | Step | Expected |
+| --- | --- | --- |
+| 6.1 | Light and dark theme | Readable contrast, status bar icons visible |
+| 6.2 | Font size 200%, TalkBack | Labels readable; transaction rows and charts announce content |
+| 6.3 | 16 KB page-size emulator | App starts, camera and OCR work |
+| 6.4 | Upgrade from 2.0.0 with existing data | Data kept, old PIN works once and is upgraded |
