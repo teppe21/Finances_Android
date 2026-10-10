@@ -3,10 +3,8 @@ package com.teppe21.finances.stocks.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
-import com.teppe21.finances.core.theme.Amber500
-import com.teppe21.finances.core.theme.Emerald500
-import com.teppe21.finances.core.theme.Rose500
 import com.teppe21.finances.stocks.domain.DataStatus
+import com.teppe21.finances.core.theme.finances
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Instant
@@ -63,14 +61,14 @@ object StockFormat {
 @Composable
 fun changeColor(value: BigDecimal?): Color = when {
     value == null || value.signum() == 0 -> MaterialTheme.colorScheme.onSurfaceVariant
-    value.signum() > 0 -> Emerald500
-    else -> Rose500
+    value.signum() > 0 -> MaterialTheme.finances.marketUp
+    else -> MaterialTheme.finances.marketDown
 }
 
 @Composable
 fun statusColor(status: DataStatus): Color = when (status) {
-    DataStatus.LIVE -> Emerald500
+    DataStatus.LIVE -> MaterialTheme.finances.marketUp
     DataStatus.DELAYED, DataStatus.LAST_CLOSE -> MaterialTheme.colorScheme.onSurfaceVariant
-    DataStatus.STALE, DataStatus.RATE_LIMITED -> Amber500
+    DataStatus.STALE, DataStatus.RATE_LIMITED -> MaterialTheme.finances.warning
     else -> MaterialTheme.colorScheme.error
 }

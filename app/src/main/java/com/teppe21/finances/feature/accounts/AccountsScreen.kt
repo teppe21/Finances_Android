@@ -48,7 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
-import com.teppe21.finances.core.theme.Blue500
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.domain.model.SupportedCurrencies
@@ -96,7 +96,7 @@ fun AccountsScreen(
 
         FloatingActionButton(
             onClick = { showAddDialog = true },
-            containerColor = Blue500,
+            containerColor = MaterialTheme.colorScheme.primary,
             contentColor = Color.White,
             modifier = Modifier
                 .align(Alignment.BottomEnd)

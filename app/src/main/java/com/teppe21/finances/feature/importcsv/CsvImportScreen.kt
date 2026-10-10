@@ -43,11 +43,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.native.csv.CsvSkipReason
 import androidx.compose.foundation.lazy.items
-import com.teppe21.finances.core.theme.Blue500
-import com.teppe21.finances.core.theme.Emerald500
 
 @Composable
 fun CsvImportScreen(
@@ -94,7 +93,7 @@ fun CsvImportScreen(
                     Icon(
                         imageVector = Icons.Default.UploadFile,
                         contentDescription = null,
-                        tint = Blue500,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -118,7 +117,7 @@ fun CsvImportScreen(
                             filePicker.launch(arrayOf("text/comma-separated-values", "text/csv", "text/plain", "*/*"))
                         },
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Blue500),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.FileOpen, contentDescription = null)
@@ -138,7 +137,7 @@ fun CsvImportScreen(
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Blue500)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -149,11 +148,11 @@ fun CsvImportScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.15f))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
                 ) {
                     Text(
                         text = state.errorMessage!!,
-                        color = Color(0xFFEF4444),
+                        color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(16.dp)
@@ -185,13 +184,13 @@ fun CsvImportScreen(
                         Text(
                             text = stringResource(R.string.new_items, state.newCount),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Emerald500,
+                            color = MaterialTheme.finances.success,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "Already imported into this account: ${state.alreadyImportedCount}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFF59E0B)
+                            color = MaterialTheme.finances.warning
                         )
                         if (state.skipped.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
@@ -242,7 +241,7 @@ fun CsvImportScreen(
                             },
                             enabled = !state.isImporting && state.newCount > 0,
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (state.isImporting) {

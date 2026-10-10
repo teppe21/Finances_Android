@@ -59,13 +59,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.ui.InfoBanner
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.TextButton
 import com.teppe21.finances.core.theme.CategoryColorProvider
-import com.teppe21.finances.core.theme.Emerald500
-import com.teppe21.finances.core.theme.Rose500
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.CategoryBreakdown
@@ -140,7 +139,7 @@ fun AnalyticsScreen(
                             text = CurrencyFormatter.formatSigned(state.stats.balanceMinor, state.currency),
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = if (state.stats.balanceMinor >= 0) Emerald500 else Rose500
+                            color = if (state.stats.balanceMinor >= 0) MaterialTheme.finances.income else MaterialTheme.finances.expense
                         )
                     }
 

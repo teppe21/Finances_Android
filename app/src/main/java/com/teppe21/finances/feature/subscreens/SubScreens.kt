@@ -36,8 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teppe21.finances.FinancesApp
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.R
-import com.teppe21.finances.core.theme.Blue500
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import java.time.format.DateTimeFormatter

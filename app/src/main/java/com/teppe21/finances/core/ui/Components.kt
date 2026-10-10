@@ -38,13 +38,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.teppe21.finances.core.theme.CategoryColorProvider
-import com.teppe21.finances.core.theme.Emerald500
+import com.teppe21.finances.core.theme.finances
+import com.teppe21.finances.core.theme.tabular
+import androidx.compose.ui.text.style.TextAlign
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
-
-val TransferColor = Color(0xFF6366F1)
 
 /** Card with a title, used for every dashboard / settings section. */
 @Composable
@@ -139,9 +139,9 @@ fun TransactionRow(
     }.joinToString(" · ")
 
     val accent = when {
-        isTransfer -> TransferColor
-        isIncome -> Emerald500
-        else -> MaterialTheme.colorScheme.onSurface
+        isTransfer -> MaterialTheme.finances.transfer
+        isIncome -> MaterialTheme.finances.income
+        else -> MaterialTheme.finances.expense
     }
     val directionLabel = when {
         isTransfer -> "Transfer"
@@ -208,9 +208,10 @@ fun TransactionRow(
             Spacer(Modifier.width(8.dp))
             Text(
                 primaryAmount,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.tabular(),
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
+                textAlign = TextAlign.End,
                 maxLines = 1
             )
         }

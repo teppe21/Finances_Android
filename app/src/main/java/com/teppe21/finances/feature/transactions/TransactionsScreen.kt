@@ -66,13 +66,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.ui.InfoBanner
 import com.teppe21.finances.core.ui.TransactionRow
-import com.teppe21.finances.core.theme.Blue500
 import com.teppe21.finances.core.theme.CategoryColorProvider
-import com.teppe21.finances.core.theme.Emerald500
-import com.teppe21.finances.core.theme.Rose500
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.Transaction
@@ -248,7 +246,7 @@ fun TransactionsScreen(
         // Floating Action Button for New Transaction
         FloatingActionButton(
             onClick = { showAddModal = true },
-            containerColor = Blue500,
+            containerColor = MaterialTheme.colorScheme.primary,
             contentColor = Color.White,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -361,7 +359,7 @@ fun TransactionsScreen(
                             transactionToDelete?.let { viewModel.deleteTransaction(it) }
                             transactionToDelete = null
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Rose500)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
                         Text(stringResource(R.string.delete))
                     }
@@ -412,7 +410,7 @@ fun TransactionDetailContent(
             text = CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = if (transaction.amountMinor > 0) Emerald500 else MaterialTheme.colorScheme.onSurface
+            color = if (transaction.amountMinor > 0) MaterialTheme.finances.income else MaterialTheme.finances.expense
         )
 
         if (!displayCurrency.equals(transaction.currency, ignoreCase = true)) {
@@ -438,7 +436,7 @@ fun TransactionDetailContent(
 
         Button(
             onClick = onDelete,
-            colors = ButtonDefaults.buttonColors(containerColor = Rose500),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.finances.expense),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -495,7 +493,7 @@ fun AddTransactionDialog(
                     Button(
                         onClick = { isExpense = true },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isExpense) Rose500 else MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = if (isExpense) MaterialTheme.finances.expense else MaterialTheme.colorScheme.surfaceVariant
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -504,7 +502,7 @@ fun AddTransactionDialog(
                     Button(
                         onClick = { isExpense = false },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (!isExpense) Emerald500 else MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = if (!isExpense) MaterialTheme.finances.income else MaterialTheme.colorScheme.surfaceVariant
                         ),
                         modifier = Modifier.weight(1f)
                     ) {

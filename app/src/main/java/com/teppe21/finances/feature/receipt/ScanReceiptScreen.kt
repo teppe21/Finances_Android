@@ -69,10 +69,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.core.money.Money
-import com.teppe21.finances.core.theme.Blue500
-import com.teppe21.finances.core.theme.Emerald500
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import java.time.LocalDate
 
@@ -274,10 +273,10 @@ fun ScanReceiptScreen(
                     },
                 shape = CircleShape,
                 color = Color.White,
-                border = androidx.compose.foundation.BorderStroke(4.dp, Blue500)
+                border = androidx.compose.foundation.BorderStroke(4.dp, MaterialTheme.colorScheme.primary)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Camera, contentDescription = "Take photo of receipt", tint = Blue500, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.Camera, contentDescription = "Take photo of receipt", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                 }
             }
 
@@ -292,7 +291,7 @@ fun ScanReceiptScreen(
                     .size(48.dp)
                     .background(Color.Black.copy(alpha = 0.6f), CircleShape)
             ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = "Try a sample receipt (demo data)", tint = Emerald500)
+                Icon(Icons.Default.AutoAwesome, contentDescription = "Try a sample receipt (demo data)", tint = MaterialTheme.finances.success)
             }
         }
 
@@ -317,7 +316,7 @@ fun ScanReceiptScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Blue500)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = stringResource(R.string.processing_ocr),

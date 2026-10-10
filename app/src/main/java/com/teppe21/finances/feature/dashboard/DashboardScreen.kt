@@ -47,9 +47,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.theme.CategoryColorProvider
-import com.teppe21.finances.core.theme.Emerald500
-import com.teppe21.finances.core.theme.Rose500
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.InfoBanner
 import com.teppe21.finances.core.ui.SectionCard
@@ -211,8 +210,8 @@ private fun BalanceCard(
             Text(month.format(MONTH_TITLE), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth()) {
-                MonthFigure(Modifier.weight(1f), stringResource(R.string.income), "+" + CurrencyFormatter.format(incomeMinor, currency), Emerald500)
-                MonthFigure(Modifier.weight(1f), stringResource(R.string.expenses), "-" + CurrencyFormatter.format(expenseMinor, currency), Rose500)
+                MonthFigure(Modifier.weight(1f), stringResource(R.string.income), "+" + CurrencyFormatter.format(incomeMinor, currency), MaterialTheme.finances.income)
+                MonthFigure(Modifier.weight(1f), stringResource(R.string.expenses), "-" + CurrencyFormatter.format(expenseMinor, currency), MaterialTheme.finances.expense)
             }
         }
     }
@@ -271,8 +270,8 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String) {
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Bar(item.incomeMinor.toFloat() / maxVal, Emerald500)
-                        Bar(item.expenseMinor.toFloat() / maxVal, Rose500)
+                        Bar(item.incomeMinor.toFloat() / maxVal, MaterialTheme.finances.income)
+                        Bar(item.expenseMinor.toFloat() / maxVal, MaterialTheme.finances.expense)
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -285,8 +284,8 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String) {
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Legend("Income", Emerald500)
-            Legend("Expenses", Rose500)
+            Legend("Income", MaterialTheme.finances.income)
+            Legend("Expenses", MaterialTheme.finances.expense)
         }
     }
 }

@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.teppe21.finances.core.theme.Emerald500
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.domain.model.Account
 import java.time.ZoneId
@@ -282,7 +282,7 @@ private fun StatusLine(label: String, ok: Boolean) {
         Icon(
             if (ok) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
             contentDescription = null,
-            tint = if (ok) Emerald500 else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (ok) MaterialTheme.finances.success else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
         Spacer(Modifier.width(8.dp))
