@@ -5,46 +5,60 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Unit tests, lint, debug build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
-      - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
-      - name: Lint
-        run: ./gradlew lintDebug --stacktrace
+      - name: Verify Gradle wrapper
+        run: |
+          test -x ./gradlew || { echo "gradlew is not executable (check git mode 100755)" >&2; exit 1; }
+          java -version
+          ./gradlew --no-daemon --version
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms"
 
-      - name: Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Run unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest --stacktrace
 
-      - name: Upload reports
+      - name: Run lint
+        run: ./gradlew --no-daemon lint --stacktrace
+
+      - name: Assemble debug APK
+        run: ./gradlew --no-daemon assembleDebug --stacktrace
+
+      - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reports
           path: |
             app/build/reports/tests/
-            app/build/reports/lint-results-debug.html
-
-      - name: Upload Room schema
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: room-schemas
-          path: app/schemas/
+            app/build/reports/lint-results-*.html
+          if-no-files-found: ignore
