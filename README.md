@@ -150,4 +150,4 @@ The project started as a React web dashboard for personal finances and grew a na
 
 ## License
 
-No license file has been chosen for this repository yet, so all rights are reserved by the author. Add a `LICENSE` file if you want to allow reuse.
+Released under the [MIT License](LICENSE). Third-party libraries keep their own licenses.
