@@ -45,7 +45,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun PenzugyekTheme(
+fun FinancesTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {

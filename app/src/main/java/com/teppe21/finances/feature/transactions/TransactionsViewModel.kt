@@ -30,7 +30,9 @@ enum class TransactionSortOrder {
 data class TransactionsUiState(
     val transactions: List<Transaction> = emptyList(),
     val filteredTransactions: List<Transaction> = emptyList(),
-    val convertedAmounts: Map<String, Long> = emptyMap(),
+    /** Amount in the display currency; null when no exchange rate is available. */
+    val convertedAmounts: Map<String, Long?> = emptyMap(),
+    val unconvertedCount: Int = 0,
     val categories: List<Category> = emptyList(),
     val accounts: List<Account> = emptyList(),
     val selectedPeriod: String = "this_month",
@@ -83,7 +85,7 @@ class TransactionsViewModel : ViewModel() {
         val categories: List<Category>,
         val accounts: List<Account>,
         val preferences: com.teppe21.finances.data.local.preferences.UserPreferences,
-        val rates: Map<String, java.math.BigDecimal>
+        val rates: com.teppe21.finances.domain.fx.RateTable
     )
 
     private val _repoDataFlow = combine(
@@ -91,7 +93,7 @@ class TransactionsViewModel : ViewModel() {
         catRepo.getAllCategoriesFlow(),
         accountRepo.getAllAccountsFlow(),
         prefsRepo.preferencesFlow,
-        fxRepo.ratesFlow
+        fxRepo.tableFlow
     ) { txs, cats, accs, prefs, rates ->
         TransactionRepoData(txs, cats, accs, prefs, rates)
     }
@@ -108,8 +110,8 @@ class TransactionsViewModel : ViewModel() {
         val recurringIds = if (filters.onlyRecurring) recurringUseCase.execute(allTx).recurringTransactionIds else emptySet()
 
         // Compute converted amounts for all transactions in target display currency
-        val convertedMap = allTx.associate { tx ->
-            tx.id to (fxRepo.convert(tx.amountMinor, tx.currency, targetCurrency, tx.date) ?: tx.amountMinor)
+        val convertedMap: Map<String, Long?> = allTx.associate { tx ->
+            tx.id to data.rates.convert(tx.amountMinor, tx.currency, targetCurrency)
         }
 
         val now = LocalDate.now()
@@ -130,7 +132,7 @@ class TransactionsViewModel : ViewModel() {
             val catMatches = filters.category == "All" || tx.categoryId == filters.category
 
             // 3. Search query
-            val q = filters.query.trim().lowercase()
+            val q = TextNormalizer.normalizeSearch(filters.query)
             val queryMatches = if (q.isBlank()) true else {
                 val merchantNorm = TextNormalizer.normalizeSearch(tx.merchant ?: "")
                 val descNorm = TextNormalizer.normalizeSearch(tx.description)
@@ -151,11 +153,12 @@ class TransactionsViewModel : ViewModel() {
             TransactionSortOrder.OLDEST -> filtered.sortedWith(
                 compareBy<Transaction> { it.date }.thenBy { it.createdAt }
             )
+            // Unconvertible amounts cannot be compared with the others; they sort last.
             TransactionSortOrder.AMOUNT_DESC -> filtered.sortedByDescending {
-                kotlin.math.abs(convertedMap[it.id] ?: it.amountMinor)
+                convertedMap[it.id]?.let { v -> kotlin.math.abs(v) } ?: Long.MIN_VALUE
             }
             TransactionSortOrder.AMOUNT_ASC -> filtered.sortedBy {
-                kotlin.math.abs(convertedMap[it.id] ?: it.amountMinor)
+                convertedMap[it.id]?.let { v -> kotlin.math.abs(v) } ?: Long.MAX_VALUE
             }
             TransactionSortOrder.MERCHANT_ASC -> filtered.sortedBy {
                 (it.merchant?.ifBlank { null } ?: it.description).lowercase()
@@ -169,6 +172,7 @@ class TransactionsViewModel : ViewModel() {
             transactions = allTx,
             filteredTransactions = sorted,
             convertedAmounts = convertedMap,
+            unconvertedCount = sorted.count { convertedMap[it.id] == null },
             categories = cats,
             accounts = accs,
             selectedPeriod = filters.period,
@@ -219,12 +223,6 @@ class TransactionsViewModel : ViewModel() {
         }
     }
 
-    fun updateTransaction(tx: Transaction) {
-        viewModelScope.launch {
-            txRepo.updateTransaction(tx)
-            _selectedTransaction.value = null
-        }
-    }
 
     fun deleteTransaction(tx: Transaction) {
         viewModelScope.launch {

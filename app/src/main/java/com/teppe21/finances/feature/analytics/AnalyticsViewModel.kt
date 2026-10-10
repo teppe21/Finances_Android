@@ -11,6 +11,7 @@ import com.teppe21.finances.domain.model.MonthlyTrend
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
 import com.teppe21.finances.domain.usecase.CalculateFinancialStatsUseCase
+import com.teppe21.finances.domain.usecase.CurrencyAmountConverter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,8 +23,8 @@ import java.time.YearMonth
 import kotlin.math.abs
 
 enum class AnalyticsPeriod {
-    THIS_MONTH,
-    LAST_MONTH,
+    /** A single calendar month, chosen with the month navigator. */
+    MONTH,
     LAST_3_MONTHS,
     LAST_6_MONTHS,
     THIS_YEAR,
@@ -38,7 +39,8 @@ data class MerchantSpending(
 )
 
 data class AnalyticsUiState(
-    val period: AnalyticsPeriod = AnalyticsPeriod.THIS_MONTH,
+    val period: AnalyticsPeriod = AnalyticsPeriod.MONTH,
+    val selectedMonth: YearMonth = YearMonth.now(),
     val customStartDate: LocalDate = LocalDate.now().withDayOfMonth(1),
     val customEndDate: LocalDate = LocalDate.now(),
     val showCustomDateDialog: Boolean = false,
@@ -61,7 +63,8 @@ class AnalyticsViewModel : ViewModel() {
 
     private val _periodState = MutableStateFlow(
         AnalyticsPeriodState(
-            period = AnalyticsPeriod.THIS_MONTH,
+            period = AnalyticsPeriod.MONTH,
+            month = YearMonth.now(),
             customStart = LocalDate.now().withDayOfMonth(1),
             customEnd = LocalDate.now(),
             showDialog = false,
@@ -72,6 +75,7 @@ class AnalyticsViewModel : ViewModel() {
 
     private data class AnalyticsPeriodState(
         val period: AnalyticsPeriod,
+        val month: YearMonth,
         val customStart: LocalDate,
         val customEnd: LocalDate,
         val showDialog: Boolean,
@@ -83,14 +87,14 @@ class AnalyticsViewModel : ViewModel() {
         val transactions: List<Transaction>,
         val categories: List<Category>,
         val preferences: UserPreferences,
-        val rates: Map<String, BigDecimal>
+        val rates: com.teppe21.finances.domain.fx.RateTable
     )
 
     private val _sourceDataFlow = combine(
         txRepo.getAllTransactionsFlow(),
         catRepo.getAllCategoriesFlow(),
         prefsRepo.preferencesFlow,
-        fxRepo.ratesFlow
+        fxRepo.tableFlow
     ) { transactions, categories, prefs, rates ->
         AnalyticsSourceData(transactions, categories, prefs, rates)
     }
@@ -104,6 +108,7 @@ class AnalyticsViewModel : ViewModel() {
         val prefs = sourceData.preferences
         val (startDate, endDate) = resolveDateRange(
             periodState.period,
+            periodState.month,
             periodState.customStart,
             periodState.customEnd
         )
@@ -113,8 +118,8 @@ class AnalyticsViewModel : ViewModel() {
         }
 
         val targetCurrency = prefs.currency
-        val converter: (Long, String, LocalDate) -> Long = { amountMinor, currency, date ->
-            fxRepo.convert(amountMinor, currency, targetCurrency, date) ?: amountMinor
+        val converter: CurrencyAmountConverter = { amountMinor, currency, _ ->
+            sourceData.rates.convert(amountMinor, currency, targetCurrency)
         }
 
         val stats = statsUseCase.execute(filteredTx, converter)
@@ -128,12 +133,12 @@ class AnalyticsViewModel : ViewModel() {
 
         // Top merchants calculation with converted currency
         val topMerchants = filteredTx
-            .filter { it.direction == TransactionDirection.EXPENSE }
+            .filter { it.direction == TransactionDirection.EXPENSE && !it.pending }
             .groupBy { it.merchant?.trim()?.ifBlank { null } ?: it.description.trim() }
             .map { (name, list) ->
                 MerchantSpending(
                     merchant = name,
-                    totalMinor = list.sumOf { abs(converter(it.amountMinor, it.currency, it.date)) },
+                    totalMinor = list.sumOf { abs(converter(it.amountMinor, it.currency, it.date) ?: 0L) },
                     count = list.size
                 )
             }
@@ -142,6 +147,7 @@ class AnalyticsViewModel : ViewModel() {
 
         AnalyticsUiState(
             period = periodState.period,
+            selectedMonth = periodState.month,
             customStartDate = periodState.customStart,
             customEndDate = periodState.customEnd,
             showCustomDateDialog = periodState.showDialog,
@@ -174,6 +180,16 @@ class AnalyticsViewModel : ViewModel() {
         }
     }
 
+    fun shiftMonth(delta: Long) {
+        val next = _periodState.value.month.plusMonths(delta)
+        if (next.isAfter(YearMonth.now())) return
+        _periodState.value = _periodState.value.copy(period = AnalyticsPeriod.MONTH, month = next)
+    }
+
+    fun goToCurrentMonth() {
+        _periodState.value = _periodState.value.copy(period = AnalyticsPeriod.MONTH, month = YearMonth.now())
+    }
+
     fun openCustomDateDialog() {
         _periodState.value = _periodState.value.copy(showDialog = true)
     }
@@ -204,22 +220,13 @@ class AnalyticsViewModel : ViewModel() {
 
     private fun resolveDateRange(
         period: AnalyticsPeriod,
+        month: YearMonth,
         customStart: LocalDate,
         customEnd: LocalDate
     ): Pair<LocalDate, LocalDate> {
         val now = LocalDate.now()
         return when (period) {
-            AnalyticsPeriod.THIS_MONTH -> {
-                val start = now.withDayOfMonth(1)
-                val end = YearMonth.from(now).atEndOfMonth()
-                start to end
-            }
-            AnalyticsPeriod.LAST_MONTH -> {
-                val lastMonth = now.minusMonths(1)
-                val start = lastMonth.withDayOfMonth(1)
-                val end = YearMonth.from(lastMonth).atEndOfMonth()
-                start to end
-            }
+            AnalyticsPeriod.MONTH -> month.atDay(1) to month.atEndOfMonth()
             AnalyticsPeriod.LAST_3_MONTHS -> {
                 val start = now.minusMonths(3).plusDays(1)
                 start to now
@@ -250,7 +257,7 @@ class AnalyticsViewModel : ViewModel() {
         end: LocalDate
     ): Int {
         return when (period) {
-            AnalyticsPeriod.THIS_MONTH, AnalyticsPeriod.LAST_MONTH -> 1
+            AnalyticsPeriod.MONTH -> 1
             AnalyticsPeriod.LAST_3_MONTHS -> 3
             AnalyticsPeriod.LAST_6_MONTHS -> 6
             AnalyticsPeriod.THIS_YEAR, AnalyticsPeriod.LAST_YEAR -> 12

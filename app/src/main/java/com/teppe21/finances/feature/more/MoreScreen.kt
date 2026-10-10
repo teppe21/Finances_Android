@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -40,6 +42,8 @@ import com.teppe21.finances.R
 
 @Composable
 fun MoreScreen(
+    onNavigateToStocks: () -> Unit,
+    onNavigateToAccounts: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToCsvImport: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -56,10 +60,20 @@ fun MoreScreen(
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
         item {
-            Text(
-                text = stringResource(R.string.more_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+            MoreNavigationItem(
+                title = "Stocks",
+                subtitle = "Watchlist and price history from your market data provider",
+                icon = Icons.AutoMirrored.Filled.ShowChart,
+                onClick = onNavigateToStocks
+            )
+        }
+
+        item {
+            MoreNavigationItem(
+                title = stringResource(R.string.accounts_title),
+                subtitle = "Balances, opening amounts and currencies",
+                icon = Icons.Default.AccountBalance,
+                onClick = onNavigateToAccounts
             )
         }
 
@@ -117,7 +131,7 @@ fun MoreScreen(
             )
         }
 
-        item { Spacer(modifier = Modifier.height(88.dp)) }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 

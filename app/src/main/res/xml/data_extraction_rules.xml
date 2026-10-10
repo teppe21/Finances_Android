@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. Financial records, notification results, preferences (including the PIN
+     verifier and encrypted API key) and the watchlist stay on this device: nothing is included
+     in cloud backup or device-to-device transfer. Keystore keys are never backed up. -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="database" path="." />
-        <include domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="root" path="." />
     </cloud-backup>
     <device-transfer>
-        <include domain="database" path="." />
-        <include domain="sharedpref" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="root" path="." />
     </device-transfer>
 </data-extraction-rules>

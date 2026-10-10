@@ -56,7 +56,7 @@ suspend fun loadSampleData(db: AppDatabase, today: LocalDate = LocalDate.now()) 
     val now = Instant.now()
     db.withTransaction {
         val accounts = db.accountDao().getAll().associateBy { it.id }
-        fun ensure(id: String, name: String, institution: String, type: AccountType, opening: Long) {
+        suspend fun ensure(id: String, name: String, institution: String, type: AccountType, opening: Long) {
             val existing = accounts[id]
             val entity = existing?.copy(openingBalanceMinor = opening, currentBalanceMinor = opening, updatedAt = now)
                 ?: AccountEntity(id, name, institution, type, "HUF", opening, opening, true, now, now)

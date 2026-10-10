@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PenzugyekNative"
+rootProject.name = "Finances"
 include(":app")

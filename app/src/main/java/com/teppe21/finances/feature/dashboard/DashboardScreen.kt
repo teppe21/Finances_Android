@@ -18,18 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.ShoppingBag
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material.icons.filled.Wallet
-import androidx.compose.ui.platform.LocalContext
-import com.teppe21.finances.core.theme.CategoryColorProvider
+import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -37,43 +31,49 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
-import com.teppe21.finances.core.theme.Blue500
-import com.teppe21.finances.core.theme.Emerald400
+import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.theme.Emerald500
-import com.teppe21.finances.core.theme.Rose400
 import com.teppe21.finances.core.theme.Rose500
-import com.teppe21.finances.core.theme.Slate800
+import com.teppe21.finances.core.ui.EmptyState
+import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.SectionCard
+import com.teppe21.finances.core.ui.TransactionRow
 import com.teppe21.finances.core.utils.CurrencyFormatter
-import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.CategoryBreakdown
 import com.teppe21.finances.domain.model.MonthlyTrend
-import com.teppe21.finances.domain.model.Transaction
-import com.teppe21.finances.domain.model.TransactionDirection
-import kotlin.math.abs
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.max
+
+private val MONTH_TITLE = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
+private val MONTH_SHORT = DateTimeFormatter.ofPattern("MMM", Locale.US)
 
 @Composable
 fun DashboardScreen(
     onNavigateToScanReceipt: () -> Unit,
     onNavigateToImportCsv: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
+    onNavigateToReview: () -> Unit,
     onNavigateToTransactions: () -> Unit,
+    onNavigateToStocks: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onAddTransaction: () -> Unit,
-    onSelectTransaction: (Transaction) -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -82,646 +82,284 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(4.dp)) }
+        item { Spacer(Modifier.height(4.dp)) }
 
-        // 1. Total Balance Headline Card
         item {
-            TotalBalanceCard(
-                balanceMinor = state.stats.balanceMinor,
+            BalanceCard(
+                totalBalanceMinor = state.totalBalanceMinor,
                 currency = state.currency,
-                savingsRate = state.stats.savingsRate,
-                transactionCount = state.stats.transactionCount
+                incomeMinor = state.monthStats.incomeMinor,
+                expenseMinor = state.monthStats.expenseMinor,
+                month = state.month
             )
         }
 
-        // 2. Income vs Expenses Mini Grid
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MetricCard(
-                    modifier = Modifier.weight(1f),
-                    title = stringResource(R.string.income),
-                    amountMinor = state.stats.incomeMinor,
-                    currency = state.currency,
-                    isIncome = true
-                )
-                MetricCard(
-                    modifier = Modifier.weight(1f),
-                    title = stringResource(R.string.expenses),
-                    amountMinor = state.stats.expenseMinor,
-                    currency = state.currency,
-                    isIncome = false
+        if (state.reviewCount > 0) {
+            item {
+                InfoBanner(
+                    text = if (state.reviewCount == 1) "1 transaction needs review before it is counted."
+                    else "${state.reviewCount} transactions need review before they are counted.",
+                    icon = Icons.Default.PendingActions,
+                    onClick = onNavigateToReview
                 )
             }
         }
 
-        // 3. Quick Actions Priority Row
-        item {
-            QuickActionsSection(
-                pendingCount = state.pendingNotificationCount,
-                onScanReceipt = onNavigateToScanReceipt,
-                onImportCsv = onNavigateToImportCsv,
-                onAddTransaction = onAddTransaction,
-                onOpenNotifications = onNavigateToNotifications
-            )
-        }
-
-        // 4. 6-Month Cash Flow Trends Chart
-        if (state.monthlyTrends.isNotEmpty()) {
+        val unconverted = state.monthStats.unconvertedCount + state.balanceUnconvertedAccounts
+        if (unconverted > 0) {
             item {
-                MonthlyTrendsChartCard(trends = state.monthlyTrends)
-            }
-        }
-
-        // 5. Category Breakdown
-        if (state.categoryBreakdown.isNotEmpty()) {
-            item {
-                CategoryBreakdownCard(breakdown = state.categoryBreakdown, currency = state.currency)
-            }
-        }
-
-        // 6. Recent Activity Section
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.recent_activity),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                InfoBanner(
+                    text = "Some amounts are not included because no exchange rate to ${state.currency} is available. " +
+                        "Refresh rates or enter a manual rate in Settings.",
+                    onClick = onNavigateToSettings
                 )
-                if (state.recentTransactions.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.see_all),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable { onNavigateToTransactions() }
-                    )
-                }
             }
         }
 
-        if (state.recentTransactions.isEmpty()) {
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickAction(Modifier.weight(1f), stringResource(R.string.add_transaction), Icons.Default.Add, onAddTransaction)
+                QuickAction(Modifier.weight(1f), stringResource(R.string.scan_receipt), Icons.Default.CameraAlt, onNavigateToScanReceipt)
+                QuickAction(Modifier.weight(1f), stringResource(R.string.import_statement), Icons.Default.FileOpen, onNavigateToImportCsv)
+            }
+        }
+
+        if (!state.isLoading && !state.hasAnyTransactions) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                EmptyState(
+                    title = "No transactions yet",
+                    body = "Add one manually, scan a receipt, import a bank CSV, or enable notification recognition under More.",
+                    action = { TextButton(onClick = onAddTransaction) { Text(stringResource(R.string.add_transaction)) } }
+                )
+            }
+        }
+
+        if (state.hasAnyTransactions) {
+            item { MonthlyTrendsChartCard(state.monthlyTrends, state.currency) }
+            if (state.categoryBreakdown.isNotEmpty()) {
+                item { CategoryBreakdownCard(state.categoryBreakdown, state.currency, state.month) }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.no_transactions),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(stringResource(R.string.recent_activity), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onNavigateToTransactions) { Text(stringResource(R.string.see_all)) }
                 }
             }
-        } else {
-            items(state.recentTransactions) { tx ->
-                val convertedItem = state.recentConvertedTransactions.firstOrNull { it.transaction.id == tx.id }
-                TransactionRowItem(
+            items(state.recentTransactions, key = { it.id }) { tx ->
+                TransactionRow(
                     transaction = tx,
                     displayCurrency = state.currency,
-                    convertedAmountMinor = convertedItem?.convertedAmountMinor ?: tx.amountMinor,
-                    onClick = { onSelectTransaction(tx) }
+                    convertedAmountMinor = state.recentConverted[tx.id],
+                    onClick = onNavigateToTransactions
                 )
             }
         }
 
-        item { Spacer(modifier = Modifier.height(80.dp)) }
+        item { StocksEntryCard(onNavigateToStocks) }
+
+        if (state.ratesAsOf != null && state.hasAnyTransactions) {
+            item {
+                Text(
+                    text = "Converted amounts use the latest available exchange rates, not the rate on each transaction date.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-fun TotalBalanceCard(
-    balanceMinor: Long,
+private fun BalanceCard(
+    totalBalanceMinor: Long?,
     currency: String,
-    savingsRate: Float,
-    transactionCount: Int
+    incomeMinor: Long,
+    expenseMinor: Long,
+    month: YearMonth
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.total_balance).uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = CurrencyFormatter.format(balanceMinor, currency),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Wallet,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(Emerald500)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "${stringResource(R.string.savings_rate)}: ",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${(savingsRate * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = Emerald500
-                    )
-                }
-
-                val txText = if (transactionCount == 1) "1 transaction" else "$transactionCount transactions"
-                Text(
-                    text = txText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun MetricCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    amountMinor: Long,
-    currency: String,
-    isIncome: Boolean
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isIncome) Emerald500.copy(alpha = 0.15f) else Rose500.copy(alpha = 0.15f),
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (isIncome) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
-                            contentDescription = null,
-                            tint = if (isIncome) Emerald500 else Rose500,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
+        Column(Modifier.padding(20.dp)) {
             Text(
-                text = "${if (isIncome) "+" else "-"}${CurrencyFormatter.format(amountMinor, currency)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = if (isIncome) Emerald500 else MaterialTheme.colorScheme.onSurface
+                stringResource(R.string.total_balance),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: "Unavailable",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "All accounts, opening balances plus recorded transactions",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(month.format(MONTH_TITLE), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth()) {
+                MonthFigure(Modifier.weight(1f), stringResource(R.string.income), "+" + CurrencyFormatter.format(incomeMinor, currency), Emerald500)
+                MonthFigure(Modifier.weight(1f), stringResource(R.string.expenses), "-" + CurrencyFormatter.format(expenseMinor, currency), Rose500)
+            }
         }
     }
 }
 
 @Composable
-fun QuickActionsSection(
-    pendingCount: Int,
-    onScanReceipt: () -> Unit,
-    onImportCsv: () -> Unit,
-    onAddTransaction: () -> Unit,
-    onOpenNotifications: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.quick_actions).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-
-            if (pendingCount > 0) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF59E0B).copy(alpha = 0.15f),
-                    modifier = Modifier.clickable { onOpenNotifications() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = null,
-                            tint = Color(0xFFF59E0B),
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = "$pendingCount detected",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFF59E0B),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            QuickActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(R.string.scan_receipt),
-                icon = Icons.Default.CameraAlt,
-                onClick = onScanReceipt
-            )
-            QuickActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(R.string.import_statement),
-                icon = Icons.Default.FileOpen,
-                onClick = onImportCsv
-            )
-            QuickActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(R.string.add_transaction),
-                icon = Icons.Default.Add,
-                isPrimary = true,
-                onClick = onAddTransaction
-            )
-        }
+private fun MonthFigure(modifier: Modifier, label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = color)
     }
 }
 
 @Composable
-fun QuickActionButton(
-    modifier: Modifier = Modifier,
-    title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isPrimary: Boolean = false,
-    onClick: () -> Unit
-) {
-    Card(
+private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
         modifier = modifier
-            .height(86.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isPrimary) Blue500.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
-        ),
-        border = if (isPrimary) androidx.compose.foundation.BorderStroke(1.dp, Blue500.copy(alpha = 0.4f)) else null
+            .height(72.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
+            modifier = Modifier.padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = if (isPrimary) Blue500 else MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(34.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (isPrimary) Color.White else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isPrimary) Blue500 else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 1, textAlign = TextAlign.Center)
         }
     }
 }
 
 @Composable
-fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(R.string.six_months_trends),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val maxVal = max(
-                trends.maxOfOrNull { max(it.incomeMinor, it.expenseMinor) } ?: 1L,
-                1L
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(110.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                trends.forEach { item ->
-                    val incRatio = (item.incomeMinor.toFloat() / maxVal.toFloat()).coerceIn(0.06f, 1f)
-                    val expRatio = (item.expenseMinor.toFloat() / maxVal.toFloat()).coerceIn(0.06f, 1f)
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.Bottom,
-                            modifier = Modifier.height(84.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(6.dp)
-                                    .height((80 * incRatio).dp)
-                                    .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                                    .background(Emerald500)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .width(6.dp)
-                                    .height((80 * expRatio).dp)
-                                    .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                                    .background(Rose500)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = item.month.takeLast(2),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CategoryBreakdownCard(
-    breakdown: List<CategoryBreakdown>,
-    currency: String = "HUF"
-) {
-    val context = LocalContext.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(R.string.category_breakdown),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            breakdown.take(5).forEach { cat ->
-                val catColor = CategoryColorProvider.getColor(cat.categoryId, cat.color)
-                val displayName = com.teppe21.finances.feature.analytics.getLocalizedCategoryName(cat.categoryId, cat.categoryName, context)
-
-                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(catColor)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = displayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                        Text(
-                            text = "${CurrencyFormatter.format(cat.totalMinor, currency)} (${cat.percentage.toInt()}%)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { (cat.percentage / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
-                        color = catColor,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TransactionRowItem(
-    transaction: Transaction,
-    displayCurrency: String = transaction.currency,
-    convertedAmountMinor: Long = transaction.amountMinor,
-    onClick: () -> Unit
-) {
-    val isIncome = transaction.direction == TransactionDirection.INCOME ||
-        (transaction.direction == TransactionDirection.REFUND && transaction.amountMinor > 0)
-    val isTransfer = transaction.direction == TransactionDirection.TRANSFER
-    val catColor = CategoryColorProvider.getColor(transaction.categoryId)
-    val hasConversion = !displayCurrency.equals(transaction.currency, ignoreCase = true)
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface
-    ) {
+fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String) {
+    SectionCard(title = stringResource(R.string.six_months_trends)) {
+        val maxVal = max(trends.maxOfOrNull { max(it.incomeMinor, it.expenseMinor) } ?: 0L, 1L)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .height(110.dp)
+                .semantics {
+                    contentDescription = trends.joinToString("; ") {
+                        "${YearMonth.parse(it.month).format(MONTH_SHORT)}: income ${CurrencyFormatter.format(it.incomeMinor, currency)}, " +
+                            "expenses ${CurrencyFormatter.format(it.expenseMinor, currency)}"
+                    }
+                },
+            verticalAlignment = Alignment.Bottom
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = when {
-                        isTransfer -> Color(0xFF6366F1).copy(alpha = 0.15f)
-                        isIncome -> Emerald500.copy(alpha = 0.15f)
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when {
-                                isTransfer -> Icons.Default.SwapHoriz
-                                isIncome -> Icons.Default.ShoppingBag
-                                else -> Icons.Default.ShoppingBag
-                            },
-                            contentDescription = null,
-                            tint = when {
-                                isTransfer -> Color(0xFF6366F1)
-                                isIncome -> Emerald500
-                                else -> MaterialTheme.colorScheme.onSurface
-                            },
-                            modifier = Modifier.size(20.dp)
-                        )
+            trends.forEach { item ->
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(
+                        modifier = Modifier.height(84.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Bar(item.incomeMinor.toFloat() / maxVal, Emerald500)
+                        Bar(item.expenseMinor.toFloat() / maxVal, Rose500)
                     }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(catColor)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = transaction.merchant?.ifBlank { null } ?: transaction.description,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    val subtitle = if (hasConversion) {
-                        "${DateFormatter.format(transaction.date)} • ${transaction.source.getDisplayName()} • Orig: ${CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency)}"
-                    } else {
-                        "${DateFormatter.format(transaction.date)} • ${transaction.source.getDisplayName()}"
-                    }
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        text = subtitle,
+                        YearMonth.parse(item.month).format(MONTH_SHORT),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Legend("Income", Emerald500)
+            Legend("Expenses", Rose500)
+        }
+    }
+}
 
-            val amountToShow = if (hasConversion) convertedAmountMinor else transaction.amountMinor
-            val currencyToShow = if (hasConversion) displayCurrency else transaction.currency
-            Text(
-                text = CurrencyFormatter.formatSigned(amountToShow, currencyToShow),
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = when {
-                    isTransfer -> Color(0xFF6366F1)
-                    isIncome -> Emerald500
-                    else -> MaterialTheme.colorScheme.onSurface
+@Composable
+private fun Bar(ratio: Float, color: androidx.compose.ui.graphics.Color) {
+    // Zero stays visibly zero: no artificial minimum height.
+    val height = (80f * ratio.coerceIn(0f, 1f)).dp
+    Box(
+        Modifier
+            .width(8.dp)
+            .height(height)
+            .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+            .background(color)
+    )
+}
+
+@Composable
+private fun Legend(label: String, color: androidx.compose.ui.graphics.Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun CategoryBreakdownCard(breakdown: List<CategoryBreakdown>, currency: String, month: YearMonth) {
+    SectionCard(title = "Spending by category, ${month.format(MONTH_TITLE)}") {
+        breakdown.take(5).forEach { cat ->
+            val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
+            Column(Modifier.padding(vertical = 5.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+                    Spacer(Modifier.width(8.dp))
+                    Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
+                    Text(
+                        "${CurrencyFormatter.format(cat.totalMinor, currency)} · ${cat.percentage.toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-            )
+                Spacer(Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { (cat.percentage / 100f).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                    color = color,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StocksEntryCard(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Stocks", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Watchlist of market quotes. Kept separate from your accounts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

@@ -30,7 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
@@ -69,6 +69,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.FinancesApp
+import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.theme.Blue500
 import com.teppe21.finances.core.theme.Emerald500
 import com.teppe21.finances.core.utils.CurrencyFormatter
@@ -106,11 +108,6 @@ fun ScanReceiptScreen(
 
     val imageCapture = remember { ImageCapture.Builder().build() }
 
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -153,13 +150,22 @@ fun ScanReceiptScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = stringResource(R.string.camera_permission_needed),
+                    text = "Camera access for receipts",
                     color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Finances uses the camera only while this screen is open, to read the text of a receipt on " +
+                        "this device. The photo is not saved or uploaded. You can also pick an image from your gallery instead.",
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                    Text(stringResource(R.string.grant_permission))
+                    Text("Allow camera")
                 }
             }
         }
@@ -181,7 +187,7 @@ fun ScanReceiptScreen(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(stringResource(R.string.back), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
@@ -232,12 +238,15 @@ fun ScanReceiptScreen(
         ) {
             // Gallery Picker
             IconButton(
-                onClick = { galleryLauncher.launch("image/*") },
+                onClick = {
+                    FinancesApp.instance.appLock.expectExternalActivity()
+                    galleryLauncher.launch("image/*")
+                },
                 modifier = Modifier
                     .size(48.dp)
                     .background(Color.Black.copy(alpha = 0.6f), CircleShape)
             ) {
-                Icon(Icons.Default.Image, contentDescription = null, tint = Color.White)
+                Icon(Icons.Default.Image, contentDescription = "Pick a receipt image from the gallery", tint = Color.White)
             }
 
             // Capture Button
@@ -258,8 +267,7 @@ fun ScanReceiptScreen(
                                 }
 
                                 override fun onError(exception: ImageCaptureException) {
-                                    // Fallback to demo text if device emulator/no physical camera
-                                    viewModel.processDemoText("LIDL MAGYARORSZAG KFT.\nFIZETENDO: 1 249 Ft\nKESZPENZ: 2000 Ft")
+                                    viewModel.reportCaptureFailed()
                                 }
                             }
                         )
@@ -269,7 +277,7 @@ fun ScanReceiptScreen(
                 border = androidx.compose.foundation.BorderStroke(4.dp, Blue500)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Camera, contentDescription = null, tint = Blue500, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.Camera, contentDescription = "Take photo of receipt", tint = Blue500, modifier = Modifier.size(32.dp))
                 }
             }
 
@@ -284,7 +292,19 @@ fun ScanReceiptScreen(
                     .size(48.dp)
                     .background(Color.Black.copy(alpha = 0.6f), CircleShape)
             ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = stringResource(R.string.demo_receipt), tint = Emerald500)
+                Icon(Icons.Default.AutoAwesome, contentDescription = "Try a sample receipt (demo data)", tint = Emerald500)
+            }
+        }
+
+        state.errorMessage?.let { error ->
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 100.dp, start = 24.dp, end = 24.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer
+            ) {
+                Text(error, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
 
@@ -318,10 +338,12 @@ fun ScanReceiptScreen(
                 onDismissRequest = { viewModel.clearScan() },
                 sheetState = sheetState
             ) {
-                var merchant: String by remember { mutableStateOf(scan.merchant ?: "Store / Merchant") }
-                val initialAmount = ((scan.totalMinor?.let { abs(it) } ?: 124900L) / 100L).toString()
+                var merchant: String by remember { mutableStateOf(scan.merchant.orEmpty()) }
+                // No total recognized: leave the field empty instead of inventing a value.
+                val initialAmount = scan.totalMinor?.let { Money.toMajor(abs(it)).stripTrailingZeros().toPlainString() }.orEmpty()
                 var totalAmountText: String by remember { mutableStateOf(initialAmount) }
                 var selectedCurrency by remember { mutableStateOf(scan.currency.ifBlank { "HUF" }) }
+                val parsedTotal = Money.parseUserInput(totalAmountText)?.takeIf { it > 0 }
 
                 val merchantLabel = stringResource(R.string.merchant)
                 val totalLabel = "${stringResource(R.string.total)} ($selectedCurrency)"
@@ -337,19 +359,35 @@ fun ScanReceiptScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
+                    if (state.isSample) {
+                        Text(
+                            "Sample receipt for trying the feature; it did not come from your camera.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Text(
+                        "Check the recognized values. Only the merchant, date, total and payment method are saved; the image and recognized text are not.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     OutlinedTextField(
                         value = merchant,
                         onValueChange = { merchant = it },
                         label = { Text(merchantLabel) },
+                        placeholder = { Text("Not recognized") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
 
                     OutlinedTextField(
                         value = totalAmountText,
-                        onValueChange = { totalAmountText = it.filter { c -> c.isDigit() } },
+                        onValueChange = { totalAmountText = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15) },
                         label = { Text(totalLabel) },
+                        isError = totalAmountText.isNotBlank() && parsedTotal == null,
+                        supportingText = { if (scan.totalMinor == null) Text("The total could not be read; enter it from the receipt.") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -373,16 +411,25 @@ fun ScanReceiptScreen(
                     val methodVal = if (scan.paymentMethod == com.teppe21.finances.domain.model.PaymentMethod.CASH) cashText else cardText
 
                     Text(
-                        text = "$methodLabel: $methodVal",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Emerald500,
-                        fontWeight = FontWeight.SemiBold
+                        text = "$methodLabel: $methodVal · Date: ${com.teppe21.finances.core.utils.DateFormatter.format(scan.date ?: LocalDate.now())}",
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                    Text("Account", style = MaterialTheme.typography.labelMedium)
+                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(state.accounts.size) { i ->
+                            val acc = state.accounts[i]
+                            androidx.compose.material3.FilterChip(
+                                selected = state.selectedAccountId == acc.id,
+                                onClick = { viewModel.setSelectedAccount(acc.id) },
+                                label = { Text(acc.getDisplayName()) }
+                            )
+                        }
+                    }
 
                     Button(
                         onClick = {
-                            val minor = (totalAmountText.toLongOrNull() ?: 0L) * 100L
-                            val accId = state.selectedAccountId ?: "acc_cash"
+                            val minor = parsedTotal ?: return@Button
+                            val accId = state.selectedAccountId ?: return@Button
                             val catId = state.selectedCategoryId ?: "food"
                             viewModel.confirmSave(
                                 merchant = merchant,
@@ -395,6 +442,7 @@ fun ScanReceiptScreen(
                                 onNavigateBack()
                             }
                         },
+                        enabled = parsedTotal != null && state.selectedAccountId != null && merchant.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {

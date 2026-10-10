@@ -12,72 +12,73 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-
-data class ConvertedTransaction(
-    val transaction: Transaction,
-    val convertedAmountMinor: Long,
-    val displayCurrency: String
-)
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
 
 data class DashboardUiState(
-    val stats: FinancialStats = FinancialStats(),
+    /** Sum of all account balances converted to the display currency; null if any part is unconvertible. */
+    val totalBalanceMinor: Long? = null,
+    val balanceUnconvertedAccounts: Int = 0,
+    val monthStats: FinancialStats = FinancialStats(),
+    val month: YearMonth = YearMonth.now(),
     val recentTransactions: List<Transaction> = emptyList(),
-    val recentConvertedTransactions: List<ConvertedTransaction> = emptyList(),
+    val recentConverted: Map<String, Long?> = emptyMap(),
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
     val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
-    val pendingNotificationCount: Int = 0,
+    val reviewCount: Int = 0,
     val currency: String = "HUF",
-    val isLoading: Boolean = false
+    val ratesAsOf: Instant? = null,
+    val hasAnyTransactions: Boolean = false,
+    val isLoading: Boolean = true
 )
 
 class DashboardViewModel : ViewModel() {
 
     private val app = FinancesApp.instance
-    private val txRepo = app.transactionRepository
-    private val catRepo = app.categoryRepository
-    private val notifRepo = app.notificationRepository
-    private val statsUseCase = app.calculateStatsUseCase
-    private val prefsRepo = app.preferencesRepository
-    private val fxRepo = app.exchangeRateRepository
+    private val stats = app.calculateStatsUseCase
 
     val uiState: StateFlow<DashboardUiState> = combine(
-        txRepo.getAllTransactionsFlow(),
-        catRepo.getAllCategoriesFlow(),
-        notifRepo.getPendingNotificationsFlow(),
-        prefsRepo.preferencesFlow,
-        fxRepo.ratesFlow
-    ) { transactions, categories, pendingNotifs, prefs, _ ->
-        val targetCurrency = prefs.currency
-        val converter: CurrencyAmountConverter = { amountMinor, currency, date ->
-            fxRepo.convert(amountMinor, currency, targetCurrency, date) ?: amountMinor
+        app.transactionRepository.getAllTransactionsFlow(),
+        app.categoryRepository.getAllCategoriesFlow(),
+        app.accountRepository.getAllAccountsFlow(),
+        app.preferencesRepository.preferencesFlow,
+        app.exchangeRateRepository.tableFlow
+    ) { transactions, categories, accounts, prefs, table ->
+        val target = prefs.currency
+        val converter: CurrencyAmountConverter = { amount, currency, _ -> table.convert(amount, currency, target) }
+        val month = YearMonth.now()
+        val thisMonth = transactions.filter { YearMonth.from(it.date) == month }
+
+        var total = 0L
+        var unconvertedAccounts = 0
+        for (account in accounts) {
+            val balance = stats.accountBalance(
+                account.openingBalanceMinor,
+                account.currency,
+                transactions.filter { it.accountId == account.id }
+            ) { a, from, to -> table.convert(a, from, to) }
+            val converted = table.convert(balance.balanceMinor, account.currency, target)
+            if (converted == null || balance.unconvertedCount > 0) unconvertedAccounts++
+            if (converted != null) total += converted
         }
 
-        val confirmed = transactions.filter { !it.pending }
-        val stats = statsUseCase.execute(confirmed, converter)
-        val trends = statsUseCase.calculateMonthlyTrends(confirmed, converter = converter)
-        val breakdown = statsUseCase.calculateCategoryBreakdown(confirmed, categories, converter = converter)
         val recent = transactions.take(5)
-        val recentConverted = recent.map { tx ->
-            ConvertedTransaction(
-                transaction = tx,
-                convertedAmountMinor = fxRepo.convert(tx.amountMinor, tx.currency, targetCurrency, tx.date) ?: tx.amountMinor,
-                displayCurrency = targetCurrency
-            )
-        }
-
         DashboardUiState(
-            stats = stats,
+            totalBalanceMinor = if (unconvertedAccounts == 0) total else null,
+            balanceUnconvertedAccounts = unconvertedAccounts,
+            monthStats = stats.execute(thisMonth, converter),
+            month = month,
             recentTransactions = recent,
-            recentConvertedTransactions = recentConverted,
-            monthlyTrends = trends,
-            categoryBreakdown = breakdown,
-            pendingNotificationCount = pendingNotifs.size,
-            currency = targetCurrency,
+            recentConverted = recent.associate { it.id to table.convert(it.amountMinor, it.currency, target) },
+            monthlyTrends = stats.calculateMonthlyTrends(transactions, monthCount = 6, referenceDate = LocalDate.now(), converter = converter),
+            categoryBreakdown = stats.calculateCategoryBreakdown(thisMonth, categories, converter),
+            reviewCount = transactions.count { it.pending },
+            currency = target,
+            ratesAsOf = table.oldestAsOf().takeIf { !table.isEmpty },
+            hasAnyTransactions = transactions.isNotEmpty(),
             isLoading = false
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = DashboardUiState(isLoading = true)
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
+
 }

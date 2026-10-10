@@ -4,151 +4,175 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
+import com.teppe21.finances.domain.model.Account
 import com.teppe21.finances.domain.model.NotificationEvent
+import com.teppe21.finances.domain.model.NotificationStatusCode
 import com.teppe21.finances.domain.model.RawNotification
+import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.native.notification.NotificationHelper
-import com.teppe21.finances.native.notification.OtpParser
-import com.teppe21.finances.native.notification.RevolutParser
+import com.teppe21.finances.native.notification.parsing.NotificationRecognizer
+import com.teppe21.finances.native.notification.parsing.NotificationSource
+import com.teppe21.finances.native.notification.parsing.Recognition
+import com.teppe21.finances.native.notification.parsing.SourceType
+import com.teppe21.finances.native.notification.parsing.SupportedSources
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 
 data class NotificationUiState(
-    val isPermissionGranted: Boolean = false,
-    val pendingEvents: List<NotificationEvent> = emptyList(),
-    val accounts: List<com.teppe21.finances.domain.model.Account> = emptyList(),
-    val bankMappings: Map<String, String> = emptyMap(),
-    val monitoredApps: List<String> = listOf("OTP Bank", "Revolut", "Erste Bank", "MBH Bank", "Wise")
+    val accessGranted: Boolean = false,
+    val disclosureAccepted: Boolean = false,
+    val sources: List<NotificationSource> = SupportedSources.ALL,
+    val accounts: List<Account> = emptyList(),
+    /** institution -> account id */
+    val mappings: Map<String, String> = emptyMap(),
+    val recentEvents: List<NotificationEvent> = emptyList(),
+    val reviewCount: Int = 0
 )
+
+/** Result of the in-app sample test; nothing is stored. */
+data class SampleResult(val title: String, val details: String)
 
 class NotificationViewModel : ViewModel() {
 
     private val app = FinancesApp.instance
-    private val notifRepo = app.notificationRepository
-    private val ingestUseCase = app.ingestTransactionUseCase
-    private val accountRepo = app.accountRepository
-    private val prefsRepo = app.preferencesRepository
+    private val prefs = app.preferencesRepository
 
-    private val _isPermissionGranted = MutableStateFlow(false)
-    private val _bankMappings = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val accessGranted = MutableStateFlow(false)
+    private val mappings = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    private val _sample = MutableStateFlow<SampleResult?>(null)
+    val sample: StateFlow<SampleResult?> = _sample.asStateFlow()
+
+    /** Institutions that can be mapped: every bank source. Wallet payments use the card issuer's mapping. */
+    val mappableInstitutions: List<String> =
+        SupportedSources.ALL.filter { it.type == SourceType.BANK }.map { it.institution }
 
     init {
-        loadBankMappings()
-    }
-
-    private fun loadBankMappings() {
         viewModelScope.launch {
-            val supportedBanks = listOf("OTP Bank", "Revolut", "Erste Bank", "MBH Bank", "Wise")
-            val map = mutableMapOf<String, String>()
-            supportedBanks.forEach { bank ->
-                prefsRepo.getBankMapping(bank)?.let { accId ->
-                    map[bank] = accId
-                }
-            }
-            _bankMappings.value = map
-        }
-    }
-
-    fun updateBankMapping(bankName: String, accountId: String) {
-        viewModelScope.launch {
-            prefsRepo.setBankMapping(bankName, accountId)
-            _bankMappings.value = _bankMappings.value + (bankName to accountId)
+            mappings.value = mappableInstitutions.mapNotNull { inst -> prefs.getBankMapping(inst)?.let { inst to it } }.toMap()
         }
     }
 
     val uiState: StateFlow<NotificationUiState> = combine(
-        _isPermissionGranted,
-        notifRepo.getPendingNotificationsFlow(),
-        accountRepo.getAllAccountsFlow(),
-        _bankMappings
-    ) { granted, pending, accounts, mappings ->
+        accessGranted,
+        prefs.preferencesFlow,
+        app.accountRepository.getAllAccountsFlow(),
+        mappings,
+        combine(app.notificationRepository.getRecentEventsFlow(30), app.transactionRepository.getPendingTransactionsFlow()) { e, p -> e to p.size }
+    ) { granted, p, accounts, maps, eventsAndReview ->
         NotificationUiState(
-            isPermissionGranted = granted,
-            pendingEvents = pending,
+            accessGranted = granted,
+            disclosureAccepted = p.notificationDisclosureAccepted,
             accounts = accounts,
-            bankMappings = mappings
+            mappings = maps,
+            recentEvents = eventsAndReview.first,
+            reviewCount = eventsAndReview.second
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = NotificationUiState()
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NotificationUiState())
 
-    fun checkPermission(context: Context) {
-        _isPermissionGranted.value = NotificationHelper.isNotificationAccessGranted(context)
+    fun refreshAccess(context: Context) {
+        accessGranted.value = NotificationHelper.isNotificationAccessGranted(context)
     }
 
-    fun openSettings(context: Context) {
-        NotificationHelper.openNotificationListenerSettings(context)
-    }
-
-    fun approveEvent(event: NotificationEvent) {
+    /** Called only from the disclosure's explicit "Continue" button. */
+    fun acceptDisclosureAndOpenSettings(context: Context) {
         viewModelScope.launch {
-            val updated = event.copy(processed = true)
-            notifRepo.updateNotification(updated)
+            prefs.setNotificationDisclosureAccepted(true)
+            openSystemSettings(context)
         }
     }
 
-    fun dismissEvent(event: NotificationEvent) {
-        viewModelScope.launch {
-            val updated = event.copy(processed = true)
-            notifRepo.updateNotification(updated)
+    fun openSystemSettings(context: Context) {
+        app.appLock.expectExternalActivity()
+        if (!NotificationHelper.openNotificationListenerSettings(context)) {
+            _sample.value = SampleResult(
+                "Settings could not be opened",
+                "Open Android Settings > Notifications > Device & app notifications (or Notification access) and enable Finances."
+            )
         }
     }
 
-    fun simulateTestNotification(type: String = "otp") {
+    /** Stops processing immediately, even before Android access is revoked. */
+    fun withdrawConsent() {
+        viewModelScope.launch { prefs.setNotificationDisclosureAccepted(false) }
+    }
+
+    fun setMapping(institution: String, accountId: String) {
         viewModelScope.launch {
-            val raw = when (type) {
-                "revolut" -> RawNotification(
-                    packageName = "com.revolut.revolut",
-                    applicationLabel = "Revolut",
-                    title = "Fizetés a következőnek: LIDL",
-                    text = "Elköltöttél 14 500 Ft-ot itt: LIDL.",
-                    postedAt = Instant.now()
-                )
-                "revolut_transfer" -> RawNotification(
-                    packageName = "com.revolut.revolut",
-                    applicationLabel = "Revolut",
-                    title = "Pénzküldés",
-                    text = "Pénzt küldtél Kovács János részére. Összeg: 10 000 Ft.",
-                    postedAt = Instant.now()
-                )
-                else -> RawNotification(
-                    packageName = "hu.otpbank.smartbank",
-                    applicationLabel = "OTP SmartBank",
-                    title = "Sikeres kártyás vásárlás",
-                    text = "Összeg: -4.500 Ft. Hely: SPAR BUDAPEST. Kártya: *1234.",
-                    postedAt = Instant.now()
-                )
-            }
-
-            val parser = if (type.startsWith("revolut")) RevolutParser() else OtpParser()
-            val parsed = parser.parse(raw)
-
-            if (parsed != null) {
-                val accounts = accountRepo.getAllAccounts()
-                val accId = accounts.firstOrNull { it.name.contains(parser.bankName, ignoreCase = true) }?.id
-                    ?: accounts.firstOrNull()?.id ?: "acc_otp"
-
-                ingestUseCase.execute(
-                    com.teppe21.finances.domain.usecase.IngestionInput(
-                        accountId = accId,
-                        date = parsed.date,
-                        amountMinor = parsed.amountMinor,
-                        currency = parsed.currency,
-                        direction = parsed.direction,
-                        description = parsed.description,
-                        merchant = parsed.merchant,
-                        source = com.teppe21.finances.domain.model.TransactionSource.NOTIFICATION,
-                        sourceAppPackage = raw.packageName,
-                        confidence = parsed.confidence
-                    )
-                )
-            }
+            prefs.setBankMapping(institution, accountId)
+            mappings.value = mappings.value + (institution to accountId)
         }
     }
+
+    /** Runs the recognizer on a built-in sample so the user can see what would happen. Nothing is stored. */
+    fun runSample(kind: String) {
+        val now = Instant.now()
+        val raw = when (kind) {
+            "promo" -> RawNotification("com.revolut.revolut", "7 days left to earn", "Get HUF22,500 for each eligible friend you refer. T&Cs apply.", null, now)
+            "otp" -> RawNotification("hu.otpbank.smartbank", "OTP Bank", "Az Ön belépési kódja: 981245. Ne adja ki senkinek!", null, now)
+            else -> RawNotification("com.revolut.revolut", "Sample Grocery", "You spent HUF4,590\nHUF balance: HUF120,000.00", null, now)
+        }
+        _sample.value = when (val r = NotificationRecognizer().recognize(raw)) {
+            is Recognition.Recognized -> SampleResult(
+                "Recognized as a transaction",
+                "Amount: ${com.teppe21.finances.core.utils.CurrencyFormatter.formatSigned(r.transaction.amountMinor, r.transaction.currency)}\n" +
+                    "Merchant: ${r.transaction.merchant ?: "unknown"}\nThe balance line was ignored. This sample was not saved."
+            )
+            is Recognition.Rejected -> SampleResult("Rejected: ${statusLabel(r.code)}", "Nothing would be stored except this status code.")
+        }
+    }
+
+    fun dismissSample() {
+        _sample.value = null
+    }
+}
+
+class ReviewViewModel : ViewModel() {
+    private val app = FinancesApp.instance
+
+    val pending: StateFlow<List<Transaction>> = app.transactionRepository.getPendingTransactionsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val accounts: StateFlow<List<Account>> = app.accountRepository.getAllAccountsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun confirm(tx: Transaction, accountId: String) {
+        if (accountId.isBlank()) return
+        viewModelScope.launch {
+            app.transactionRepository.update(
+                tx.copy(accountId = accountId, pending = false, notes = null, updatedAt = Instant.now())
+            )
+            app.notificationRepository.markProcessedForTransaction(tx.id)
+        }
+    }
+
+    fun discard(tx: Transaction) {
+        viewModelScope.launch {
+            app.transactionRepository.deleteById(tx.id)
+            app.notificationRepository.markProcessedForTransaction(tx.id)
+        }
+    }
+}
+
+fun statusLabel(code: NotificationStatusCode?): String = when (code) {
+    NotificationStatusCode.ACCEPTED_EXPENSE -> "Expense recorded"
+    NotificationStatusCode.ACCEPTED_INCOME -> "Income recorded"
+    NotificationStatusCode.ACCEPTED_TRANSFER -> "Transfer recorded"
+    NotificationStatusCode.ACCEPTED_REFUND -> "Refund recorded"
+    NotificationStatusCode.REJECTED_PROMOTIONAL -> "Promotion ignored"
+    NotificationStatusCode.REJECTED_SECURITY_MESSAGE -> "Security message ignored"
+    NotificationStatusCode.REJECTED_UNSUPPORTED_PACKAGE -> "Unsupported app"
+    NotificationStatusCode.REJECTED_NON_TRANSACTION -> "Not a transaction"
+    NotificationStatusCode.REJECTED_MALFORMED_TRANSACTION -> "Could not read amount"
+    NotificationStatusCode.DUPLICATE_EXISTING_TRANSACTION -> "Duplicate of an existing transaction"
+    NotificationStatusCode.PENDING_POSSIBLE_DUPLICATE -> "Possible duplicate, needs review"
+    NotificationStatusCode.PENDING_ACCOUNT_REVIEW -> "Account unclear, needs review"
+    NotificationStatusCode.PENDING_LOW_CONFIDENCE -> "Needs review"
+    null -> "Unknown"
 }

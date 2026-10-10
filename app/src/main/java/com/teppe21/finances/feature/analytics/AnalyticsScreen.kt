@@ -59,6 +59,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.ui.InfoBanner
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.TextButton
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.theme.Emerald500
 import com.teppe21.finances.core.theme.Rose500
@@ -71,37 +75,6 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
-fun getLocalizedCategoryName(categoryId: String?, defaultName: String, context: Context): String {
-    return when (categoryId) {
-        "food" -> context.getString(R.string.cat_food)
-        "dining" -> context.getString(R.string.cat_dining)
-        "transport" -> context.getString(R.string.cat_transport)
-        "subscriptions" -> context.getString(R.string.cat_subscriptions)
-        "housing" -> context.getString(R.string.cat_housing)
-        "entertainment" -> context.getString(R.string.cat_entertainment)
-        "savings" -> context.getString(R.string.cat_savings)
-        "income" -> context.getString(R.string.cat_income)
-        "health" -> context.getString(R.string.cat_health)
-        "shopping" -> context.getString(R.string.cat_shopping)
-        "transfers" -> context.getString(R.string.cat_transfers)
-        "other" -> context.getString(R.string.cat_other)
-        else -> when (defaultName) {
-            "Élelmiszer" -> context.getString(R.string.cat_food)
-            "Étkezés / Étterem", "Étkezés" -> context.getString(R.string.cat_dining)
-            "Tankolás / Közlekedés", "Közlekedés" -> context.getString(R.string.cat_transport)
-            "Előfizetések" -> context.getString(R.string.cat_subscriptions)
-            "Rezsi / Szolgáltatás", "Lakhatás" -> context.getString(R.string.cat_housing)
-            "Szórakozás" -> context.getString(R.string.cat_entertainment)
-            "Megtakarítás" -> context.getString(R.string.cat_savings)
-            "Bevétel", "Fizetés" -> context.getString(R.string.cat_income)
-            "Egészség / Patika", "Egészség" -> context.getString(R.string.cat_health)
-            "Bevásárlás" -> context.getString(R.string.cat_shopping)
-            "Átutalások", "Átutalás", "Utalás" -> context.getString(R.string.cat_transfers)
-            "Egyéb / Ismeretlen", "Egyéb", "Ismeretlen" -> context.getString(R.string.cat_other)
-            else -> defaultName
-        }
-    }
-}
 
 @Composable
 fun AnalyticsScreen(
@@ -126,6 +99,25 @@ fun AnalyticsScreen(
                 customEndDate = state.customEndDate,
                 onOpenCustomDialog = { viewModel.openCustomDateDialog() }
             )
+        }
+
+        if (state.period == AnalyticsPeriod.MONTH) {
+            item {
+                MonthNavigator(
+                    month = state.selectedMonth,
+                    onPrevious = { viewModel.shiftMonth(-1) },
+                    onNext = { viewModel.shiftMonth(1) },
+                    onCurrent = { viewModel.goToCurrentMonth() }
+                )
+            }
+        }
+
+        if (state.stats.unconvertedCount > 0) {
+            item {
+                InfoBanner(
+                    "${state.stats.unconvertedCount} transactions are not included: no exchange rate to ${state.currency} is available."
+                )
+            }
         }
 
         // Headline Metrics Grid
@@ -207,7 +199,7 @@ fun AnalyticsScreen(
         // Monthly trends bar chart
         if (state.monthlyTrends.isNotEmpty()) {
             item {
-                MonthlyTrendsChartCard(trends = state.monthlyTrends)
+                MonthlyTrendsChartCard(trends = state.monthlyTrends, currency = state.currency)
             }
         }
 
@@ -223,6 +215,37 @@ fun AnalyticsScreen(
             onDismiss = { viewModel.closeCustomDateDialog() },
             onApply = { start, end -> viewModel.applyCustomDateRange(start, end) }
         )
+    }
+}
+
+private val MONTH_TITLE = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.US)
+
+@Composable
+fun MonthNavigator(
+    month: java.time.YearMonth,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onCurrent: () -> Unit
+) {
+    val isCurrent = month == java.time.YearMonth.now()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+        }
+        Text(
+            text = month.format(MONTH_TITLE),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onNext, enabled = !isCurrent) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+        }
+        TextButton(onClick = onCurrent, enabled = !isCurrent) { Text("This month") }
     }
 }
 
@@ -244,15 +267,10 @@ fun PeriodFilterRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FilterChip(
-                selected = currentPeriod == AnalyticsPeriod.THIS_MONTH,
-                onClick = { onSelectPeriod(AnalyticsPeriod.THIS_MONTH) },
-                label = { Text(stringResource(R.string.period_this_month)) },
+                selected = currentPeriod == AnalyticsPeriod.MONTH,
+                onClick = { onSelectPeriod(AnalyticsPeriod.MONTH) },
+                label = { Text("Month") },
                 colors = FilterChipDefaults.filterChipColors()
-            )
-            FilterChip(
-                selected = currentPeriod == AnalyticsPeriod.LAST_MONTH,
-                onClick = { onSelectPeriod(AnalyticsPeriod.LAST_MONTH) },
-                label = { Text(stringResource(R.string.period_last_month)) }
             )
             FilterChip(
                 selected = currentPeriod == AnalyticsPeriod.LAST_3_MONTHS,
@@ -457,7 +475,7 @@ fun SpendingDonutChartCard(
                         if (selectedItem != null) {
                             val catColor = CategoryColorProvider.getColor(selectedItem.categoryId, selectedItem.color)
                             Text(
-                                text = getLocalizedCategoryName(selectedItem.categoryId, selectedItem.categoryName, context),
+                                text = selectedItem.categoryName,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -513,7 +531,7 @@ fun SpendingDonutChartCard(
                     breakdown.forEach { item ->
                         val isSelected = item.categoryId == selectedCategoryId
                         val color = CategoryColorProvider.getColor(item.categoryId, item.color)
-                        val name = getLocalizedCategoryName(item.categoryId, item.categoryName, context)
+                        val name = item.categoryName
 
                         Row(
                             modifier = Modifier

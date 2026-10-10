@@ -29,7 +29,9 @@ data class ReceiptUiState(
     val categories: List<Category> = emptyList(),
     val selectedAccountId: String? = null,
     val selectedCategoryId: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    /** True when the scan came from the built-in sample, not the camera or gallery. */
+    val isSample: Boolean = false
 )
 
 class ReceiptViewModel : ViewModel() {
@@ -68,10 +70,14 @@ class ReceiptViewModel : ViewModel() {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
-                    errorMessage = e.message ?: "OCR error"
+                    errorMessage = "Text recognition failed. Try again with better lighting."
                 )
             }
         }
+    }
+
+    fun reportCaptureFailed() {
+        _uiState.value = _uiState.value.copy(isProcessing = false, errorMessage = "The photo could not be taken. Try again or pick an image.")
     }
 
     fun processUri(context: Context, uri: Uri) {
@@ -84,7 +90,7 @@ class ReceiptViewModel : ViewModel() {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
-                    errorMessage = e.message ?: "OCR error"
+                    errorMessage = "The image could not be read. Try another image."
                 )
             }
         }
@@ -94,11 +100,11 @@ class ReceiptViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(isProcessing = true, errorMessage = null)
         viewModelScope.launch {
             val scan = ReceiptParser.parse(sampleText)
-            handleScanResult(scan)
+            handleScanResult(scan, isSample = true)
         }
     }
 
-    private fun handleScanResult(scan: ReceiptScan) {
+    private fun handleScanResult(scan: ReceiptScan, isSample: Boolean = false) {
         val accounts = _uiState.value.accounts
         // If cash detected, suggest Cash Wallet account!
         val suggestedAccount = if (scan.paymentMethod == PaymentMethod.CASH) {
@@ -111,7 +117,9 @@ class ReceiptViewModel : ViewModel() {
             isProcessing = false,
             scannedReceipt = scan,
             selectedAccountId = suggestedAccount?.id,
-            selectedCategoryId = "food" // default
+            selectedCategoryId = "food",
+            errorMessage = null,
+            isSample = isSample
         )
     }
 
@@ -144,12 +152,14 @@ class ReceiptViewModel : ViewModel() {
 
             ingestUseCase.execute(
                 IngestionInput(
+                    fingerprint = scan?.id?.let { com.teppe21.finances.domain.usecase.Fingerprints.receipt(it) },
+                    notes = if (_uiState.value.isSample) "Demo data" else null,
                     accountId = accountId,
                     date = date,
                     amountMinor = -kotlin.math.abs(amountMinor),
                     currency = currency,
                     direction = TransactionDirection.EXPENSE,
-                    description = "$merchant (Receipt)",
+                    description = merchant,
                     merchant = merchant,
                     categoryId = categoryId,
                     source = TransactionSource.RECEIPT,

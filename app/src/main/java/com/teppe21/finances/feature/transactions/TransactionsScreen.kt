@@ -52,6 +52,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +66,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.money.Money
+import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.TransactionRow
 import com.teppe21.finances.core.theme.Blue500
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.theme.Emerald500
@@ -73,16 +77,16 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
-import com.teppe21.finances.feature.analytics.getLocalizedCategoryName
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
+    openAddDialog: Boolean = false,
     viewModel: TransactionsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    var showAddModal by remember { mutableStateOf(false) }
+    var showAddModal by rememberSaveable { mutableStateOf(openAddDialog) }
     var showSortModal by remember { mutableStateOf(false) }
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
 
@@ -220,11 +224,19 @@ fun TransactionsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f)
                 ) {
+                    if (state.unconvertedCount > 0) {
+                        item {
+                            InfoBanner(
+                                "${state.unconvertedCount} transactions have no exchange rate to ${state.currency}; " +
+                                    "they are shown in their original currency."
+                            )
+                        }
+                    }
                     items(state.filteredTransactions, key = { it.id }) { tx ->
-                        TransactionCard(
+                        TransactionRow(
                             transaction = tx,
                             displayCurrency = state.currency,
-                            convertedAmountMinor = state.convertedAmounts[tx.id] ?: tx.amountMinor,
+                            convertedAmountMinor = state.convertedAmounts[tx.id],
                             onClick = { viewModel.selectTransaction(tx) }
                         )
                     }
@@ -240,7 +252,7 @@ fun TransactionsScreen(
             contentColor = Color.White,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 80.dp, end = 20.dp)
+                .padding(bottom = 16.dp, end = 16.dp)
         ) {
             Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_transaction))
         }
@@ -314,7 +326,9 @@ fun TransactionsScreen(
                 TransactionDetailContent(
                     transaction = selected,
                     displayCurrency = state.currency,
-                    convertedAmountMinor = state.convertedAmounts[selected.id] ?: selected.amountMinor,
+                    convertedAmountMinor = state.convertedAmounts[selected.id],
+                    categoryName = state.categories.firstOrNull { it.id == selected.categoryId }?.displayName() ?: "Other / Uncategorized",
+                    accountName = state.accounts.firstOrNull { it.id == selected.accountId }?.getDisplayName() ?: "Not assigned",
                     onDelete = { transactionToDelete = selected },
                     onClose = { viewModel.selectTransaction(null) }
                 )
@@ -363,117 +377,12 @@ fun TransactionsScreen(
 }
 
 @Composable
-fun TransactionCard(
-    transaction: Transaction,
-    displayCurrency: String = transaction.currency,
-    convertedAmountMinor: Long = transaction.amountMinor,
-    onClick: () -> Unit
-) {
-    val isIncome = transaction.direction == TransactionDirection.INCOME ||
-        (transaction.direction == TransactionDirection.REFUND && transaction.amountMinor > 0)
-    val isTransfer = transaction.direction == TransactionDirection.TRANSFER
-    val catColor = CategoryColorProvider.getColor(transaction.categoryId)
-    val hasConversion = !displayCurrency.equals(transaction.currency, ignoreCase = true)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = when {
-                        isTransfer -> Color(0xFF6366F1).copy(alpha = 0.15f)
-                        isIncome -> Emerald500.copy(alpha = 0.15f)
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when {
-                                isTransfer -> Icons.Default.SwapHoriz
-                                isIncome -> Icons.Default.ShoppingBag
-                                else -> Icons.Default.ShoppingBag
-                            },
-                            contentDescription = null,
-                            tint = when {
-                                isTransfer -> Color(0xFF6366F1)
-                                isIncome -> Emerald500
-                                else -> MaterialTheme.colorScheme.onSurface
-                            },
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(catColor)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = transaction.merchant?.ifBlank { null } ?: transaction.description,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    val subtitle = if (hasConversion) {
-                        "${DateFormatter.format(transaction.date)} • ${transaction.source.getDisplayName()} • Orig: ${CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency)}"
-                    } else {
-                        "${DateFormatter.format(transaction.date)} • ${transaction.source.getDisplayName()}"
-                    }
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            val amountToShow = if (hasConversion) convertedAmountMinor else transaction.amountMinor
-            val currencyToShow = if (hasConversion) displayCurrency else transaction.currency
-            Text(
-                text = CurrencyFormatter.formatSigned(amountToShow, currencyToShow),
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = when {
-                    isTransfer -> Color(0xFF6366F1)
-                    isIncome -> Emerald500
-                    else -> MaterialTheme.colorScheme.onSurface
-                }
-            )
-        }
-    }
-}
-
-@Composable
 fun TransactionDetailContent(
     transaction: Transaction,
     displayCurrency: String = transaction.currency,
-    convertedAmountMinor: Long = transaction.amountMinor,
+    convertedAmountMinor: Long?,
+    categoryName: String,
+    accountName: String,
     onDelete: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -498,33 +407,29 @@ fun TransactionDetailContent(
             }
         }
 
-        val hasConversion = !displayCurrency.equals(transaction.currency, ignoreCase = true)
-        val amountToShow = if (hasConversion) convertedAmountMinor else transaction.amountMinor
-        val currencyToShow = if (hasConversion) displayCurrency else transaction.currency
-
+        // The stored amount in its own currency is always the primary figure.
         Text(
-            text = CurrencyFormatter.formatSigned(amountToShow, currencyToShow),
-            style = MaterialTheme.typography.headlineLarge,
-            fontFamily = FontFamily.Monospace,
+            text = CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency),
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = if (transaction.amountMinor > 0) Emerald500 else MaterialTheme.colorScheme.onSurface
         )
 
-        if (hasConversion) {
+        if (!displayCurrency.equals(transaction.currency, ignoreCase = true)) {
             DetailRow(
-                label = "Original Amount",
-                value = CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency)
-            )
-            DetailRow(
-                label = "Display Conversion",
-                value = "${transaction.currency} → $displayCurrency"
+                label = "In $displayCurrency",
+                value = convertedAmountMinor?.let { "≈ " + CurrencyFormatter.formatSigned(it, displayCurrency) }
+                    ?: "No exchange rate available"
             )
         }
 
-        val context = LocalContext.current
         DetailRow(label = stringResource(R.string.date), value = DateFormatter.format(transaction.date))
-        DetailRow(label = stringResource(R.string.category), value = getLocalizedCategoryName(transaction.categoryId, transaction.categoryId ?: "other", context))
+        DetailRow(label = stringResource(R.string.category), value = categoryName)
+        DetailRow(label = "Account", value = accountName)
         DetailRow(label = stringResource(R.string.source), value = transaction.source.getDisplayName())
+        if (transaction.pending) {
+            DetailRow(label = "Status", value = "Needs review, not counted yet")
+        }
         if (!transaction.notes.isNullOrBlank()) {
             DetailRow(label = stringResource(R.string.note), value = transaction.notes)
         }
@@ -579,6 +484,7 @@ fun AddTransactionDialog(
     var isExpense by remember { mutableStateOf(true) }
     var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id ?: "acc_otp") }
     var selectedCategoryId by remember { mutableStateOf("food") }
+    val parsedAmount = Money.parseUserInput(amountText)?.takeIf { it > 0 }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -626,9 +532,15 @@ fun AddTransactionDialog(
 
                 OutlinedTextField(
                     value = amountText,
-                    onValueChange = { amountText = it.filter { c -> c.isDigit() } },
+                    onValueChange = { input ->
+                        amountText = input.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15)
+                    },
                     label = { Text(stringResource(R.string.amount) + " (${selectedCurrency})") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = amountText.isNotBlank() && parsedAmount == null,
+                    supportingText = {
+                        if (amountText.isNotBlank() && parsedAmount == null) Text("Use digits with up to two decimals, e.g. 1250 or 12.50")
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -672,13 +584,12 @@ fun AddTransactionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val major = amountText.toLongOrNull() ?: 0L
-                    val minor = major * 100L
+                    val minor = parsedAmount ?: return@Button
                     val dir = if (isExpense) TransactionDirection.EXPENSE else TransactionDirection.INCOME
-                    val desc = descriptionText.ifBlank { merchantText.ifBlank { "Manual Entry" } }
+                    val desc = descriptionText.ifBlank { merchantText.ifBlank { "Manual entry" } }
                     onConfirm(selectedAccountId, if (isExpense) -minor else minor, selectedCurrency, dir, desc, merchantText.ifBlank { null }, selectedCategoryId, LocalDate.now())
                 },
-                enabled = amountText.isNotBlank()
+                enabled = parsedAmount != null && accounts.isNotEmpty()
             ) {
                 Text(stringResource(R.string.save))
             }

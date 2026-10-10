@@ -5,5 +5,4 @@
         <item name="android:navigationBarColor">@color/background_dark</item>
         <item name="android:windowBackground">@color/background_dark</item>
     </style>
-    <style name="Theme.Penzugyek" parent="Theme.Finances" />
 </resources>

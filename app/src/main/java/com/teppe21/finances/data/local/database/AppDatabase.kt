@@ -134,6 +134,7 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `cardLast4` TEXT")
+                db.execSQL("ALTER TABLE `budgets` ADD COLUMN `currency` TEXT")
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `watchlist` (

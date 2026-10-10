@@ -43,6 +43,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.FinancesApp
+import com.teppe21.finances.native.csv.CsvSkipReason
+import androidx.compose.foundation.lazy.items
 import com.teppe21.finances.core.theme.Blue500
 import com.teppe21.finances.core.theme.Emerald500
 
@@ -58,7 +61,7 @@ fun CsvImportScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            var fileName = "kivonat.csv"
+            var fileName = "statement.csv"
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -111,6 +114,7 @@ fun CsvImportScreen(
 
                     Button(
                         onClick = {
+                            FinancesApp.instance.appLock.expectExternalActivity()
                             filePicker.launch(arrayOf("text/comma-separated-values", "text/csv", "text/plain", "*/*"))
                         },
                         shape = RoundedCornerShape(12.dp),
@@ -168,7 +172,7 @@ fun CsvImportScreen(
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
-                            text = stringResource(R.string.selected_file, state.fileName ?: "kivonat.csv"),
+                            text = stringResource(R.string.selected_file, state.fileName ?: "statement.csv"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -185,10 +189,30 @@ fun CsvImportScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = stringResource(R.string.duplicates_skipped, state.duplicateCount),
+                            text = "Already imported into this account: ${state.alreadyImportedCount}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color(0xFFF59E0B)
                         )
+                        if (state.skipped.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Rows skipped because they could not be read exactly: " +
+                                    state.skipped.entries.joinToString { (reason, count) ->
+                                        "$count " + when (reason) {
+                                            CsvSkipReason.INVALID_DATE -> "with an unknown date format"
+                                            CsvSkipReason.INVALID_AMOUNT -> "with an unreadable amount"
+                                            CsvSkipReason.ZERO_AMOUNT -> "with a zero amount"
+                                            CsvSkipReason.UNSUPPORTED_CURRENCY -> "in an unsupported currency"
+                                            CsvSkipReason.TOO_FEW_COLUMNS -> "with too few columns"
+                                        }
+                                    },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        state.charset?.let {
+                            Text("Text encoding: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
 
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
@@ -198,12 +222,12 @@ fun CsvImportScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            state.accounts.forEach { acc ->
+                        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(state.accounts, key = { it.id }) { acc ->
                                 FilterChip(
                                     selected = state.selectedAccountId == acc.id,
                                     onClick = { viewModel.setSelectedAccount(acc.id) },
-                                    label = { Text(acc.name) }
+                                    label = { Text("${acc.getDisplayName()} (${acc.currency})") }
                                 )
                             }
                         }
@@ -216,7 +240,7 @@ fun CsvImportScreen(
                                     onImportFinished()
                                 }
                             },
-                            enabled = !state.isImporting,
+                            enabled = !state.isImporting && state.newCount > 0,
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
                             modifier = Modifier.fillMaxWidth()
@@ -234,6 +258,6 @@ fun CsvImportScreen(
             }
         }
 
-        item { Spacer(modifier = Modifier.height(80.dp)) }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }

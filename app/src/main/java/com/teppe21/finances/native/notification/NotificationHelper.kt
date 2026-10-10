@@ -7,6 +7,10 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 
+/**
+ * resolveActivity() is not used: with package visibility rules on Android 11+ it can
+ * return null for settings screens that do exist, so each intent is simply tried.
+ */
 object NotificationHelper {
 
     fun isNotificationAccessGranted(context: Context): Boolean {
@@ -24,11 +28,11 @@ object NotificationHelper {
                     putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, componentName.flattenToString())
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-                if (detailIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(detailIntent)
-                    return true
-                }
-            } catch (_: Exception) {}
+                context.startActivity(detailIntent)
+                return true
+            } catch (_: Exception) {
+                // Some OEM builds do not implement the per-app screen; fall through.
+            }
         }
 
         // 2. Try General Notification Listener Settings
@@ -36,11 +40,11 @@ object NotificationHelper {
             val generalIntent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
-            if (generalIntent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(generalIntent)
-                return true
-            }
-        } catch (_: Exception) {}
+            context.startActivity(generalIntent)
+            return true
+        } catch (_: Exception) {
+            // Fall back to the main settings screen below.
+        }
 
         // 3. Fallback to general system settings
         return try {

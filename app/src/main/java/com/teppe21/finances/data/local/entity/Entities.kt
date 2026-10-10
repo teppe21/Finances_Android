@@ -124,7 +124,9 @@ data class BudgetEntity(
     val amountMinor: Long,
     val period: String,
     val spentMinor: Long,
-    val notes: String?
+    val notes: String?,
+    /** Currency of [amountMinor]; null for rows created before v5 (treated as HUF). */
+    val currency: String? = null
 )
 
 @Entity(tableName = "recurring_rules")

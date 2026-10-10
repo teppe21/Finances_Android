@@ -238,6 +238,9 @@ interface BudgetDao {
 
     @Query("DELETE FROM budgets")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM budgets WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
