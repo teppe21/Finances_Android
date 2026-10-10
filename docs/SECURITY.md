@@ -25,4 +25,4 @@ Raw notification text exists only in memory during processing. It is not written
 
 ## Reporting
 
-Report security issues privately to the repository owner rather than in a public issue.
+Report security issues privately, not in a public issue. How to do that is described in the repository's [SECURITY.md](../SECURITY.md).

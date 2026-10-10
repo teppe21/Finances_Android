@@ -67,8 +67,12 @@ jobs:
 
       - name: Verify APK signature
         run: |
+          set -euxo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          ls -la app/build/outputs/apk/release/
           apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
-          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
+          "$apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/sig.txt" 2>&1 || { cat "$RUNNER_TEMP/sig.txt"; exit 1; }
+          grep -E "Verifies|Signer #1 certificate (DN|SHA-256)" "$RUNNER_TEMP/sig.txt"
 
       - name: Check 16 KB alignment of native libraries
         run: ./scripts/check-16kb-alignment.sh app/build/outputs/apk/release/app-release.apk

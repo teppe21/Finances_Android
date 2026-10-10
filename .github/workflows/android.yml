@@ -76,3 +76,58 @@ jobs:
             app/build/reports/tests/
             app/build/reports/lint-results-*.html
           if-no-files-found: ignore
+
+  release-build:
+    # Catches R8, release-lint and packaging problems before a real release is tagged.
+    # Signs with a throwaway key generated on this runner; the key and its password are never stored
+    # or uploaded, and the resulting APK is not a release.
+    name: Release build check (R8, throwaway key)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Create throwaway signing key
+        run: |
+          pw="$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          keytool -genkeypair -keystore "$RUNNER_TEMP/throwaway.jks" -alias throwaway \
+            -keyalg RSA -keysize 2048 -validity 2 -dname "CN=CI throwaway" \
+            -storepass "$pw" -keypass "$pw" >/dev/null 2>&1
+          {
+            echo "FINANCES_KEYSTORE_PATH=$RUNNER_TEMP/throwaway.jks"
+            echo "FINANCES_KEYSTORE_PASSWORD=$pw"
+            echo "FINANCES_KEY_ALIAS=throwaway"
+            echo "FINANCES_KEY_PASSWORD=$pw"
+          } >> "$GITHUB_ENV"
+
+      - name: Run release unit tests, release lint, assemble release APK and bundle
+        run: ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease bundleRelease --stacktrace
+
+      - name: Verify signature and 16 KB alignment
+        run: |
+          set -euxo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          ls -la app/build/outputs/apk/release/
+          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          "$apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/sig.txt" 2>&1 || { cat "$RUNNER_TEMP/sig.txt"; exit 1; }
+          grep -E "Verifies|Signer #1 certificate (DN|SHA-256)" "$RUNNER_TEMP/sig.txt"
+          ./scripts/check-16kb-alignment.sh "$apk"
+
+      - name: Remove throwaway key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/throwaway.jks"
