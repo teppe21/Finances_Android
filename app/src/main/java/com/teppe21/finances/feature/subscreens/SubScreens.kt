@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.subscreens
+package com.teppe21.finances.feature.subscreens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

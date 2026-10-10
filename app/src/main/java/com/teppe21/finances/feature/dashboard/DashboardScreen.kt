@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.dashboard
+package com.teppe21.finances.feature.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

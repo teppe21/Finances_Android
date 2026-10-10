@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.domain.model
+package com.teppe21.finances.domain.model
 
 import java.time.Instant
 import java.time.LocalDate
@@ -25,7 +25,7 @@ enum class TransactionSource {
         return when (this) {
             MANUAL -> "Manual"
             CSV -> "CSV Import"
-            NOTIFICATION -> "Bank Push"
+            NOTIFICATION -> "Notification"
             RECEIPT -> "Receipt OCR"
             OPEN_BANKING -> "Open Banking"
             BACKUP -> "Backup Restore"
@@ -38,7 +38,8 @@ data class Transaction(
     val accountId: String,
     val date: LocalDate,
     val valueDate: Instant? = null,
-    val amountMinor: Long, // Integer minor units: e.g. 100 HUF = 10000 minor units
+    /** Signed effect on the account balance, scale 2 (100 HUF = 10000). Outflows are negative. */
+    val amountMinor: Long,
     val currency: String = "HUF",
     val direction: TransactionDirection,
     val description: String,
@@ -53,9 +54,18 @@ data class Transaction(
     val recurringRuleId: String? = null,
     val transferId: String? = null,
     val notes: String? = null,
+    /** Pending transactions wait for review and are excluded from balances and statistics. */
     val pending: Boolean = false,
     val confidence: Float = 1.0f,
     val importedAt: Instant = Instant.now(),
     val createdAt: Instant = Instant.now(),
-    val updatedAt: Instant = Instant.now()
-)
+    val updatedAt: Instant = Instant.now(),
+    val cardLast4: String? = null
+) {
+    /** True when the transaction has not been assigned to an account yet. */
+    val isUnassigned: Boolean get() = accountId.isBlank()
+
+    companion object {
+        const val UNASSIGNED_ACCOUNT = ""
+    }
+}

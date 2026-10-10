@@ -43,11 +43,21 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE amountMinor = :amountMinor AND currency = :currency AND date >= :minDate AND date <= :maxDate")
     suspend fun findPossibleDuplicates(amountMinor: Long, currency: String, minDate: LocalDate, maxDate: LocalDate): List<TransactionEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(transaction: TransactionEntity)
+    @Query("SELECT * FROM transactions WHERE pending = 1 ORDER BY date DESC, createdAt DESC")
+    fun getPendingFlow(): Flow<List<TransactionEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(transactions: List<TransactionEntity>)
+    /** Never replaces: a fingerprint or id collision returns -1 instead of deleting the old row. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnore(transaction: TransactionEntity): Long
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM transactions WHERE fingerprint LIKE :pattern")
+    suspend fun deleteByFingerprintPrefix(pattern: String)
+
+    @Query("UPDATE transactions SET accountId = :newAccountId, updatedAt = :updatedAt WHERE accountId = :oldAccountId")
+    suspend fun reassignAccount(oldAccountId: String, newAccountId: String, updatedAt: java.time.Instant)
 
     @Update
     suspend fun update(transaction: TransactionEntity)
@@ -75,6 +85,9 @@ interface AccountDao {
 
     @Query("SELECT * FROM accounts WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): AccountEntity?
+
+    @Query("DELETE FROM accounts")
+    suspend fun deleteAll()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(account: AccountEntity)
@@ -114,6 +127,9 @@ interface CategoryDao {
 
     @Query("DELETE FROM categories WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -147,6 +163,9 @@ interface CategoryRuleDao {
 
     @Query("DELETE FROM category_rules WHERE categoryId = :categoryId")
     suspend fun deleteByCategoryId(categoryId: String)
+
+    @Query("DELETE FROM category_rules")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -159,6 +178,18 @@ interface NotificationDao {
 
     @Query("SELECT * FROM notification_events WHERE processed = 0 ORDER BY postedAt DESC")
     suspend fun getPending(): List<NotificationEventEntity>
+
+    @Query("SELECT * FROM notification_events ORDER BY postedAt DESC LIMIT :limit")
+    fun getRecentFlow(limit: Int): Flow<List<NotificationEventEntity>>
+
+    @Query("UPDATE notification_events SET processed = 1 WHERE transactionId = :transactionId")
+    suspend fun markProcessedForTransaction(transactionId: String)
+
+    @Query("DELETE FROM notification_events WHERE postedAt < :cutoff")
+    suspend fun deleteOlderThan(cutoff: java.time.Instant)
+
+    @Query("DELETE FROM notification_events")
+    suspend fun deleteAll()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: NotificationEventEntity)
@@ -183,6 +214,9 @@ interface ReceiptDao {
 
     @Delete
     suspend fun delete(receipt: ReceiptEntity)
+
+    @Query("DELETE FROM receipts")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -201,6 +235,9 @@ interface BudgetDao {
 
     @Delete
     suspend fun delete(budget: BudgetEntity)
+
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -219,6 +256,9 @@ interface RecurringDao {
 
     @Delete
     suspend fun delete(rule: RecurringRuleEntity)
+
+    @Query("DELETE FROM recurring_rules")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -240,5 +280,14 @@ interface ExchangeRateDao {
 
     @Query("DELETE FROM exchange_rates WHERE rateDate = 'latest'")
     suspend fun clearLatestRates()
+
+    @Query("SELECT * FROM exchange_rates WHERE rateDate = :rateDate")
+    suspend fun getByRateDate(rateDate: String): List<com.teppe21.finances.data.local.entity.ExchangeRateEntity>
+
+    @Query("DELETE FROM exchange_rates WHERE baseCurrency = :base AND targetCurrency = :target AND rateDate = :rateDate")
+    suspend fun deleteRate(base: String, target: String, rateDate: String)
+
+    @Query("DELETE FROM exchange_rates")
+    suspend fun deleteAll()
 }
 

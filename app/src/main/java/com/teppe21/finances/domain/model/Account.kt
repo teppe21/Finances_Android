@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.domain.model
+package com.teppe21.finances.domain.model
 
 import java.time.Instant
 

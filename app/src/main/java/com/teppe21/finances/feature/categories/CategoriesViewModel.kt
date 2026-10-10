@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.categories
+package com.teppe21.finances.feature.categories
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

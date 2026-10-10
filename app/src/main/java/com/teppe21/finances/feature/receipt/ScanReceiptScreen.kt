@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.receipt
+package com.teppe21.finances.feature.receipt
 
 import android.Manifest
 import android.content.pm.PackageManager

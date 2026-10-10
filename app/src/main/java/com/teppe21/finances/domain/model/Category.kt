@@ -1,7 +1,5 @@
-﻿package com.teppe21.finances.domain.model
+package com.teppe21.finances.domain.model
 
-import android.content.Context
-import com.teppe21.finances.R
 import java.time.Instant
 
 data class Category(
@@ -14,36 +12,51 @@ data class Category(
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now()
 ) {
-    fun getDisplayName(context: Context): String {
-        return when (id) {
-            "food" -> context.getString(R.string.cat_food)
-            "dining" -> context.getString(R.string.cat_dining)
-            "transport" -> context.getString(R.string.cat_transport)
-            "subscriptions" -> context.getString(R.string.cat_subscriptions)
-            "housing" -> context.getString(R.string.cat_housing)
-            "entertainment" -> context.getString(R.string.cat_entertainment)
-            "savings" -> context.getString(R.string.cat_savings)
-            "income" -> context.getString(R.string.cat_income)
-            "health" -> context.getString(R.string.cat_health)
-            "shopping" -> context.getString(R.string.cat_shopping)
-            "transfers" -> context.getString(R.string.cat_transfers)
-            "other" -> context.getString(R.string.cat_other)
-            else -> when (name) {
-                "Élelmiszer" -> context.getString(R.string.cat_food)
-                "Étkezés / Étterem", "Étkezés" -> context.getString(R.string.cat_dining)
-                "Tankolás / Közlekedés", "Közlekedés" -> context.getString(R.string.cat_transport)
-                "Előfizetések" -> context.getString(R.string.cat_subscriptions)
-                "Rezsi / Szolgáltatás", "Lakhatás" -> context.getString(R.string.cat_housing)
-                "Szórakozás" -> context.getString(R.string.cat_entertainment)
-                "Megtakarítás" -> context.getString(R.string.cat_savings)
-                "Bevétel", "Fizetés" -> context.getString(R.string.cat_income)
-                "Egészség / Patika", "Egészség" -> context.getString(R.string.cat_health)
-                "Bevásárlás" -> context.getString(R.string.cat_shopping)
-                "Átutalások", "Átutalás", "Utalás" -> context.getString(R.string.cat_transfers)
-                "Egyéb / Ismeretlen", "Egyéb", "Ismeretlen" -> context.getString(R.string.cat_other)
-                else -> name
-            }
-        }
+    /**
+     * English display name. Built-in categories map by id; legacy Hungarian names from
+     * databases created by early versions are mapped to their English equivalents.
+     */
+    fun displayName(): String = BUILT_IN_NAMES[id] ?: LEGACY_NAMES[name] ?: name
+
+    companion object {
+        val BUILT_IN_NAMES = mapOf(
+            "food" to "Food & Groceries",
+            "dining" to "Dining & Restaurants",
+            "transport" to "Transport & Fuel",
+            "subscriptions" to "Subscriptions",
+            "housing" to "Housing & Utilities",
+            "entertainment" to "Entertainment",
+            "savings" to "Savings",
+            "income" to "Income",
+            "health" to "Health & Pharmacy",
+            "shopping" to "Shopping",
+            "transfers" to "Transfers",
+            "other" to "Other / Uncategorized"
+        )
+
+        private val LEGACY_NAMES = mapOf(
+            "Élelmiszer" to "Food & Groceries",
+            "Étkezés / Étterem" to "Dining & Restaurants",
+            "Étkezés" to "Dining & Restaurants",
+            "Tankolás / Közlekedés" to "Transport & Fuel",
+            "Közlekedés" to "Transport & Fuel",
+            "Előfizetések" to "Subscriptions",
+            "Rezsi / Szolgáltatás" to "Housing & Utilities",
+            "Lakhatás" to "Housing & Utilities",
+            "Szórakozás" to "Entertainment",
+            "Megtakarítás" to "Savings",
+            "Bevétel" to "Income",
+            "Fizetés" to "Income",
+            "Egészség / Patika" to "Health & Pharmacy",
+            "Egészség" to "Health & Pharmacy",
+            "Bevásárlás" to "Shopping",
+            "Átutalások" to "Transfers",
+            "Átutalás" to "Transfers",
+            "Utalás" to "Transfers",
+            "Egyéb / Ismeretlen" to "Other / Uncategorized",
+            "Egyéb" to "Other / Uncategorized",
+            "Ismeretlen" to "Other / Uncategorized"
+        )
     }
 }
 

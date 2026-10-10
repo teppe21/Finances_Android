@@ -1,5 +1,6 @@
-﻿package com.teppe21.finances.native.receipt
+package com.teppe21.finances.native.receipt
 
+import com.teppe21.finances.core.money.AmountParser
 import com.teppe21.finances.core.utils.TextNormalizer
 import com.teppe21.finances.domain.model.PaymentMethod
 import com.teppe21.finances.domain.model.ReceiptItem
@@ -178,13 +179,12 @@ object ReceiptParser {
                     continue
                 }
 
-                val priceRaw = match.groupValues[2].replace("\\s".toRegex(), "").replace(".", "").replace(",", ".")
-                val priceMajor = priceRaw.toDoubleOrNull() ?: 0.0
-                if (priceMajor > 0.0) {
+                val priceMinor = AmountParser.parseMinor(match.groupValues[2].trim())
+                if (priceMinor != null && priceMinor > 0L) {
                     items.add(
                         ReceiptItem(
                             name = name,
-                            totalPriceMinor = (priceMajor * 100).toLong()
+                            totalPriceMinor = priceMinor
                         )
                     )
                 }
@@ -200,7 +200,6 @@ object ReceiptParser {
 
         if (matcher.find()) {
             val group1 = matcher.group(1) ?: return null
-            val rawNum = group1.replace("\\s".toRegex(), "").replace(".", "").replace(",", ".")
             val rawCurr = matcher.group(2)?.uppercase() ?: "HUF"
 
             val curr = when (rawCurr) {
@@ -209,8 +208,7 @@ object ReceiptParser {
                 else -> "HUF"
             }
 
-            val major = rawNum.toDoubleOrNull() ?: return null
-            val minor = (major * 100).toLong()
+            val minor = AmountParser.parseMinor(group1.trim()) ?: return null
             return Pair(minor, curr)
         }
         return null

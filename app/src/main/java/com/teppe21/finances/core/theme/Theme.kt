@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.core.theme
+package com.teppe21.finances.core.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme

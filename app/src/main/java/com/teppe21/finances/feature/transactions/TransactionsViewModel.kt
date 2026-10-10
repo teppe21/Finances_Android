@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.transactions
+package com.teppe21.finances.feature.transactions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.domain.usecase
+package com.teppe21.finances.domain.usecase
 
 import com.teppe21.finances.core.utils.TextNormalizer
 import com.teppe21.finances.domain.model.CategoryRule
@@ -8,7 +8,8 @@ class CategorizeTransactionUseCase {
     fun execute(
         description: String,
         merchant: String? = null,
-        rules: List<CategoryRule>
+        rules: List<CategoryRule>,
+        fallback: String = "other"
     ): String {
         val targetText = "${merchant ?: ""} $description"
         val normalized = TextNormalizer.normalizeSearch(targetText)
@@ -33,14 +34,14 @@ class CategorizeTransactionUseCase {
                         }
                     } catch (_: Exception) {}
                 }
-                else -> { // "contains"
-                    if (normalized.contains(normPattern)) {
+                else -> { // "contains": the keyword must start at a word boundary ("ber" must not match "uber")
+                    if (" $normalized".contains(" $normPattern")) {
                         return rule.categoryId
                     }
                 }
             }
         }
 
-        return "other"
+        return fallback
     }
 }

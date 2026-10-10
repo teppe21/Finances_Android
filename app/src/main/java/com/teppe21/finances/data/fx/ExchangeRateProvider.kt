@@ -1,193 +1,106 @@
-﻿package com.teppe21.finances.data.fx
+package com.teppe21.finances.data.fx
 
+import com.teppe21.finances.core.net.HttpClient
+import com.teppe21.finances.core.net.UrlConnectionHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.math.BigDecimal
-import java.net.HttpURLConnection
-import java.net.URL
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+
+/** A set of EUR-based rates with the date the provider says they apply to. */
+data class FetchedRates(
+    val rates: Map<String, BigDecimal>,
+    val asOf: Instant,
+    val provider: String
+)
 
 interface ExchangeRateProvider {
     val name: String
 
     /**
-     * Fetches current exchange rates relative to [baseCurrency].
-     * Returns a map of currencyCode -> rate (e.g. "HUF" -> 395.42).
+     * Fetches current rates relative to EUR for [currencies]. The request contains only
+     * currency codes; no transaction or account data is ever sent.
      */
-    suspend fun getLatestRates(baseCurrency: String = "EUR"): Result<Map<String, BigDecimal>>
-
-    /**
-     * Fetches historical exchange rate for a specific date.
-     */
-    suspend fun getHistoricalRate(
-        baseCurrency: String,
-        targetCurrency: String,
-        date: LocalDate
-    ): Result<BigDecimal>
+    suspend fun getLatestRates(currencies: Set<String>): Result<FetchedRates>
 }
 
-/**
- * Exchange rate provider backed by Frankfurter API (European Central Bank data).
- * Free, open source, no API key required, highly reliable.
- */
-class FrankfurterRateProvider : ExchangeRateProvider {
-    override val name: String = "European Central Bank (Frankfurter)"
+/** ECB reference rates via the Frankfurter API (no API key). Published on ECB working days. */
+class FrankfurterRateProvider(
+    private val http: HttpClient = UrlConnectionHttpClient()
+) : ExchangeRateProvider {
+    override val name: String = "European Central Bank via Frankfurter"
 
-    override suspend fun getLatestRates(baseCurrency: String): Result<Map<String, BigDecimal>> {
-        return withContext(Dispatchers.IO) {
-            try {
-                val urlString = "https://api.frankfurter.app/latest?from=${baseCurrency.uppercase()}"
-                val responseJson = executeGetRequest(urlString)
-                val json = JSONObject(responseJson)
-                val ratesObj = json.getJSONObject("rates")
-
-                val result = mutableMapOf<String, BigDecimal>()
-                result[baseCurrency.uppercase()] = BigDecimal.ONE
-
-                val keys = ratesObj.keys()
-                while (keys.hasNext()) {
-                    val code = keys.next()
-                    val rateDouble = ratesObj.optDouble(code, -1.0)
-                    if (rateDouble > 0.0) {
-                        result[code.uppercase()] = BigDecimal.valueOf(rateDouble)
-                    }
-                }
-
-                if (result.size > 1) {
-                    Result.success(result)
-                } else {
-                    Result.failure(IllegalStateException("No valid rates found in Frankfurter response"))
-                }
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
+    override suspend fun getLatestRates(currencies: Set<String>): Result<FetchedRates> = withContext(Dispatchers.IO) {
+        runCatching {
+            val symbols = currencies.filter { it != "EUR" }.sorted().joinToString(",")
+            val response = http.get("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=$symbols", emptyMap())
+            check(response.code in 200..299) { "HTTP ${response.code}" }
+            parseFrankfurter(response.body, name)
         }
     }
 
-    override suspend fun getHistoricalRate(
-        baseCurrency: String,
-        targetCurrency: String,
-        date: LocalDate
-    ): Result<BigDecimal> {
-        return withContext(Dispatchers.IO) {
-            try {
-                val dateStr = date.toString() // YYYY-MM-DD
-                val urlString = "https://api.frankfurter.app/$dateStr?from=${baseCurrency.uppercase()}&to=${targetCurrency.uppercase()}"
-                val responseJson = executeGetRequest(urlString)
-                val json = JSONObject(responseJson)
-                val ratesObj = json.getJSONObject("rates")
-                val rateDouble = ratesObj.optDouble(targetCurrency.uppercase(), -1.0)
-
-                if (rateDouble > 0.0) {
-                    Result.success(BigDecimal.valueOf(rateDouble))
-                } else {
-                    Result.failure(IllegalStateException("Historical rate not found for $targetCurrency on $dateStr"))
-                }
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
+    companion object {
+        fun parseFrankfurter(body: String, provider: String): FetchedRates {
+            val json = JSONObject(body)
+            val date = LocalDate.parse(json.getString("date"))
+            val rates = parseRates(json.getJSONObject("rates"))
+            require(rates.isNotEmpty()) { "No rates in response" }
+            return FetchedRates(rates, date.atStartOfDay().toInstant(ZoneOffset.UTC), provider)
         }
     }
 }
 
-/**
- * Fallback provider backed by open.er-api.com.
- * Free, keyless, global coverage.
- */
-class OpenErApiRateProvider : ExchangeRateProvider {
-    override val name: String = "Open Exchange Rates API"
+/** Fallback: open.er-api.com (no API key), used only when Frankfurter is unreachable. */
+class OpenErApiRateProvider(
+    private val http: HttpClient = UrlConnectionHttpClient()
+) : ExchangeRateProvider {
+    override val name: String = "ExchangeRate-API (open.er-api.com)"
 
-    override suspend fun getLatestRates(baseCurrency: String): Result<Map<String, BigDecimal>> {
-        return withContext(Dispatchers.IO) {
-            try {
-                val urlString = "https://open.er-api.com/v6/latest/${baseCurrency.uppercase()}"
-                val responseJson = executeGetRequest(urlString)
-                val json = JSONObject(responseJson)
-
-                if (json.optString("result") != "success") {
-                    return@withContext Result.failure(IllegalStateException("API returned failure status"))
-                }
-
-                val ratesObj = json.getJSONObject("rates")
-                val result = mutableMapOf<String, BigDecimal>()
-                result[baseCurrency.uppercase()] = BigDecimal.ONE
-
-                val keys = ratesObj.keys()
-                while (keys.hasNext()) {
-                    val code = keys.next()
-                    val rateDouble = ratesObj.optDouble(code, -1.0)
-                    if (rateDouble > 0.0) {
-                        result[code.uppercase()] = BigDecimal.valueOf(rateDouble)
-                    }
-                }
-
-                Result.success(result)
-            } catch (e: Exception) {
-                Result.failure(e)
+    override suspend fun getLatestRates(currencies: Set<String>): Result<FetchedRates> = withContext(Dispatchers.IO) {
+        runCatching {
+            val response = http.get("https://open.er-api.com/v6/latest/EUR", emptyMap())
+            check(response.code in 200..299) { "HTTP ${response.code}" }
+            parseOpenEr(response.body, name).let { fetched ->
+                fetched.copy(rates = fetched.rates.filterKeys { it in currencies })
             }
         }
     }
 
-    override suspend fun getHistoricalRate(
-        baseCurrency: String,
-        targetCurrency: String,
-        date: LocalDate
-    ): Result<BigDecimal> {
-        // open.er-api.com free tier does not support arbitrary historical queries without key, fallback to failure
-        return Result.failure(UnsupportedOperationException("Historical queries require Frankfurter"))
+    companion object {
+        fun parseOpenEr(body: String, provider: String): FetchedRates {
+            val json = JSONObject(body)
+            require(json.optString("result") == "success") { "Provider returned an error" }
+            val updated = json.optLong("time_last_update_unix", -1L)
+            require(updated > 0) { "Missing update time" }
+            val rates = parseRates(json.getJSONObject("rates"))
+            require(rates.isNotEmpty()) { "No rates in response" }
+            return FetchedRates(rates, Instant.ofEpochSecond(updated), provider)
+        }
     }
 }
 
-/**
- * Composite provider: tries Frankfurter first; if network/server fails, falls back to OpenErApi.
- */
+private fun parseRates(obj: JSONObject): Map<String, BigDecimal> {
+    val result = mutableMapOf<String, BigDecimal>()
+    val keys = obj.keys()
+    while (keys.hasNext()) {
+        val key = keys.next()
+        val value = obj.opt(key)?.toString()?.toBigDecimalOrNull()
+        if (value != null && value.signum() > 0) result[key.uppercase()] = value
+    }
+    return result
+}
+
 class CompositeRateProvider(
     private val primary: ExchangeRateProvider = FrankfurterRateProvider(),
     private val secondary: ExchangeRateProvider = OpenErApiRateProvider()
 ) : ExchangeRateProvider {
-    override val name: String = "${primary.name} / ${secondary.name}"
+    override val name: String = primary.name
 
-    override suspend fun getLatestRates(baseCurrency: String): Result<Map<String, BigDecimal>> {
-        val primaryResult = primary.getLatestRates(baseCurrency)
-        if (primaryResult.isSuccess) {
-            return primaryResult
-        }
-        return secondary.getLatestRates(baseCurrency)
+    override suspend fun getLatestRates(currencies: Set<String>): Result<FetchedRates> {
+        val first = primary.getLatestRates(currencies)
+        return if (first.isSuccess) first else secondary.getLatestRates(currencies)
     }
-
-    override suspend fun getHistoricalRate(
-        baseCurrency: String,
-        targetCurrency: String,
-        date: LocalDate
-    ): Result<BigDecimal> {
-        return primary.getHistoricalRate(baseCurrency, targetCurrency, date)
-    }
-}
-
-private fun executeGetRequest(urlString: String, timeoutMs: Int = 6000): String {
-    val url = URL(urlString)
-    val conn = url.openConnection() as HttpURLConnection
-    conn.requestMethod = "GET"
-    conn.connectTimeout = timeoutMs
-    conn.readTimeout = timeoutMs
-    conn.setRequestProperty("Accept", "application/json")
-    conn.setRequestProperty("User-Agent", "Finances-Android/1.0")
-
-    val responseCode = conn.responseCode
-    if (responseCode !in 200..299) {
-        throw IllegalStateException("HTTP $responseCode from $urlString")
-    }
-
-    val reader = BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8))
-    val sb = StringBuilder()
-    var line: String?
-    while (reader.readLine().also { line = it } != null) {
-        sb.append(line)
-    }
-    reader.close()
-    conn.disconnect()
-    return sb.toString()
 }

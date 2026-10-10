@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.receipt
+package com.teppe21.finances.feature.receipt
 
 import android.content.Context
 import android.graphics.Bitmap

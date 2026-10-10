@@ -1,6 +1,8 @@
-﻿package com.teppe21.finances.core.utils
+package com.teppe21.finances.core.utils
 
 import com.teppe21.finances.domain.model.SupportedCurrencies
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
@@ -15,7 +17,8 @@ object CurrencyFormatter {
 
     fun format(amountMinor: Long, currency: String = "HUF"): String {
         val curr = SupportedCurrencies.fromCode(currency)
-        val major = abs(amountMinor) / 100.0
+        // Exact decimal: amounts are scale 2; HUF is rounded half-up to whole forints for display.
+        val major = BigDecimal.valueOf(abs(amountMinor), 2).setScale(curr.decimalPlaces, RoundingMode.HALF_UP)
 
         val pattern = if (curr.decimalPlaces == 0) {
             "#,##0"
@@ -23,7 +26,7 @@ object CurrencyFormatter {
             "#,##0." + "0".repeat(curr.decimalPlaces)
         }
 
-        val df = DecimalFormat(pattern, symbols)
+        val df = DecimalFormat(pattern, symbols).apply { roundingMode = RoundingMode.HALF_UP }
         val formattedNumber = df.format(major)
 
         return when (curr.code) {

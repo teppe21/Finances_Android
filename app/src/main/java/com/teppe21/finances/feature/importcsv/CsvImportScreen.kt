@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.importcsv
+package com.teppe21.finances.feature.importcsv
 
 import android.net.Uri
 import android.provider.OpenableColumns

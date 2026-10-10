@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.domain.model
+package com.teppe21.finances.domain.model
 
 data class FinancialStats(
     val incomeMinor: Long = 0L,
@@ -8,7 +8,9 @@ data class FinancialStats(
     val savingsRate: Float = 0.0f,
     val transactionCount: Int = 0,
     val maxExpenseItem: MaxExpenseItem = MaxExpenseItem(),
-    val avgExpenseMinor: Long = 0L
+    val avgExpenseMinor: Long = 0L,
+    /** Confirmed transactions left out because no exchange rate was available. */
+    val unconvertedCount: Int = 0
 )
 
 data class MaxExpenseItem(

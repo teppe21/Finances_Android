@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.accounts
+package com.teppe21.finances.feature.accounts
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

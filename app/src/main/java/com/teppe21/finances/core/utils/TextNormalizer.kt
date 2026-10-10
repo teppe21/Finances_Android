@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.core.utils
+package com.teppe21.finances.core.utils
 
 import java.text.Normalizer
 import java.util.regex.Pattern

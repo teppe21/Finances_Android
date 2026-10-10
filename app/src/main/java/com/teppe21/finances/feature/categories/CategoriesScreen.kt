@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.categories
+package com.teppe21.finances.feature.categories
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -118,7 +118,7 @@ fun CategoriesScreen(
                 val category = catWithRules.category
                 val rules = catWithRules.rules
                 val catColor = CategoryColorProvider.getColor(category)
-                val displayName = category.getDisplayName(context)
+                val displayName = category.displayName()
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -423,7 +423,7 @@ fun CategoriesScreen(
                             onExpandedChange = { dropdownExpanded = it }
                         ) {
                             val selectedCat = otherCategories.find { it.id == selectedReplacement }
-                            val repName = selectedCat?.getDisplayName(context) ?: selectedReplacement
+                            val repName = selectedCat?.displayName() ?: selectedReplacement
 
                             OutlinedTextField(
                                 value = repName,
@@ -442,7 +442,7 @@ fun CategoriesScreen(
                             ) {
                                 otherCategories.forEach { cat ->
                                     DropdownMenuItem(
-                                        text = { Text(cat.getDisplayName(context)) },
+                                        text = { Text(cat.displayName()) },
                                         onClick = {
                                             selectedReplacement = cat.id
                                             dropdownExpanded = false
@@ -453,7 +453,7 @@ fun CategoriesScreen(
                         }
                     } else {
                         Text(
-                            text = "${stringResource(R.string.delete_category)}: ${categoryToDelete.getDisplayName(context)}?",
+                            text = "${stringResource(R.string.delete_category)}: ${categoryToDelete.displayName()}?",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -488,7 +488,7 @@ fun CategoriesScreen(
 
         AlertDialog(
             onDismissRequest = { viewModel.closeAddKeyword() },
-            title = { Text("${stringResource(R.string.add_keyword)}: ${category.getDisplayName(context)}") },
+            title = { Text("${stringResource(R.string.add_keyword)}: ${category.displayName()}") },
             text = {
                 OutlinedTextField(
                     value = keyword,

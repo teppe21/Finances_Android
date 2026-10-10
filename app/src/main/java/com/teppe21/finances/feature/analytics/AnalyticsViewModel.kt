@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.analytics
+package com.teppe21.finances.feature.analytics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

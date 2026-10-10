@@ -46,7 +46,8 @@ data class TransactionEntity(
     val confidence: Float,
     val importedAt: Instant,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val updatedAt: Instant,
+    val cardLast4: String? = null
 )
 
 @Entity(tableName = "accounts")
@@ -153,3 +154,34 @@ data class ExchangeRateEntity(
     val provider: String
 )
 
+
+/** A symbol the user follows. Kept apart from all personal finance tables. */
+@Entity(tableName = "watchlist")
+data class WatchlistEntity(
+    @PrimaryKey val symbol: String,
+    val displaySymbol: String,
+    val name: String?,
+    val exchange: String?,
+    val currency: String?,
+    val position: Int,
+    val addedAt: Instant
+)
+
+/** Last quote received from the market data provider. Decimal values are stored as text. */
+@Entity(tableName = "stock_quotes")
+data class StockQuoteEntity(
+    @PrimaryKey val symbol: String,
+    val price: String,
+    val change: String?,
+    val changePercent: String?,
+    val open: String?,
+    val high: String?,
+    val low: String?,
+    val previousClose: String?,
+    /** Provider timestamp of the price. */
+    val quoteTime: Instant,
+    /** When this app received it. */
+    val fetchedAt: Instant,
+    val provider: String,
+    val currency: String?
+)

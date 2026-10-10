@@ -18,10 +18,13 @@ import com.teppe21.finances.domain.model.CategoryRule
 import com.teppe21.finances.domain.model.NotificationEvent
 import com.teppe21.finances.domain.model.ReceiptScan
 import com.teppe21.finances.domain.model.Transaction
+import com.teppe21.finances.domain.usecase.CategoryRuleSource
+import com.teppe21.finances.domain.usecase.NotificationEventSink
+import com.teppe21.finances.domain.usecase.TransactionStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class TransactionRepository(private val transactionDao: TransactionDao) {
+class TransactionRepository(private val transactionDao: TransactionDao) : TransactionStore {
 
     fun getAllTransactionsFlow(): Flow<List<Transaction>> {
         return transactionDao.getAllFlow().map { list -> list.map { it.toDomain() } }
@@ -39,11 +42,11 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
         return transactionDao.getById(id)?.toDomain()
     }
 
-    suspend fun findByFingerprint(fingerprint: String): Transaction? {
+    override suspend fun findByFingerprint(fingerprint: String): Transaction? {
         return transactionDao.findByFingerprint(fingerprint)?.toDomain()
     }
 
-    suspend fun findByExternalId(externalId: String): Transaction? {
+    override suspend fun findByExternalId(externalId: String): Transaction? {
         return transactionDao.findByExternalId(externalId)?.toDomain()
     }
 
@@ -56,12 +59,22 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
         return transactionDao.findPossibleDuplicates(amountMinor, currency, minDate, maxDate).map { it.toDomain() }
     }
 
-    suspend fun insertTransaction(transaction: Transaction) {
-        transactionDao.insert(transaction.toEntity())
+    fun getPendingTransactionsFlow(): Flow<List<Transaction>> {
+        return transactionDao.getPendingFlow().map { list -> list.map { it.toDomain() } }
     }
 
-    suspend fun insertAll(transactions: List<Transaction>) {
-        transactionDao.insertAll(transactions.map { it.toEntity() })
+    override suspend fun findSameAmount(
+        amountMinor: Long,
+        currency: String,
+        from: java.time.LocalDate,
+        to: java.time.LocalDate
+    ): List<Transaction> = findPossibleDuplicates(amountMinor, currency, from, to)
+
+    override suspend fun insertIfAbsent(transaction: Transaction): Boolean =
+        transactionDao.insertIgnore(transaction.toEntity()) != -1L
+
+    override suspend fun update(transaction: Transaction) {
+        transactionDao.update(transaction.toEntity())
     }
 
     suspend fun updateTransaction(transaction: Transaction) {
@@ -107,7 +120,9 @@ class AccountRepository(private val accountDao: AccountDao) {
 class CategoryRepository(
     private val categoryDao: CategoryDao,
     private val categoryRuleDao: CategoryRuleDao
-) {
+) : CategoryRuleSource {
+
+    override suspend fun activeRules(): List<CategoryRule> = getAllRules()
 
     fun getAllCategoriesFlow(): Flow<List<Category>> {
         return categoryDao.getAllFlow().map { list -> list.map { it.toDomain() } }
@@ -178,7 +193,19 @@ class CategoryRepository(
     }
 }
 
-class NotificationRepository(private val notificationDao: NotificationDao) {
+class NotificationRepository(private val notificationDao: NotificationDao) : NotificationEventSink {
+
+    override suspend fun record(event: NotificationEvent) {
+        notificationDao.insert(event.toEntity())
+    }
+
+    fun getRecentEventsFlow(limit: Int = 50): Flow<List<NotificationEvent>> {
+        return notificationDao.getRecentFlow(limit).map { list -> list.map { it.toDomain() } }
+    }
+
+    suspend fun markProcessedForTransaction(transactionId: String) {
+        notificationDao.markProcessedForTransaction(transactionId)
+    }
 
     fun getPendingNotificationsFlow(): Flow<List<NotificationEvent>> {
         return notificationDao.getPendingFlow().map { list -> list.map { it.toDomain() } }
@@ -203,8 +230,9 @@ class ReceiptRepository(private val receiptDao: ReceiptDao) {
         return receiptDao.getAllFlow().map { list -> list.map { it.toDomain() } }
     }
 
+    /** Stores the structured receipt fields only: no image reference, no raw OCR text. */
     suspend fun insertReceipt(receipt: ReceiptScan) {
-        receiptDao.insert(receipt.toEntity())
+        receiptDao.insert(receipt.copy(imageUri = null, rawOcrText = null).toEntity())
     }
 }
 
@@ -234,7 +262,8 @@ fun TransactionEntity.toDomain() = Transaction(
     confidence = confidence,
     importedAt = importedAt,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    cardLast4 = cardLast4
 )
 
 fun Transaction.toEntity() = TransactionEntity(
@@ -261,7 +290,8 @@ fun Transaction.toEntity() = TransactionEntity(
     confidence = confidence,
     importedAt = importedAt,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    cardLast4 = cardLast4
 )
 
 fun AccountEntity.toDomain() = Account(

@@ -29,7 +29,11 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 
 import com.teppe21.finances.data.local.dao.ExchangeRateDao
+import com.teppe21.finances.data.local.dao.StockQuoteDao
+import com.teppe21.finances.data.local.dao.WatchlistDao
 import com.teppe21.finances.data.local.entity.ExchangeRateEntity
+import com.teppe21.finances.data.local.entity.StockQuoteEntity
+import com.teppe21.finances.data.local.entity.WatchlistEntity
 import androidx.room.migration.Migration
 
 @Database(
@@ -42,9 +46,11 @@ import androidx.room.migration.Migration
         ReceiptEntity::class,
         BudgetEntity::class,
         RecurringRuleEntity::class,
-        ExchangeRateEntity::class
+        ExchangeRateEntity::class,
+        WatchlistEntity::class,
+        StockQuoteEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -59,6 +65,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun recurringDao(): RecurringDao
     abstract fun exchangeRateDao(): ExchangeRateDao
+    abstract fun watchlistDao(): WatchlistDao
+    abstract fun stockQuoteDao(): StockQuoteDao
 
     companion object {
         @Volatile
@@ -119,6 +127,63 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v5: card suffix column for duplicate detection, stock watchlist and quote cache
+         * tables, and removal of raw notification / OCR text stored by earlier versions.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `cardLast4` TEXT")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `watchlist` (
+                        `symbol` TEXT NOT NULL,
+                        `displaySymbol` TEXT NOT NULL,
+                        `name` TEXT,
+                        `exchange` TEXT,
+                        `currency` TEXT,
+                        `position` INTEGER NOT NULL,
+                        `addedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`symbol`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `stock_quotes` (
+                        `symbol` TEXT NOT NULL,
+                        `price` TEXT NOT NULL,
+                        `change` TEXT,
+                        `changePercent` TEXT,
+                        `open` TEXT,
+                        `high` TEXT,
+                        `low` TEXT,
+                        `previousClose` TEXT,
+                        `quoteTime` INTEGER NOT NULL,
+                        `fetchedAt` INTEGER NOT NULL,
+                        `provider` TEXT NOT NULL,
+                        `currency` TEXT,
+                        PRIMARY KEY(`symbol`)
+                    )
+                    """.trimIndent()
+                )
+                // Versions up to 4 copied the raw notification text into the description.
+                db.execSQL(
+                    """
+                    UPDATE `transactions`
+                    SET `description` = CASE
+                        WHEN `merchant` IS NOT NULL AND `merchant` != '' THEN `merchant`
+                        ELSE 'Recognized from notification'
+                    END
+                    WHERE `source` = 'NOTIFICATION'
+                    """.trimIndent()
+                )
+                db.execSQL("UPDATE `receipts` SET `rawOcrText` = NULL, `imageUri` = NULL")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -126,9 +191,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "finances.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(*ALL_MIGRATIONS)
                     .addCallback(DatabasePrepopulateCallback())
-                    .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance
                 instance
@@ -186,7 +250,7 @@ suspend fun prepopulateDefaults(db: AppDatabase) {
     listOf("wolt", "foodora", "mcdonalds", "kfc", "burger king", "starbucks", "étterem", "kávézó", "pizza", "bistro").forEachIndexed { i, kw ->
         rules.add(CategoryRuleEntity("rule_dining_$i", "dining", kw, "contains", 10, true, now))
     }
-    listOf("mol", "shell", "omv", "orlen", "lukoil", "bkk", "máv", "autópálya", "parkolás", "bolt", "uber").forEachIndexed { i, kw ->
+    listOf("mol", "shell", "omv", "orlen", "lukoil", "bkk", "máv", "autópálya", "parkolás", "uber").forEachIndexed { i, kw ->
         rules.add(CategoryRuleEntity("rule_trans_$i", "transport", kw, "contains", 10, true, now))
     }
     listOf("netflix", "spotify", "google", "apple", "youtube", "patreon", "steam", "disney", "hbo", "chatgpt").forEachIndexed { i, kw ->
@@ -202,31 +266,3 @@ suspend fun prepopulateDefaults(db: AppDatabase) {
     db.categoryRuleDao().insertAll(rules)
 }
 
-/**
- * Opt-in action to load sample demo data for demonstration / portfolio showcase.
- * Initial installs strictly default to 0 balance accounts.
- */
-suspend fun loadSampleData(db: AppDatabase) {
-    val now = Instant.now()
-    val sampleAccounts = listOf(
-        AccountEntity("acc_cash", "Cash Wallet", "Wallet", AccountType.CASH, "HUF", 1500000L, 1500000L, true, now, now),
-        AccountEntity("acc_otp", "OTP Current Account", "OTP Bank", AccountType.BANK, "HUF", 15000000L, 15000000L, true, now, now),
-        AccountEntity("acc_revolut", "Revolut", "Revolut", AccountType.BANK, "HUF", 5000000L, 5000000L, true, now, now),
-        AccountEntity("acc_savings", "Savings", "Treasury", AccountType.SAVINGS, "HUF", 50000000L, 50000000L, true, now, now)
-    )
-    db.accountDao().insertAll(sampleAccounts)
-}
-
-/**
- * Opt-in action to clear sample demo data and reset all account balances back to zero (clean install state).
- */
-suspend fun clearSampleData(db: AppDatabase) {
-    val now = Instant.now()
-    val cleanAccounts = listOf(
-        AccountEntity("acc_cash", "Cash Wallet", "Wallet", AccountType.CASH, "HUF", 0L, 0L, true, now, now),
-        AccountEntity("acc_otp", "OTP Current Account", "OTP Bank", AccountType.BANK, "HUF", 0L, 0L, true, now, now),
-        AccountEntity("acc_revolut", "Revolut", "Revolut", AccountType.BANK, "HUF", 0L, 0L, true, now, now),
-        AccountEntity("acc_savings", "Savings", "Treasury", AccountType.SAVINGS, "HUF", 0L, 0L, true, now, now)
-    )
-    db.accountDao().insertAll(cleanAccounts)
-}

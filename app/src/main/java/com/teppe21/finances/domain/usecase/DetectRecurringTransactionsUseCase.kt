@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.domain.usecase
+package com.teppe21.finances.domain.usecase
 
 import com.teppe21.finances.core.utils.TextNormalizer
 import com.teppe21.finances.domain.model.RecurringRule

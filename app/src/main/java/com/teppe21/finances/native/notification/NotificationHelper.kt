@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.native.notification
+package com.teppe21.finances.native.notification
 
 import android.content.ComponentName
 import android.content.Context

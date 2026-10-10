@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.core.utils
+package com.teppe21.finances.core.utils
 
 import java.math.BigDecimal
 import java.math.RoundingMode

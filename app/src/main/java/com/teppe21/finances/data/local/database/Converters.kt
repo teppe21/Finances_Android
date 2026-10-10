@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.data.local.database
+package com.teppe21.finances.data.local.database
 
 import androidx.room.TypeConverter
 import com.teppe21.finances.domain.model.AccountType

@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.more
+package com.teppe21.finances.feature.more
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

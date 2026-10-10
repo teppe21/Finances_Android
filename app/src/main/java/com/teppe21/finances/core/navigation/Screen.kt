@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.core.navigation
+package com.teppe21.finances.core.navigation
 
 sealed class Screen(val route: String) {
     data object Dashboard : Screen("dashboard")

@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.core.theme
+package com.teppe21.finances.core.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

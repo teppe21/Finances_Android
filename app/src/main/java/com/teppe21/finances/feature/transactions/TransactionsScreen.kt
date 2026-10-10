@@ -1,4 +1,4 @@
-﻿package com.teppe21.finances.feature.transactions
+package com.teppe21.finances.feature.transactions
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -647,7 +647,7 @@ fun AddTransactionDialog(
                         FilterChip(
                             selected = selectedCategoryId == cat.id,
                             onClick = { selectedCategoryId = cat.id },
-                            label = { Text(cat.getDisplayName(context), style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(cat.displayName(), style = MaterialTheme.typography.labelSmall) }
                         )
                     }
                 }

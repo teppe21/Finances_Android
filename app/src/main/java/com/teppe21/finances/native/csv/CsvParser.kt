@@ -1,10 +1,16 @@
-﻿package com.teppe21.finances.native.csv
+package com.teppe21.finances.native.csv
 
+import com.teppe21.finances.core.money.AmountParser
+import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.utils.TextNormalizer
+import com.teppe21.finances.domain.model.SupportedCurrencies
 import com.teppe21.finances.domain.model.TransactionDirection
-import java.io.BufferedReader
 import java.io.InputStream
-import java.io.InputStreamReader
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
+import java.time.DateTimeException
 import java.time.LocalDate
 
 data class CsvColumnMapping(
@@ -18,66 +24,104 @@ data class CsvColumnMapping(
 )
 
 data class ParsedCsvRow(
+    /** 1-based line number of the record in the file, for error messages. */
+    val line: Int,
     val date: LocalDate,
     val description: String,
     val merchant: String?,
+    /** Signed amount, scale 2. */
     val amountMinor: Long,
     val currency: String,
     val direction: TransactionDirection,
     val categorySuggestion: String?
 )
 
+enum class CsvSkipReason { INVALID_DATE, INVALID_AMOUNT, ZERO_AMOUNT, UNSUPPORTED_CURRENCY, TOO_FEW_COLUMNS }
+
+data class CsvParseResult(
+    val rows: List<ParsedCsvRow>,
+    val skipped: Map<CsvSkipReason, Int>,
+    val charset: String
+) {
+    val skippedCount: Int get() = skipped.values.sum()
+}
+
+/**
+ * Bank statement CSV import. Rows that cannot be read exactly (unknown date format,
+ * unreadable amount, unsupported currency) are skipped and counted, never guessed.
+ */
 object CsvParser {
 
-    fun tokenizeLine(line: String, delimiter: Char): List<String> {
-        val result = mutableListOf<String>()
-        val current = StringBuilder()
-        var inQuotes = false
-        var i = 0
+    private const val MAX_BYTES = 10 * 1024 * 1024
 
-        while (i < line.length) {
-            val c = line[i]
-            if (c == '"') {
-                if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
-                    current.append('"')
-                    i++ // skip escaped quote
-                } else {
-                    inQuotes = !inQuotes
+    /** UTF-8 when valid (BOM stripped), otherwise Windows-1250, common for Hungarian banks. */
+    fun decode(bytes: ByteArray): Pair<String, String> {
+        val utf8 = Charsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+        return try {
+            val text = utf8.decode(ByteBuffer.wrap(bytes)).toString().removePrefix("﻿")
+            text to "UTF-8"
+        } catch (e: CharacterCodingException) {
+            String(bytes, Charset.forName("windows-1250")) to "windows-1250"
+        }
+    }
+
+    /** RFC 4180 style records: quoted fields may contain delimiters, quotes ("") and newlines. */
+    fun records(text: String, delimiter: Char): List<Pair<Int, List<String>>> {
+        val out = mutableListOf<Pair<Int, List<String>>>()
+        val field = StringBuilder()
+        var fields = mutableListOf<String>()
+        var inQuotes = false
+        var line = 1
+        var recordLine = 1
+        var i = 0
+        fun endRecord() {
+            fields.add(field.toString().trim())
+            field.clear()
+            if (fields.any { it.isNotEmpty() }) out += recordLine to fields
+            fields = mutableListOf()
+        }
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                inQuotes && c == '"' && i + 1 < text.length && text[i + 1] == '"' -> { field.append('"'); i++ }
+                c == '"' -> inQuotes = !inQuotes
+                !inQuotes && c == delimiter -> { fields.add(field.toString().trim()); field.clear() }
+                !inQuotes && (c == '\n' || c == '\r') -> {
+                    if (c == '\r' && i + 1 < text.length && text[i + 1] == '\n') i++
+                    endRecord()
+                    line++
+                    recordLine = line
                 }
-            } else if (c == delimiter && !inQuotes) {
-                result.add(current.toString().trim())
-                current.clear()
-            } else {
-                current.append(c)
+                else -> {
+                    if (c == '\n') line++
+                    field.append(c)
+                }
             }
             i++
         }
-        result.add(current.toString().trim())
-        return result
+        if (field.isNotEmpty() || fields.isNotEmpty()) endRecord()
+        return out
     }
 
-    fun detectDelimiter(content: String): Char {
-        val sample = content.take(2048)
-        val semicolons = sample.count { it == ';' }
-        val commas = sample.count { it == ',' }
-        val tabs = sample.count { it == '\t' }
+    fun tokenizeLine(line: String, delimiter: Char): List<String> =
+        records(line, delimiter).firstOrNull()?.second ?: emptyList()
 
-        return when {
-            semicolons > commas && semicolons > tabs -> ';'
-            tabs > commas && tabs > semicolons -> '\t'
-            else -> ','
-        }
+    fun detectDelimiter(content: String): Char {
+        val firstLine = content.lineSequence().firstOrNull { it.isNotBlank() } ?: return ','
+        val counts = listOf(';', ',', '\t').associateWith { d -> firstLine.count { it == d } }
+        return counts.maxByOrNull { it.value }?.takeIf { it.value > 0 }?.key ?: ','
     }
 
     fun detectMapping(headers: List<String>): CsvColumnMapping {
         val norm = headers.map { TextNormalizer.removeDiacritics(it).lowercase().trim().replace("\"", "") }
 
-        fun findIndex(vararg keywords: String): Int {
-            return norm.indexOfFirst { col -> keywords.any { kw -> col.contains(kw) } }
-        }
+        fun findIndex(vararg keywords: String): Int =
+            norm.indexOfFirst { col -> keywords.any { kw -> col.contains(kw) } }
 
         val dateIdx = findIndex("datum", "date", "konyveles", "erteknap")
-        val descIdx = findIndex("leiras", "description", "partner", "megjegyzes", "kozlemeny", "payee")
+        val descIdx = findIndex("leiras", "description", "partner", "megjegyzes", "kozlemeny", "payee", "merchant")
         val amountIdx = findIndex("osszeg", "amount", "ertek")
         val debitIdx = findIndex("terheles", "kiadas", "debit")
         val creditIdx = findIndex("jovairas", "bevetel", "credit")
@@ -87,113 +131,122 @@ object CsvParser {
         return CsvColumnMapping(
             dateCol = if (dateIdx != -1) dateIdx else 0,
             descCol = if (descIdx != -1) descIdx else 1,
-            amountCol = if (amountIdx != -1) amountIdx else null,
-            debitCol = if (debitIdx != -1) debitIdx else null,
-            creditCol = if (creditIdx != -1) creditIdx else null,
-            currencyCol = if (currIdx != -1) currIdx else null,
-            categoryCol = if (catIdx != -1) catIdx else null
+            amountCol = amountIdx.takeIf { it != -1 },
+            debitCol = debitIdx.takeIf { it != -1 },
+            creditCol = creditIdx.takeIf { it != -1 },
+            currencyCol = currIdx.takeIf { it != -1 },
+            categoryCol = catIdx.takeIf { it != -1 }
         )
     }
 
-    fun parse(inputStream: InputStream, mappingOverride: CsvColumnMapping? = null): List<ParsedCsvRow> {
-        val reader = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
-        var fullText = reader.readText()
+    fun parse(
+        inputStream: InputStream,
+        defaultCurrency: String = "HUF",
+        mappingOverride: CsvColumnMapping? = null
+    ): CsvParseResult {
+        val bytes = inputStream.readBytesLimited(MAX_BYTES)
+        val (text, charset) = decode(bytes)
+        return parseText(text, defaultCurrency, mappingOverride, charset)
+    }
 
-        // Strip UTF-8 BOM
-        if (fullText.startsWith("\uFEFF")) {
-            fullText = fullText.substring(1)
-        }
+    fun parseText(
+        text: String,
+        defaultCurrency: String = "HUF",
+        mappingOverride: CsvColumnMapping? = null,
+        charset: String = "UTF-8"
+    ): CsvParseResult {
+        val delimiter = detectDelimiter(text)
+        val records = records(text.removePrefix("﻿"), delimiter)
+        if (records.size < 2) return CsvParseResult(emptyList(), emptyMap(), charset)
 
-        val lines = fullText.lines().map { it.trim() }.filter { it.isNotEmpty() }
-        if (lines.size < 2) return emptyList()
-
-        val delimiter = detectDelimiter(fullText)
-        val headers = tokenizeLine(lines[0], delimiter)
-        val mapping = mappingOverride ?: detectMapping(headers)
-
+        val mapping = mappingOverride ?: detectMapping(records.first().second)
         val rows = mutableListOf<ParsedCsvRow>()
+        val skipped = mutableMapOf<CsvSkipReason, Int>()
+        fun skip(reason: CsvSkipReason) { skipped[reason] = (skipped[reason] ?: 0) + 1 }
 
-        for (i in 1 until lines.size) {
-            val cells = tokenizeLine(lines[i], delimiter)
-            if (cells.size < 2) continue
+        for ((line, cells) in records.drop(1)) {
+            if (cells.size < 2) { skip(CsvSkipReason.TOO_FEW_COLUMNS); continue }
 
-            val rawDate = cells.getOrNull(mapping.dateCol) ?: ""
-            val rawDesc = cells.getOrNull(mapping.descCol) ?: "Transaction"
+            val date = parseDate(cells.getOrNull(mapping.dateCol)) ?: run { skip(CsvSkipReason.INVALID_DATE); null } ?: continue
 
-            val date = parseDate(rawDate) ?: LocalDate.now()
+            val currency = mapping.currencyCol?.let { col ->
+                val raw = cells.getOrNull(col)?.trim()?.uppercase().orEmpty()
+                when {
+                    raw.isEmpty() -> defaultCurrency
+                    raw == "FT" -> "HUF"
+                    SupportedCurrencies.isValid(raw) -> raw
+                    else -> null
+                }
+            } ?: if (mapping.currencyCol == null) defaultCurrency else { skip(CsvSkipReason.UNSUPPORTED_CURRENCY); continue }
 
-            var amountMajor = 0.0
-            var currency = "HUF"
-
-            if (mapping.currencyCol != null) {
-                val c = cells.getOrNull(mapping.currencyCol)?.uppercase()?.trim() ?: "HUF"
-                if (listOf("HUF", "EUR", "USD").contains(c)) currency = c
-            }
-
-            if (mapping.debitCol != null && mapping.creditCol != null) {
-                val debit = parseNumber(cells.getOrNull(mapping.debitCol))
-                val credit = parseNumber(cells.getOrNull(mapping.creditCol))
-                if (debit > 0) amountMajor = -debit
-                else if (credit > 0) amountMajor = credit
+            val amountMinor: Long? = if (mapping.debitCol != null && mapping.creditCol != null) {
+                val debitRaw = cells.getOrNull(mapping.debitCol)
+                val creditRaw = cells.getOrNull(mapping.creditCol)
+                val debit = if (debitRaw.isNullOrBlank()) 0L else parseAmount(debitRaw)
+                val credit = if (creditRaw.isNullOrBlank()) 0L else parseAmount(creditRaw)
+                if (debit == null || credit == null) null else credit - kotlin.math.abs(debit)
             } else if (mapping.amountCol != null) {
-                amountMajor = parseNumber(cells.getOrNull(mapping.amountCol))
+                parseAmount(cells.getOrNull(mapping.amountCol))
+            } else {
+                null
             }
+            if (amountMinor == null) { skip(CsvSkipReason.INVALID_AMOUNT); continue }
+            if (amountMinor == 0L) { skip(CsvSkipReason.ZERO_AMOUNT); continue }
 
-            val amountMinor = (amountMajor * 100).toLong()
-            val direction = when {
-                amountMajor > 0 -> TransactionDirection.INCOME
-                amountMajor < 0 -> TransactionDirection.EXPENSE
-                else -> TransactionDirection.ADJUSTMENT
-            }
-
-            val merchant = TextNormalizer.cleanMerchantName(rawDesc)
-            val catSuggestion = if (mapping.categoryCol != null) cells.getOrNull(mapping.categoryCol) else null
-
-            rows.add(
-                ParsedCsvRow(
-                    date = date,
-                    description = rawDesc,
-                    merchant = merchant.ifBlank { null },
-                    amountMinor = amountMinor,
-                    currency = currency,
-                    direction = direction,
-                    categorySuggestion = catSuggestion
-                )
+            val rawDesc = cells.getOrNull(mapping.descCol)?.trim().orEmpty().ifBlank { "Imported transaction" }
+            rows += ParsedCsvRow(
+                line = line,
+                date = date,
+                description = rawDesc,
+                merchant = TextNormalizer.cleanMerchantName(rawDesc).ifBlank { null },
+                amountMinor = amountMinor,
+                currency = currency,
+                direction = if (amountMinor > 0) TransactionDirection.INCOME else TransactionDirection.EXPENSE,
+                categorySuggestion = mapping.categoryCol?.let { cells.getOrNull(it) }?.ifBlank { null }
             )
         }
-
-        return rows
+        return CsvParseResult(rows, skipped, charset)
     }
 
-    private fun parseDate(raw: String): LocalDate? {
-        val clean = raw.trim().replace("/", "-").replace(".", "-")
-        val match = Regex("(20\\d{2})-(\\d{1,2})-(\\d{1,2})").find(clean)
-        if (match != null) {
-            val y = match.groupValues[1].toInt()
-            val m = match.groupValues[2].toInt()
-            val d = match.groupValues[3].toInt()
-            return LocalDate.of(y, m, d)
+    /**
+     * Accepted: 2026-03-28, 2026.03.28(.), 2026/03/28, and day-first 28.03.2026.
+     * Slash-separated day/month orders are ambiguous and rejected.
+     */
+    fun parseDate(raw: String?): LocalDate? {
+        val s = raw?.trim()?.trimEnd('.') ?: return null
+        val iso = Regex("^(\\d{4})[-./](\\d{1,2})[-./](\\d{1,2})(?:[ T].*)?$").find(s)
+        val dayFirst = Regex("^(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})(?:\\s.*)?$").find(s)
+        return try {
+            when {
+                iso != null -> LocalDate.of(iso.groupValues[1].toInt(), iso.groupValues[2].toInt(), iso.groupValues[3].toInt())
+                dayFirst != null -> LocalDate.of(dayFirst.groupValues[3].toInt(), dayFirst.groupValues[2].toInt(), dayFirst.groupValues[1].toInt())
+                else -> null
+            }
+        } catch (e: DateTimeException) {
+            null
         }
-        return null
     }
 
-    private fun parseNumber(raw: String?): Double {
-        if (raw.isNullOrBlank()) return 0.0
-        val clean = raw.replace("\\s".toRegex(), "")
-            .replace("Ft", "", ignoreCase = true)
-            .replace("HUF", "", ignoreCase = true)
-            .replace("EUR", "", ignoreCase = true)
-            .replace("USD", "", ignoreCase = true)
-            .replace("€", "")
-            .replace("$", "")
+    /** Signed amount in scale-2 minor units, or null if the cell is not an exact number. */
+    fun parseAmount(raw: String?): Long? {
+        if (raw.isNullOrBlank()) return null
+        val clean = raw.trim()
+            .replace(Regex("(?i)\\b(HUF|EUR|USD|GBP|CHF|Ft)\\b"), "")
+            .replace("€", "").replace("$", "").replace("£", "")
+            .trim()
+        val value = AmountParser.parse(clean) ?: return null
+        return runCatching { Money.toMinor(value) }.getOrNull()
+    }
 
-        return if (clean.contains(",") && clean.contains(".")) {
-            // E.g. 1.245,50 -> 1245.50
-            clean.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
-        } else if (clean.contains(",")) {
-            clean.replace(",", ".").toDoubleOrNull() ?: 0.0
-        } else {
-            clean.toDoubleOrNull() ?: 0.0
+    private fun InputStream.readBytesLimited(limit: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        while (true) {
+            val n = read(buf)
+            if (n < 0) break
+            out.write(buf, 0, n)
+            require(out.size() <= limit) { "File is larger than ${limit / (1024 * 1024)} MB" }
         }
+        return out.toByteArray()
     }
 }
