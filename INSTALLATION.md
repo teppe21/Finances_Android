@@ -1,100 +1,155 @@
-# Installing Finances
+# Installing Finances / Finances telepítése
 
-Finances is an Android app (minimum Android 8.0, API 26). There are four ways to get it onto a phone. Pick the one that matches what you have.
+[English](#english) · [Magyar](#magyar)
 
-| Route | You need | Use it for |
-| --- | --- | --- |
-| [1. Signed release APK](#1-signed-release-apk) | a release APK signed with the upload/release key | everyday use |
-| [2. Debug APK](#2-debug-apk-for-testing) | a debug build | testing only |
-| [3. ADB](#3-installing-with-adb) | a USB cable or wireless debugging | developers, repeatable installs |
-| [4. Build from source](#4-building-from-source) | JDK 17 and the Android SDK | producing any of the above |
+---
 
-## Where to get an APK
+## English
 
-No verified release artifact is published for this repository yet, and there is no download URL to trust. Until one exists, the APK has to be built (route 4) and, for a release, signed with your own key (see [docs/RELEASE.md](docs/RELEASE.md)). Do not install a `Finances` APK that someone sends you from anywhere else: an APK can read everything the app can, and the notification access this app asks for is a powerful permission. Only install files you built yourself or that come from a source whose signing certificate you have verified.
+Finances is an Android app (Android 8.0 or newer). It is not on Google Play, so you install the APK file from GitHub.
 
-## 1. Signed release APK
+> **Status:** until the first signed release is published on the [Releases page](https://github.com/teppe21/Finances-Android/releases), there is nothing to download there. Developers can build the app themselves, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-1. Build and sign it (route 4), or obtain it from a source you verified.
-2. Check the signature before copying it to the phone:
-   ```bash
-   apksigner verify --print-certs app-release.apk
-   ```
-   Compare the certificate fingerprint with the one you expect. A debug certificate (`CN=Android Debug`) means this is **not** a release.
-3. Copy the file to the phone (USB file transfer, a cable-free tool you trust, or a private cloud folder).
-4. Open it with the phone's file manager and tap **Install**.
+### 1. Download the APK
 
-## 2. Debug APK for testing
+1. On your phone, open the [latest release](https://github.com/teppe21/Finances-Android/releases/latest).
+2. Under **Assets**, tap `Finances-vX.Y.Z.apk`. (The `.sha256` file is only for checking the download.)
+3. If the browser warns that this type of file can harm your device, choose **Download anyway**. This warning appears for every APK from outside Google Play.
 
-`./gradlew assembleDebug` produces `app/build/outputs/apk/debug/app-debug.apk`. It is signed with a throw-away debug key, is debuggable, and is **not** a release: never distribute it and do not keep real financial data in it. A debug build and a release build have different signatures, so one cannot be installed over the other (see [Updating](#updating)).
+Only download the app from this repository's Releases page. Do not install an APK that someone sends you.
 
-## 3. Installing with ADB
+### 2. Allow "Install unknown apps"
 
-Enable **Developer options > USB debugging** on the phone, connect it and accept the fingerprint prompt, then:
+When you open the file, Android asks you to allow installing from this source. Tap **Settings** and switch on **Allow from this source** for the app you opened the file with (your browser or file manager). You can switch it off again after the installation.
 
-```bash
-adb devices                       # the phone must be listed as "device"
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
+### 3. Install
 
-`-r` replaces an existing installation of the same signature and keeps its data. Use `adb uninstall com.teppe21.finances` to remove the app (this deletes its data).
+Open the downloaded file (notification, browser downloads, or the Files app), tap **Install**, then **Open**.
 
-## Allowing installation from a file
+### 4. Turn on notification access (optional)
 
-When you open an APK from a file manager or browser, Android asks you to allow that app to install unknown apps (Settings > Apps > Special access > Install unknown apps; the exact path varies by manufacturer). Allow it only for the app you are installing from, and switch it off again afterwards. ADB installs do not need this.
+Notification recognition reads payment notifications from a short list of supported banking apps and wallets. It is optional; the app works without it. The app shows an explanation first; after you tap **Continue**, Android opens its notification access screen.
 
-## Installation and signature errors
+> **Android 13 and newer: restricted setting.** For apps installed outside Google Play, Android blocks this switch (it is greyed out, or shows "Restricted setting"). To unblock it:
+> 1. Long-press the Finances icon → **App info** (or Settings → Apps → Finances).
+> 2. Tap **⋮** (three dots, top right) → **Allow restricted settings**. Confirm with your PIN or fingerprint.
+> 3. Go back to the notification access screen and turn **Finances** on.
+>
+> If you do not see the ⋮ menu, first try to switch notification access on once (it will be refused), then open App info again. Menu wording differs a little between phone brands.
 
-| Message | Likely cause |
+Other permissions are asked only when needed (for example the camera, when you open the receipt scanner).
+
+### 5. Troubleshooting
+
+| Problem | What to do |
 | --- | --- |
-| "App not installed" / `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | the installed copy was signed with a different key (for example debug vs. release). Uninstalling is the only fix, which deletes the app's data |
-| `INSTALL_FAILED_VERSION_DOWNGRADE` | the APK's `versionCode` is lower than the installed one |
-| `INSTALL_PARSE_FAILED_NO_CERTIFICATES` or "package appears to be invalid" | the APK is unsigned or damaged; an unsigned release build cannot be installed |
-| `INSTALL_FAILED_OLDER_SDK` | Android older than 8.0 |
-| Blocked by Play Protect | expected for an app Google has not seen; decide deliberately and only for a file you built or verified |
+| "App not installed" | The same app with a different signature is already installed (for example a test build). Uninstall it first. **Uninstalling deletes its data.** |
+| Install button is greyed out or missing | Allow "Install unknown apps" for the app you opened the file from (step 2). |
+| "Blocked by Play Protect" / "app is not safe" | Expected for an app that is not on Google Play. Choose **More details → Install anyway** only if you got the file from this repository's Releases page. |
+| Notification access is greyed out | See the restricted-setting box in step 4. |
+| Download looks incomplete or damaged | Download again; optionally compare the SHA-256 value with the `.sha256` file. |
 
-## Updating
+### Updating
 
-Install the new APK over the old one. It must be signed with the **same key** and have a higher `versionCode`; data is kept. There is no cloud backup (`allowBackup="false"`) and the app currently has **no export function**, so before any uninstall or switch between debug and release builds there is no supported way to save your records. Treat debug builds as disposable.
+Install the newer APK over the old one (or use Obtainium below). Your data stays, because releases are signed with the same key. Android refuses an update signed with a different key.
 
-## Uninstalling
+### Automatic updates with Obtainium
 
-All financial data lives only in the app's private storage on the phone. Uninstalling the app, clearing its storage, or installing a differently signed build removes it permanently, and it cannot be recovered.
+[Obtainium](https://github.com/ImranR98/Obtainium) installs and updates apps straight from GitHub Releases.
 
-## First launch
+1. Install Obtainium (see its own page for the download).
+2. Tap **Add App**, paste `https://github.com/teppe21/Finances-Android`, and tap **Add**.
+3. Obtainium finds the latest release and offers the APK. Tap **Install**.
+4. It checks for new releases in the background and tells you when an update is available.
 
-The app has no sign-up and no onboarding wizard; it opens on the Dashboard with an empty database (no dummy balances). A sensible order:
+### Your data
 
-1. **Currency.** Settings > Currency: choose the display currency (HUF, EUR, USD, GBP or CHF). Exchange rates are fetched automatically unless you turn that off, in which case enter manual rates there. Without a rate, a transaction in another currency is left out of totals and the screen says so.
-2. **Accounts.** Create at least one account with its currency and opening balance.
-3. **App lock (optional).** Settings > Security: set a 4 to 8 digit PIN and, if the phone supports it, biometric unlock. There is no default PIN and no PIN recovery.
-4. **Notification recognition (optional).** More > Notification automation shows a disclosure first; Android's notification-access screen opens only after you tap Continue. The app reads notifications only from the explicitly supported apps listed in the [README](README.md#automatic-transaction-recognition) and drops all others. Recognized payments may land in a review queue instead of being booked directly. Do not connect real financial accounts for a demo; use **Settings > Data management > Add demo data** instead, and remove it afterwards.
-5. **Receipt scanning (optional).** The camera permission is requested only when you open the scanner. Check every recognized value before saving.
-6. **CSV import (optional).** More > CSV import. Format details: [docs/IMPORT_FORMATS.md](docs/IMPORT_FORMATS.md).
-7. **Stock watchlist (optional).** Settings > Market data (or the Stocks tab) asks for your own [Finnhub](https://finnhub.io) API key; the app ships no key. Without one, or with an invalid one, the screen explains what is missing. Whether quotes are real-time or delayed depends on your Finnhub plan and is labelled from each quote's own timestamp. See [docs/STOCKS.md](docs/STOCKS.md).
-8. **Privacy policy.** Settings > Privacy > Privacy policy, also in [docs/privacy-policy.html](docs/privacy-policy.html).
-9. **Deleting data.** Settings > Data management > *Delete all financial data* or *Reset app completely*.
+Everything is stored only on your phone. There is no account and no cloud backup, and **there is currently no export function**. Uninstalling the app or clearing its storage deletes your data permanently. To delete the data from inside the app: Settings → Data management. Privacy policy: Settings → Privacy.
 
 ### Known limitations
 
-- No export or backup of your data (see above).
-- Existing transactions cannot be edited; delete and re-enter them.
-- Notification recognition covers only the listed apps; the Hungarian bank and Wise package names are unverified against real devices.
-- Currency conversion uses the latest rate, not the rate of each transaction date.
-- The app has not yet been tested on a physical device; see [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md).
+- Notification recognition covers only the listed supported apps; other notifications are ignored. Do not connect real financial accounts to try the app: use Settings → Data management → **Add demo data**.
+- Existing transactions cannot be edited (delete and re-add).
+- Currency conversion uses the latest exchange rate, not the rate of the transaction date.
+- The stock watchlist needs your own free [Finnhub](https://finnhub.io) API key (Settings → Market data); whether quotes are real-time depends on your Finnhub plan.
+- The app has not been tested on a wide range of physical devices yet.
 
-## 4. Building from source
+### Building from source
 
-Requirements: JDK 17 and the Android SDK with platform 36 (see [DEVELOPMENT.md](DEVELOPMENT.md)). Run everything from the repository root:
+See [DEVELOPMENT.md](DEVELOPMENT.md).
 
-```bash
-./gradlew testDebugUnitTest     # JVM unit tests
-./gradlew lint                  # Android lint
-./gradlew assembleDebug         # app/build/outputs/apk/debug/app-debug.apk
-./gradlew assembleRelease       # needs signing values, see below
-./gradlew bundleRelease         # Play bundle (.aab), needs signing values
-```
+---
 
-Release tasks stop with an error unless all four signing values are present; there is no fallback to the debug key. Provide `FINANCES_KEYSTORE_PATH`, `FINANCES_KEYSTORE_PASSWORD`, `FINANCES_KEY_ALIAS` and `FINANCES_KEY_PASSWORD` as environment variables or in a git-ignored `keystore.properties` (template: `keystore.properties.example`). Create your own key with `keytool`; never commit keystores or passwords. Details: [docs/RELEASE.md](docs/RELEASE.md).
+## Magyar
 
-Building needs network access to `dl.google.com` (Google Maven) and Maven Central. If your network blocks them, the build fails at dependency resolution (`Plugin ... was not found`), and nothing about the app can be claimed as built or tested.
+A Finances egy Android-alkalmazás (Android 8.0 vagy újabb). Nincs a Google Play-en, ezért az APK fájlt a GitHubról kell telepíteni.
+
+> **Állapot:** amíg az első aláírt kiadás meg nem jelenik a [Releases oldalon](https://github.com/teppe21/Finances-Android/releases), ott nincs mit letölteni. Fejlesztők maguk is megépíthetik az appot, lásd: [DEVELOPMENT.md](DEVELOPMENT.md).
+
+### 1. Az APK letöltése
+
+1. A telefonodon nyisd meg a [legfrissebb kiadást](https://github.com/teppe21/Finances-Android/releases/latest).
+2. Az **Assets** alatt koppints a `Finances-vX.Y.Z.apk` fájlra. (A `.sha256` fájl csak a letöltés ellenőrzésére való.)
+3. Ha a böngésző figyelmeztet, hogy ez a fájltípus károsíthatja az eszközt, válaszd a **Letöltés mindenképp** lehetőséget. Ez a figyelmeztetés minden, Google Play-en kívüli APK-nál megjelenik.
+
+Az appot csak ennek a tárolónak a Releases oldaláról töltsd le. Ne telepíts olyan APK-t, amit valaki elküldött neked.
+
+### 2. „Ismeretlen alkalmazások telepítése" engedélyezése
+
+A fájl megnyitásakor az Android engedélyt kér a telepítéshez erről a forrásról. Koppints a **Beállításokra**, és kapcsold be az **Engedélyezés erről a forrásról** opciót annál az appnál, amellyel a fájlt megnyitottad (böngésző vagy fájlkezelő). A telepítés után ki is kapcsolhatod.
+
+### 3. Telepítés
+
+Nyisd meg a letöltött fájlt (értesítésből, a böngésző letöltéseiből vagy a Fájlok appból), koppints a **Telepítés** gombra, majd a **Megnyitás**ra.
+
+### 4. Értesítéshozzáférés bekapcsolása (opcionális)
+
+Az értesítésfelismerés néhány támogatott banki app és pénztárca fizetési értesítéseit olvassa. Nem kötelező, enélkül is működik az app. Az app előbb elmagyarázza, mit csinál; a **Continue** után az Android megnyitja az értesítéshozzáférés képernyőjét.
+
+> **Android 13 és újabb: korlátozott beállítás.** A Google Play-en kívül telepített appoknál az Android letiltja ezt a kapcsolót (szürke, vagy „Korlátozott beállítás" felirat látszik). A feloldás:
+> 1. Tartsd nyomva a Finances ikonját → **Alkalmazásinfó** (vagy Beállítások → Alkalmazások → Finances).
+> 2. Koppints a **⋮** (jobb felső három pont) → **Korlátozott beállítások engedélyezése** menüre. Erősítsd meg PIN-nel vagy ujjlenyomattal.
+> 3. Menj vissza az értesítéshozzáférés képernyőjére, és kapcsold be a **Finances**-t.
+>
+> Ha nem látod a ⋮ menüt, próbáld meg egyszer bekapcsolni az értesítéshozzáférést (elutasítja), majd nyisd meg újra az Alkalmazásinfót. A menü szövege telefonmárkánként kicsit eltérhet.
+
+A többi engedélyt az app csak akkor kéri, amikor kell (például a kamerát, amikor megnyitod a nyugtaszkennert).
+
+### 5. Hibaelhárítás
+
+| Probléma | Teendő |
+| --- | --- |
+| „Az alkalmazás nincs telepítve" | Már telepítve van ugyanez az app más aláírással (például egy tesztverzió). Előbb távolítsd el. **Az eltávolítás törli az adatait.** |
+| A Telepítés gomb szürke vagy hiányzik | Engedélyezd az „ismeretlen alkalmazások telepítését" annál az appnál, amiből a fájlt megnyitottad (2. lépés). |
+| „Play Protect blokkolta" / „az app nem biztonságos" | Várható egy Google Play-en kívüli appnál. A **További részletek → Telepítés mindenképp** lehetőséget csak akkor válaszd, ha a fájlt ennek a tárolónak a Releases oldaláról töltötted le. |
+| Az értesítéshozzáférés szürke | Lásd a 4. lépés korlátozott beállításról szóló részét. |
+| A letöltés hiányosnak vagy sérültnek tűnik | Töltsd le újra; ha szeretnéd, hasonlítsd össze az SHA-256 értéket a `.sha256` fájllal. |
+
+### Frissítés
+
+Telepítsd az újabb APK-t a régi fölé (vagy használd lent az Obtainiumot). Az adataid megmaradnak, mert a kiadások ugyanazzal a kulccsal vannak aláírva. Az Android elutasítja a más kulccsal aláírt frissítést.
+
+### Automatikus frissítés Obtainiummal
+
+Az [Obtainium](https://github.com/ImranR98/Obtainium) közvetlenül a GitHub Releases oldalról telepít és frissít appokat.
+
+1. Telepítsd az Obtainiumot (a letöltéshez lásd a saját oldalát).
+2. Koppints az **Add App** gombra, illeszd be: `https://github.com/teppe21/Finances-Android`, majd koppints az **Add** gombra.
+3. Az Obtainium megtalálja a legújabb kiadást, és felajánlja az APK-t. Koppints a **Telepítés** gombra.
+4. A háttérben ellenőrzi az új kiadásokat, és jelzi, ha van frissítés.
+
+### Az adataid
+
+Minden adat kizárólag a telefonodon tárolódik. Nincs fiók és nincs felhős mentés, **és jelenleg nincs exportfunkció**. Az app eltávolítása vagy a tárhelyének törlése véglegesen törli az adataidat. Az adatok törlése az appból: Settings → Data management. Adatvédelmi tájékoztató: Settings → Privacy → Privacy policy.
+
+### Ismert korlátok
+
+- Az értesítésfelismerés csak a felsorolt támogatott appokat fedi le, a többi értesítést figyelmen kívül hagyja. Ne kapcsolj valódi pénzügyi fiókot a kipróbáláshoz: használd a Settings → Data management → **Add demo data** lehetőséget.
+- A meglévő tranzakciók nem szerkeszthetők (töröld és vidd fel újra).
+- A pénznemváltás a legfrissebb árfolyamot használja, nem a tranzakció napjáét.
+- A részvény-figyelőlistához saját, ingyenes [Finnhub](https://finnhub.io) API-kulcs kell (Settings → Market data); hogy az árfolyamok valós idejűek-e, a Finnhub csomagodtól függ.
+- Az appot még nem tesztelték sokféle fizikai eszközön.
+
+### Forrásból építés
+
+Lásd: [DEVELOPMENT.md](DEVELOPMENT.md).

@@ -1,10 +1,25 @@
 # Finances
 
-Finances is a personal finance app for Android, written in Kotlin with Jetpack Compose. It keeps your transactions on the phone and tries to take some of the typing out of bookkeeping: it can pick up card payments from the notifications of a few banking apps, read the total from a paper receipt, and import bank statements in CSV format. It also has a small stock watchlist that shows market quotes from a provider you connect yourself.
+[![Android CI](https://github.com/teppe21/Finances-Android/actions/workflows/android.yml/badge.svg)](https://github.com/teppe21/Finances-Android/actions/workflows/android.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A privacy-first personal finance app for Android (Kotlin, Jetpack Compose) that keeps your data on the phone and can pick up card payments from supported banking notifications.
+
+**[Download latest APK](https://github.com/teppe21/Finances-Android/releases/latest)** · [Installation guide / Telepítési útmutató](INSTALLATION.md) · [Development guide](DEVELOPMENT.md)
+
+> The Releases page has an APK only once the first signed release is published. Until then, build the app yourself ([DEVELOPMENT.md](DEVELOPMENT.md)).
+
+Finances keeps your transactions on the phone and tries to take some of the typing out of bookkeeping: it can pick up card payments from the notifications of a few banking apps, read the total from a paper receipt, and import bank statements in CSV format. It also has a small stock watchlist that shows market quotes from a provider you connect yourself.
 
 This repository contains only the Android app. It used to live in the `android-native/` folder of the [teppe21/finances](https://github.com/teppe21/finances) repository next to an older web dashboard; it was moved here so it can be built and released on its own.
 
-**Install:** [INSTALLATION.md](INSTALLATION.md) · **Develop:** [DEVELOPMENT.md](DEVELOPMENT.md)
+## Screenshots
+
+Screenshots will be added here. See [docs/screenshots/](docs/screenshots/).
+
+## Built with AI assistance
+
+This app was developed together with an AI assistant (Claude). The architecture, the design decisions and the review of the code are mine; the assistant helped write and test code and documentation under my direction.
 
 ## Overview
 
@@ -122,7 +137,7 @@ The repository contains the pieces that can be prepared in code: target SDK 36, 
 
 ## Current status
 
-Unreleased. The Android CI workflow (unit tests, lint, debug APK) is the authority on whether the project builds; see its latest run on GitHub. The R8 release build, instrumented tests, signature and 16 KB checks and the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) have not been run. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and existing transactions cannot be edited yet.
+Unreleased (pre-1.0 quality bar). The Android CI workflow builds the app with the Android Gradle Plugin and runs the JVM unit tests, Android lint and the debug build on every push to `main`; see its latest run on GitHub. The signed release build (R8), the instrumented tests, signature and 16 KB checks and the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) have not been run yet. No signed release has been published. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and existing transactions cannot be edited yet.
 
 ## Project background
 
@@ -141,6 +156,7 @@ The project started as a React web dashboard for personal finances and grew a na
 - [Testing](docs/TESTING.md)
 - [Real-device test plan](docs/REAL_DEVICE_TEST_PLAN.md)
 - [Release process](docs/RELEASE.md)
+- [Contributing](CONTRIBUTING.md) and [Security policy](SECURITY.md)
 - [16 KB page-size compatibility](docs/16KB_COMPATIBILITY.md)
 - [Play Console compliance notes](docs/PLAY_CONSOLE_COMPLIANCE.md)
 - [Financial features declaration](docs/PLAY_FINANCIAL_FEATURES_DECLARATION.md)

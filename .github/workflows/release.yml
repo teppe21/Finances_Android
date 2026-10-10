@@ -1,6 +1,10 @@
 name: Android release build
 
+# Push a tag like v2.1.0 to build a signed release APK and publish it as a GitHub Release.
+# "Run workflow" (workflow_dispatch) builds and uploads artifacts only; it does not publish a Release.
 on:
+  push:
+    tags: [ "v*" ]
   workflow_dispatch:
 
 permissions:
@@ -11,11 +15,14 @@ jobs:
     name: Signed AAB and APK
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: write   # needed only to create the GitHub Release
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -26,6 +33,15 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Check tag matches versionName
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(grep -m1 'versionName' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match versionName ${version} in app/build.gradle.kts" >&2
+            exit 1
+          fi
 
       - name: Decode upload keystore
         env:
@@ -45,12 +61,24 @@ jobs:
           FINANCES_KEY_PASSWORD: ${{ secrets.FINANCES_KEY_PASSWORD }}
         run: ./gradlew --no-daemon testReleaseUnitTest lintRelease bundleRelease assembleRelease --stacktrace
 
-      - name: Check 16 KB alignment of native libraries
-        run: ./scripts/check-16kb-alignment.sh app/build/outputs/apk/release/app-release.apk
-
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks"
+
+      - name: Verify APK signature
+        run: |
+          apksigner="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
+
+      - name: Check 16 KB alignment of native libraries
+        run: ./scripts/check-16kb-alignment.sh app/build/outputs/apk/release/app-release.apk
+
+      - name: Name the release files
+        run: |
+          name="Finances-${GITHUB_REF_NAME:-manual}"
+          cp app/build/outputs/apk/release/app-release.apk "${name}.apk"
+          sha256sum "${name}.apk" > "${name}.apk.sha256"
+          echo "RELEASE_NAME=${name}" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -60,4 +88,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: |
+            ${{ env.RELEASE_NAME }}.apk
+            ${{ env.RELEASE_NAME }}.apk.sha256
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${RELEASE_NAME}.apk" "${RELEASE_NAME}.apk.sha256" \
+            --title "Finances ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag
