@@ -32,6 +32,8 @@ data class DashboardUiState(
     val recentConverted: Map<String, Long?> = emptyMap(),
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
     val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
+    /** For translated category names; the breakdown carries ids. */
+    val categories: List<Category> = emptyList(),
     val reviewCount: Int = 0,
     val currency: String = "HUF",
     val ratesAsOf: Instant? = null,
@@ -95,6 +97,7 @@ class DashboardViewModel(
             recentConverted = recent.associate { it.id to table.convert(it.amountMinor, it.currency, target) },
             monthlyTrends = stats.calculateMonthlyTrends(transactions, monthCount = 6, referenceDate = LocalDate.now(), converter = converter),
             categoryBreakdown = stats.calculateCategoryBreakdown(thisMonth, categories, converter),
+            categories = categories,
             reviewCount = transactions.count { it.pending },
             currency = target,
             ratesAsOf = table.oldestAsOf().takeIf { !table.isEmpty },

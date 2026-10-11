@@ -89,3 +89,20 @@ Record for each step: device, Android version, result, notes.
 | 6.2 | Font size 200%, TalkBack | Labels readable; transaction rows and charts announce content |
 | 6.3 | 16 KB page-size emulator | App starts, camera and OCR work |
 | 6.4 | Upgrade from 2.0.0 with existing data | Data kept, old PIN works once and is upgraded |
+
+## 7. Motion and glass (Phase 3; nothing here has been measured yet)
+
+No frame-rate or jank figure has been recorded for this app. On a physical device, record the device, Android version and the measured value; do not fill in a number you did not measure.
+
+| # | Step | Expected |
+| --- | --- | --- |
+| 7.1 | Developer options > "Profile GPU rendering" (on screen as bars), scroll Transactions with 500+ rows (Settings > Add demo data, import a long CSV) | Note the share of frames over the 16 ms line; note it separately with the tab bar visible |
+| 7.2 | Same on Analytics (donut and legend) and Dashboard | Same |
+| 7.3 | `adb shell dumpsys gfxinfo com.teppe21.finances reset`, scroll for 20 s, then `dumpsys gfxinfo com.teppe21.finances` | Record "Janky frames" and the 90th/95th percentile frame time |
+| 7.4 | Tab switch and drill in/out of Budgets, Accounts, Settings | Fade between tabs, short slide for drill-in; no frame stalls; Back reverses it |
+| 7.5 | Android 14+: Settings > Accessibility > Colour and motion > Colour contrast = medium/high | The tab bar is opaque with no highlight; labels are readable |
+| 7.6 | Settings > Accessibility > "Remove animations" (or animator scale off in Developer options) | Tab switches, row placement and chart drawing are instant; nothing is stuck half-way |
+| 7.7 | Light and dark theme, font scale 1.0 and the largest, with a long list scrolled under the tab bar | Labels stay readable; content dissolves above the bar without a hard edge |
+| 7.8 | Low-end device (2 GB RAM class) if available: repeat 7.1 and 7.4 | Same expectations; note any dropped frames |
+| 7.9 | Gesture navigation: swipe back from a sub-screen slowly | The system shows its back preview (home animation on Android 15+); the in-app screen does not follow the finger (known, see MOTION_DESIGN.md) |
+| 7.10 | Optional, if a backdrop blur is ever added: repeat 7.1-7.3 with and without it | Only adopt it if the frame figures stay unchanged |

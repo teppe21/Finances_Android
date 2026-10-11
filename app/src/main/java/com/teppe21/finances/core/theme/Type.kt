@@ -117,3 +117,18 @@ val Typography = Typography(
 
 /** Apply to monetary text so digits line up (tabular figures) where the font supports it. */
 fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "tnum")
+
+// Amounts: the app font (never monospace) with tabular figures, so digits line up in columns
+// without a typewriter look; the unit is joined by a normal-width non-breaking space.
+
+/** Hero figures (the total balance). */
+val Typography.amountHero: TextStyle get() = displayLarge.tabular()
+
+/** Amounts that head a card (net result, a selected category). */
+val Typography.amountLarge: TextStyle get() = titleLarge.tabular()
+
+/** Amounts in list rows, next to a name. */
+val Typography.amount: TextStyle get() = bodyLarge.copy(fontWeight = FontWeight.SemiBold).tabular()
+
+/** Secondary amounts (an original currency, a share). */
+val Typography.amountSmall: TextStyle get() = bodySmall.tabular()

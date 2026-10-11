@@ -4,7 +4,16 @@ data class FinancialStats(
     val incomeMinor: Long = 0L,
     val expenseMinor: Long = 0L,
     val balanceMinor: Long = 0L,
+    /**
+     * Money moved out of an account to another own account, an exchange or cash. Only outgoing
+     * legs count, so a move between two tracked accounts is not counted twice.
+     */
     val transfersMinor: Long = 0L,
+    val transferCount: Int = 0,
+    /** Money sent to and received from other people. Never part of income or spending. */
+    val personalSentMinor: Long = 0L,
+    val personalReceivedMinor: Long = 0L,
+    val personalCount: Int = 0,
     val savingsRate: Float = 0.0f,
     val transactionCount: Int = 0,
     val maxExpenseItem: MaxExpenseItem = MaxExpenseItem(),

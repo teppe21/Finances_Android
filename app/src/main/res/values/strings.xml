@@ -14,6 +14,7 @@
     <string name="save">Save</string>
     <string name="delete">Delete</string>
     <string name="back">Back</string>
+    <string name="close">Close</string>
     <string name="apply">Apply</string>
 
     <!-- Dashboard -->
@@ -70,12 +71,12 @@
     <string name="notif_title">Notification recognition</string>
 
     <!-- CSV import -->
-    <string name="import_title">Import bank statement (CSV)</string>
+    <string name="import_title">Import CSV statement</string>
     <string name="select_csv_file">Choose CSV file</string>
     <string name="select_csv_desc">Choose a statement exported as CSV. Date, description and amount columns are detected from the header row; rows that cannot be read exactly are skipped and listed.</string>
     <string name="selected_file">File: %1$s</string>
-    <string name="detected_rows">%1$d readable rows</string>
-    <string name="new_items">%1$d new transactions</string>
+    <string name="detected_rows">Readable rows: %1$d</string>
+    <string name="new_items">New transactions: %1$d</string>
     <string name="import_confirm">Import</string>
 
     <!-- Accounts -->
@@ -90,7 +91,6 @@
     <string name="net_balance">Net (income minus expenses)</string>
     <string name="avg_expense">Average expense</string>
     <string name="largest_expense">Largest expense</string>
-    <string name="transfer_volume">Transfers</string>
     <string name="period_3_months">Last 3 months</string>
     <string name="period_6_months">Last 6 months</string>
     <string name="period_this_year">This year</string>
@@ -104,6 +104,8 @@
     <string name="top_merchants">Top merchants</string>
     <string name="no_analytics_data">No expenses in this period.</string>
     <string name="tap_to_filter">Tap a category to highlight it</string>
+    <string name="clear_search">Clear search</string>
+    <string name="analytics_donut_description">Donut chart of spending by category. Total %1$s. %2$s.</string>
 
     <!-- More -->
     <string name="more_title">More</string>
@@ -131,7 +133,7 @@
     <string name="add_keyword">Add keyword</string>
     <string name="keyword_hint">For example: uber, spar, netflix</string>
     <string name="keyword_already_exists">This keyword already exists.</string>
-    <string name="delete_category_in_use">This category is used by %1$d transactions. Choose a category to move them to.</string>
+    <string name="delete_category_in_use">Transactions in this category: %1$d. Choose a category to move them to.</string>
     <string name="reassign_and_delete">Move and delete</string>
     <string name="replacement_category">Replacement category</string>
     <string name="system_category">Built-in category</string>
@@ -140,4 +142,510 @@
     <!-- Settings -->
     <string name="settings">Settings</string>
     <string name="currency">Currency</string>
+
+    <!-- Import summary -->
+    <string name="import_done_title">Import finished</string>
+    <string name="import_summary_imported">Imported</string>
+    <string name="import_summary_skipped">Skipped</string>
+    <string name="import_summary_skipped_detail">Already imported: %1$d · unreadable or not completed: %2$d</string>
+    <string name="import_summary_categorized">Categorized</string>
+    <string name="import_summary_uncategorized">Still uncategorized</string>
+    <string name="import_summary_transfers">Transfers detected</string>
+    <string name="import_summary_transfers_detail">Between own accounts: %1$d · with people: %2$d</string>
+    <string name="import_review_uncategorized">Review uncategorized</string>
+    <string name="import_view_transactions">View transactions</string>
+    <string name="import_another">Import another file</string>
+    <string name="import_already_imported">Already imported into this account: %1$d</string>
+    <string name="import_skipped_intro">Rows skipped because they could not be read exactly:</string>
+    <string name="import_encoding">Text encoding: %1$s</string>
+    <string name="import_error_no_rows">No readable transaction rows were found.</string>
+    <string name="import_error_rows_unreadable">Unreadable rows: %1$d.</string>
+    <string name="import_error_file">The file could not be read as CSV.</string>
+    <string name="skip_invalid_date">unknown date format: %1$d</string>
+    <string name="skip_ambiguous_date">day/month date that reads either way: %1$d</string>
+    <string name="skip_invalid_amount">unreadable amount: %1$d</string>
+    <string name="skip_zero_amount">zero amount: %1$d</string>
+    <string name="skip_unsupported_currency">unsupported currency: %1$d</string>
+    <string name="skip_too_few_columns">too few columns: %1$d</string>
+    <string name="skip_not_completed">reverted or declined by the bank: %1$d</string>
+
+    <!-- Uncategorized and rules -->
+    <string name="uncategorized_title">Uncategorized</string>
+    <string name="more_uncategorized_sub">Sort the transactions no rule recognized</string>
+    <string name="uncategorized_intro">Transactions no rule recognized, grouped by merchant. Choose a category once and a rule can sort the rest.</string>
+    <string name="uncategorized_empty_title">Nothing left to sort</string>
+    <string name="uncategorized_empty_desc">Every transaction has a category.</string>
+    <string name="reapply_rules">Re-apply rules</string>
+    <string name="reapply_rules_desc">Runs the rules over existing transactions. Categories you chose yourself are never changed.</string>
+    <string name="categorize_title">Categorize “%1$s”</string>
+    <string name="categorize_create_rule">Remember for the future</string>
+    <string name="categorize_create_rule_desc">Creates a rule for this keyword and applies it to every matching transaction.</string>
+    <string name="categorize_keyword">Keyword</string>
+    <string name="change_category">Change</string>
+    <string name="category_set_by_you">Chosen by you</string>
+    <plurals name="transaction_count">
+        <item quantity="one">%1$d transaction</item>
+        <item quantity="other">%1$d transactions</item>
+    </plurals>
+    <plurals name="recategorize_updated">
+        <item quantity="one">%1$d transaction updated</item>
+        <item quantity="other">%1$d transactions updated</item>
+    </plurals>
+    <plurals name="recategorize_rule_saved">
+        <item quantity="one">Rule saved, %1$d transaction updated</item>
+        <item quantity="other">Rule saved, %1$d transactions updated</item>
+    </plurals>
+
+    <!-- Analytics: transfers -->
+    <string name="analytics_transfers_title">Transfers</string>
+    <string name="analytics_transfers_desc">Not counted as income or spending.</string>
+    <string name="analytics_own_transfers">Between own accounts and cash</string>
+    <string name="analytics_people_sent">Sent to people</string>
+    <string name="analytics_people_received">Received from people</string>
+
+    <!-- Settings -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_display_currency">Display currency</string>
+    <string name="settings_exchange_rates">Exchange rates</string>
+    <string name="settings_last_fetched">Last fetched %1$s</string>
+    <string name="settings_rates_note">Totals use the latest rate for every transaction, not the historical rate on the transaction date. Only currency codes are sent to the rate service.</string>
+    <string name="settings_auto_rates">Fetch rates automatically</string>
+    <string name="settings_auto_rates_desc">When off, the app makes no exchange-rate requests; cached and manual rates are used.</string>
+    <string name="settings_updating">Updating…</string>
+    <string name="settings_update_now">Update now</string>
+    <string name="settings_manual_rates">Manual rates</string>
+    <string name="settings_rates_fetching">Fetching rates…</string>
+    <string name="settings_rates_none_off">No rates yet and automatic fetching is off. Amounts in other currencies cannot be converted.</string>
+    <string name="settings_rates_none">No rates available yet. Amounts in other currencies cannot be converted until rates are fetched or entered.</string>
+    <string name="settings_rates_of">%1$s, rates of %2$s</string>
+    <string name="settings_rates_manual">manual: %1$s</string>
+    <string name="settings_rates_failed">last update failed, using stored rates</string>
+    <string name="settings_security">Security</string>
+    <string name="settings_lock_off">Off</string>
+    <string name="settings_lock_pin_biometric">PIN and biometrics</string>
+    <string name="settings_lock_pin">PIN</string>
+    <string name="settings_app_lock">App lock: %1$s</string>
+    <string name="settings_lock_note">The app locks whenever you leave it. While the lock is on, screenshots and the Recents preview are blocked.</string>
+    <string name="settings_change_pin">Change PIN</string>
+    <string name="settings_set_pin">Set PIN</string>
+    <string name="settings_turn_off">Turn off</string>
+    <string name="settings_biometric">Unlock with biometrics</string>
+    <string name="settings_biometric_desc">Your PIN remains the fallback.</string>
+    <string name="settings_biometric_unavailable">No biometric unlock is set up on this device.</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_desc">Access, supported apps, account mapping and recent results</string>
+    <string name="settings_market_data">Market data</string>
+    <string name="settings_stocks_key">Stocks API key</string>
+    <string name="settings_stocks_key_saved">Finnhub key saved on this device</string>
+    <string name="settings_stocks_key_missing">Not set. Required for stock quotes.</string>
+    <string name="settings_data">Data management</string>
+    <string name="settings_demo_note">Demo data adds clearly labelled sample accounts and transactions for trying the app.</string>
+    <string name="settings_demo_add">Add demo data</string>
+    <string name="settings_demo_remove">Remove demo data</string>
+    <string name="settings_delete_data">Delete all financial data</string>
+    <string name="settings_reset_app">Reset app completely</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_privacy_storage">Your transactions, accounts, categories and receipts are stored only in this app\'s private storage and are excluded from Android backup and device transfer. The app has no account system, analytics or advertising SDK.</string>
+    <string name="settings_privacy_network">Network use: exchange rates (currency codes only) from the Frankfurter API with open.er-api.com as fallback, and, if you add an API key, stock symbols and search text sent to Finnhub.</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="settings_privacy_read">Read the full policy</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Finances %1$s (%2$d)</string>
+    <string name="settings_about_sources">Exchange rates: European Central Bank reference rates via Frankfurter. Market data: Finnhub. Stock information is for monitoring only and is not investment advice.</string>
+    <string name="settings_delete_title">Delete all financial data?</string>
+    <string name="settings_delete_body">This permanently deletes every transaction, account, category, keyword rule, budget, recurring rule, receipt record and notification result on this device, and the bank-to-account mappings. Default accounts and categories are recreated empty.\n\nKept: app lock and PIN, settings, exchange rates, stock watchlist and API key.\n\nThis cannot be undone.</string>
+    <string name="settings_reset_title">Reset the app?</string>
+    <string name="settings_reset_body">This deletes all financial data, the stock watchlist, the market data API key, the app lock and every setting, returning the app to its first-launch state. This cannot be undone.</string>
+    <string name="settings_reset_confirm">Reset everything</string>
+    <string name="settings_lock_off_title">Turn off app lock?</string>
+    <string name="settings_lock_off_body">Anyone with access to this phone will be able to open Finances.</string>
+    <string name="settings_manual_rates_title">Manual exchange rates</string>
+    <string name="settings_manual_rates_note">Rates are per 1 EUR. A manual rate overrides fetched rates for that currency. Leave empty to use fetched rates.</string>
+    <string name="settings_rate_label">1 EUR = ? %1$s</string>
+    <string name="settings_no_fetched_rate">no fetched rate</string>
+    <string name="settings_msg_rates_updated">Exchange rates updated.</string>
+    <string name="settings_msg_rates_failed">Could not reach the exchange-rate service.</string>
+    <string name="settings_msg_set_pin_first">Set a PIN first.</string>
+    <string name="settings_msg_demo_added">Demo data added. Every demo row is marked “Demo data”.</string>
+    <string name="settings_msg_demo_removed">Demo data removed.</string>
+    <string name="settings_msg_data_deleted">Financial data deleted. App lock and settings were kept.</string>
+    <string name="pin_current">Current PIN</string>
+    <string name="pin_new">New PIN (4 to 8 digits)</string>
+    <string name="pin_repeat">Repeat new PIN</string>
+    <string name="pin_error_length">Use 4 to 8 digits.</string>
+    <string name="pin_error_repeated">Avoid repeating the same digit.</string>
+    <string name="pin_error_sequence">Avoid simple sequences such as 1234.</string>
+    <string name="pin_error_mismatch">The PINs do not match.</string>
+    <string name="pin_error_wait">Too many attempts. Wait %1$d s.</string>
+    <string name="pin_error_current_wrong">Current PIN is incorrect.</string>
+    <string name="pin_error_later">Too many attempts. Try again later.</string>
+    <string name="pin_error_wrong">Incorrect PIN.</string>
+
+    <!-- Analytics -->
+    <string name="period_month">Month</string>
+    <string name="previous_month">Previous month</string>
+    <string name="next_month">Next month</string>
+    <plurals name="unconverted_banner">
+        <item quantity="one">%1$d transaction is not included: no exchange rate to %2$s is available.</item>
+        <item quantity="other">%1$d transactions are not included: no exchange rate to %2$s is available.</item>
+    </plurals>
+
+    <!-- Transactions -->
+    <plurals name="unconverted_shown_original">
+        <item quantity="one">%1$d transaction has no exchange rate to %2$s; it is shown in its original currency.</item>
+        <item quantity="other">%1$d transactions have no exchange rate to %2$s; they are shown in their original currency.</item>
+    </plurals>
+    <string name="account_not_assigned">Not assigned</string>
+    <string name="no_rate_available">No exchange rate available</string>
+    <string name="detail_in_currency">In %1$s</string>
+    <string name="detail_status">Status</string>
+    <string name="detail_needs_review">Needs review, not counted yet</string>
+    <string name="amount_format_error">Use digits with up to two decimals, e.g. 1250 or 12.50</string>
+    <string name="manual_entry">Manual entry</string>
+
+    <!-- Built-in category names (shown while the user has not renamed them) -->
+    <string name="category_name_food">Food &amp; Groceries</string>
+    <string name="category_name_dining">Dining &amp; Restaurants</string>
+    <string name="category_name_transport">Transport &amp; Fuel</string>
+    <string name="category_name_subscriptions">Subscriptions</string>
+    <string name="category_name_housing">Housing &amp; Utilities</string>
+    <string name="category_name_entertainment">Entertainment</string>
+    <string name="category_name_savings">Savings</string>
+    <string name="category_name_income">Income</string>
+    <string name="category_name_health">Health &amp; Pharmacy</string>
+    <string name="category_name_shopping">Shopping</string>
+    <string name="category_name_transfers">Between own accounts</string>
+    <string name="category_name_other">Other / Uncategorized</string>
+    <string name="category_name_personal_transfers">Transfers with people</string>
+    <string name="category_name_cash">Cash &amp; ATM</string>
+    <string name="category_name_taxes">Government &amp; Taxes</string>
+    <string name="category_name_fees">Bank fees</string>
+    <string name="category_name_interest">Interest</string>
+    <string name="category_name_electronics">Electronics</string>
+
+    <!-- Transaction sources and kinds -->
+    <string name="source_manual">Manual</string>
+    <string name="source_csv">CSV import</string>
+    <string name="source_notification">Notification</string>
+    <string name="source_receipt">Receipt</string>
+    <string name="source_open_banking">Open banking</string>
+    <string name="source_backup">Backup</string>
+    <string name="kind_expense">Expense</string>
+    <string name="kind_income">Income</string>
+    <string name="kind_transfer">Transfer between own accounts</string>
+    <string name="kind_personal_transfer">Transfer with a person</string>
+    <string name="row_no_rate">no %1$s rate</string>
+    <string name="row_needs_review">needs review</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="yes">yes</string>
+    <string name="no">no</string>
+    <string name="unknown">unknown</string>
+    <string name="continue_label">Continue</string>
+    <string name="not_now">Not now</string>
+
+    <!-- Notification recognition -->
+    <string name="notif_status">Status</string>
+    <string name="notif_status_access">Android notification access</string>
+    <string name="notif_status_disclosure">In-app disclosure accepted</string>
+    <string name="notif_status_line">%1$s: %2$s</string>
+    <string name="notif_active">Supported notifications are being processed on this device.</string>
+    <string name="notif_inactive">Notifications are not being processed.</string>
+    <string name="notif_setup">Set up notification access</string>
+    <string name="notif_manage_access">Manage access in Android settings</string>
+    <string name="notif_grant_access">Grant access in Android settings</string>
+    <string name="notif_stop">Stop using notifications</string>
+    <plurals name="notif_review_waiting">
+        <item quantity="one">%1$d recognized transaction is waiting for review.</item>
+        <item quantity="other">%1$d recognized transactions are waiting for review.</item>
+    </plurals>
+    <string name="notif_supported_apps">Supported apps</string>
+    <string name="notif_supported_desc">Only notifications from these exact Android packages are read. Everything else is ignored without being stored.</string>
+    <string name="notif_source_verified">Tested with real notification samples</string>
+    <string name="notif_source_unverified">Recognized transactions always go to the review queue (patterns not yet verified on real notifications)</string>
+    <string name="notif_accounts">Accounts for recognized transactions</string>
+    <string name="notif_accounts_desc">Choose which account receives each bank’s transactions. Without a choice, a transaction is assigned automatically only when exactly one account belongs to that bank; otherwise it waits for review. Wallet payments use the account of the card’s bank.</string>
+    <string name="notif_mapping_automatic">Automatic</string>
+    <string name="notif_try">Try it without a real notification</string>
+    <string name="notif_try_desc">Runs the recognizer on a built-in sample. Nothing is saved.</string>
+    <string name="notif_sample_purchase">Purchase</string>
+    <string name="notif_sample_promo">Promotion</string>
+    <string name="notif_sample_login">Login code</string>
+    <string name="notif_recent">Recent processing results</string>
+    <string name="notif_recent_desc">Only the app, time and outcome are kept (for 30 days). Notification text is never stored.</string>
+    <string name="notif_recent_empty">Nothing processed yet.</string>
+    <string name="notif_stop_title">Stop using notifications?</string>
+    <string name="notif_stop_body">Finances will stop processing notifications immediately. To also remove the Android permission, turn Finances off on the notification access screen that opens next.</string>
+    <string name="notif_stop_confirm">Stop and open settings</string>
+    <string name="notif_disclosure_title">Notification access</string>
+    <string name="notif_disclosure_1">Finances uses Android Notification Access to recognize transactions from supported banking and payment apps: Revolut, Google Wallet, OTP Bank, Wise, Erste Bank (George) and MBH Bank.</string>
+    <string name="notif_disclosure_2">Notification contents can contain sensitive financial information. Finances reads the title and text of notifications from those apps only, and processes them on this device to find the amount, currency, merchant, card ending and time of a payment.</string>
+    <string name="notif_disclosure_3">Notifications from all other apps are ignored. Promotional messages and security messages such as login codes are rejected and never stored. Raw notification text is not saved; only the recognized transaction and a short status record (app, time, outcome) are kept on this device.</string>
+    <string name="notif_disclosure_4">Notification contents are not sent to any server.</string>
+    <string name="notif_disclosure_5">You can stop this here at any time, and revoke Notification Access in Android Settings.</string>
+    <string name="sample_recognized_title">Recognized as a transaction</string>
+    <string name="sample_recognized_body">Amount: %1$s\nMerchant: %2$s\nThe balance line was ignored. This sample was not saved.</string>
+    <string name="sample_rejected_title">Rejected: %1$s</string>
+    <string name="sample_rejected_body">Nothing would be stored except this status code.</string>
+    <string name="sample_settings_title">Settings could not be opened</string>
+    <string name="sample_settings_body">Open Android Settings &gt; Notifications &gt; Device &amp; app notifications (or Notification access) and enable Finances.</string>
+    <string name="status_accepted_expense">Expense recorded</string>
+    <string name="status_accepted_income">Income recorded</string>
+    <string name="status_accepted_transfer">Transfer recorded</string>
+    <string name="status_accepted_refund">Refund recorded</string>
+    <string name="status_rejected_promotional">Promotion ignored</string>
+    <string name="status_rejected_security">Security message ignored</string>
+    <string name="status_rejected_unsupported">Unsupported app</string>
+    <string name="status_rejected_non_transaction">Not a transaction</string>
+    <string name="status_rejected_malformed">Could not read amount</string>
+    <string name="status_duplicate">Duplicate of an existing transaction</string>
+    <string name="status_pending_duplicate">Possible duplicate, needs review</string>
+    <string name="status_pending_account">Account unclear, needs review</string>
+    <string name="status_pending_low_confidence">Needs review</string>
+    <string name="status_timeout">Not recorded: processing timed out</string>
+    <string name="status_error">Not recorded: processing failed</string>
+    <string name="status_unknown">Unknown</string>
+
+    <!-- Budgets and recurring -->
+    <string name="budgets_empty_title">No budgets yet</string>
+    <string name="budgets_empty_desc">Set a monthly limit for a spending category to see how much of it you have used this month.</string>
+    <string name="budget_delete">Delete budget for %1$s</string>
+    <string name="budget_progress">%1$s of %2$s this month</string>
+    <string name="budget_over">Over budget</string>
+    <plurals name="budget_unconverted">
+        <item quantity="one">%1$d expense not included: no exchange rate to %2$s.</item>
+        <item quantity="other">%1$d expenses not included: no exchange rate to %2$s.</item>
+    </plurals>
+    <string name="budget_add">Add budget</string>
+    <string name="budget_dialog_title">Monthly budget</string>
+    <string name="budget_limit">Limit per month (%1$s)</string>
+    <string name="recurring_monthly">Monthly</string>
+    <string name="recurring_monthly_next">Monthly · next: %1$s</string>
+    <string name="keyword_remove">Remove %1$s</string>
+
+    <!-- Receipt -->
+    <string name="receipt_error_ocr">Text recognition failed. Try again with better lighting.</string>
+    <string name="receipt_error_image">The image could not be read. Try another image.</string>
+    <string name="receipt_error_photo">The photo could not be taken. Try again or pick an image.</string>
+    <string name="receipt_error_save">The receipt could not be saved. Try again.</string>
+    <string name="receipt_camera_title">Camera access for receipts</string>
+    <string name="receipt_camera_body">Finances uses the camera only while this screen is open, to read the text of a receipt on this device. The photo is not saved or uploaded. You can also pick an image from your gallery instead.</string>
+    <string name="receipt_allow_camera">Allow camera</string>
+    <string name="receipt_pick_image">Pick a receipt image from the gallery</string>
+    <string name="receipt_take_photo">Take photo of receipt</string>
+    <string name="receipt_try_sample">Try a sample receipt (demo data)</string>
+    <string name="receipt_sample_note">Sample receipt for trying the feature; it did not come from your camera.</string>
+    <string name="receipt_check_values">Check the recognized values. Only the merchant, date, total and payment method are saved; the image and recognized text are not.</string>
+    <string name="receipt_not_recognized">Not recognized</string>
+    <string name="receipt_total_missing">The total could not be read; enter it from the receipt.</string>
+
+    <!-- Dashboard -->
+    <plurals name="dashboard_review">
+        <item quantity="one">%1$d transaction needs review before it is counted.</item>
+        <item quantity="other">%1$d transactions need review before they are counted.</item>
+    </plurals>
+    <string name="dashboard_unconverted">Some amounts are not included because no exchange rate to %1$s is available. Refresh rates or enter a manual rate in Settings.</string>
+    <string name="no_transactions_title">No transactions yet</string>
+    <string name="no_transactions_desc">Add one manually, scan a receipt, import a bank CSV, or enable notification recognition under More.</string>
+    <string name="dashboard_rates_note">Converted amounts use the latest available exchange rates, not the rate on each transaction date.</string>
+    <string name="unavailable">Unavailable</string>
+    <string name="dashboard_balance_note">All accounts: opening balances plus recorded transactions</string>
+    <string name="trend_point">%1$s: income %2$s, expenses %3$s</string>
+    <string name="dashboard_spending_month">Spending by category, %1$s</string>
+    <string name="stocks_title">Stocks</string>
+    <string name="dashboard_stocks_desc">Watchlist of market quotes. Kept separate from your accounts.</string>
+
+    <!-- Lock screen -->
+    <string name="lock_title">Finances is locked</string>
+    <string name="lock_biometric_title">Unlock Finances</string>
+    <string name="lock_biometric_subtitle">Confirm it is you to view your finances</string>
+    <string name="lock_use_pin">Use PIN</string>
+    <plurals name="lock_wrong_pin_left">
+        <item quantity="one">Incorrect PIN. %1$d attempt left before a temporary lockout.</item>
+        <item quantity="other">Incorrect PIN. %1$d attempts left before a temporary lockout.</item>
+    </plurals>
+    <string name="lock_too_many">Too many attempts. Try again in a moment.</string>
+    <string name="lock_no_pin">No PIN is set. Use biometric unlock.</string>
+    <string name="lock_locked_for">Locked for %1$d s</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_use_biometrics">Use biometrics</string>
+    <string name="lock_forgot">Forgot PIN?</string>
+    <string name="lock_reset_title">Reset Finances?</string>
+    <string name="lock_reset_body">The PIN cannot be recovered. Resetting erases every transaction, account, category, receipt record, the stock watchlist, the market data API key and all settings on this device. This cannot be undone.</string>
+    <string name="lock_erase">Erase everything</string>
+
+    <!-- Review queue -->
+    <string name="review_title">Review queue</string>
+    <string name="review_confirmed">Confirmed. It now counts toward your totals.</string>
+    <string name="review_discarded">Discarded. Nothing was added.</string>
+    <string name="undo">Undo</string>
+    <string name="review_empty_title">Nothing to review</string>
+    <string name="review_empty_desc">Recognized transactions that need a decision will appear here.</string>
+    <string name="review_hint_account">Choose the account this belongs to.</string>
+    <string name="review_hint_duplicate">This may be the same payment as another notification. Discard it if so.</string>
+    <string name="review_hint_check">Check the amount and merchant before confirming.</string>
+    <string name="review_confirm">Confirm</string>
+    <string name="review_discard">Discard</string>
+    <string name="review_select_account">Select</string>
+    <string name="review_swipe_hint">Swipe right to confirm or left to discard.</string>
+
+    <!-- Accounts -->
+    <string name="accounts_note">Balances are the opening balance plus every confirmed transaction recorded for the account.</string>
+    <string name="accounts_incomplete">Incomplete: without exchange rate: %1$d</string>
+    <string name="accounts_awaiting_review">Awaiting review: %1$d</string>
+    <string name="account_type">Type</string>
+    <string name="accounts_negative_opening">Opening balance is negative (debt)</string>
+    <string name="account_default_cash">Cash Wallet</string>
+    <string name="account_default_otp">OTP Current Account</string>
+    <string name="account_default_savings">Savings</string>
+    <string name="account_type_bank">Bank account</string>
+    <string name="account_type_savings">Savings</string>
+    <string name="account_type_credit_card">Credit card</string>
+    <string name="account_type_cash">Cash</string>
+    <string name="account_type_investment">Investment</string>
+    <string name="account_type_other">Other</string>
+    <string name="more_stocks_sub">Watchlist and price history from your market data provider</string>
+    <string name="more_accounts_sub">Balances, opening amounts and currencies</string>
+    <string name="stock_details_title">Stock details</string>
+
+    <!-- Stocks -->
+    <string name="stock_disclaimer">Quotes come from Finnhub and may be delayed. This is market information for monitoring only, not investment advice.</string>
+    <string name="stock_not_in_accounts">Watched stocks are not added to your accounts or balances.</string>
+    <string name="stock_no_quote">No quote available yet.</string>
+    <string name="stock_vs_previous_close">%1$s  %2$s vs previous close</string>
+    <string name="stock_open">Open</string>
+    <string name="stock_high">High</string>
+    <string name="stock_low">Low</string>
+    <string name="stock_previous_close">Previous close</string>
+    <string name="stock_volume">Volume</string>
+    <string name="stock_not_provided">Not provided</string>
+    <string name="stock_refresh_quote">Refresh quote</string>
+    <string name="stock_price_history">Price history</string>
+    <string name="stock_history_not_on_plan">Your Finnhub plan does not include historical prices for this symbol, so no chart can be drawn. The app does not estimate or fill in missing prices.</string>
+    <string name="stock_history_no_data">The provider has no prices for this period (for example, a weekend or holiday for 1 day).</string>
+    <string name="stock_history_none">No history loaded.</string>
+    <string name="stock_remove_from_watchlist">Remove from watchlist</string>
+    <string name="stock_remove_title">Remove %1$s?</string>
+    <string name="stock_remove_body">The symbol and its cached quote are removed from this device. Your financial records are not affected.</string>
+    <string name="stock_remove">Remove</string>
+    <string name="stock_trades_in">Trades in %1$s</string>
+    <string name="stock_session_non_us">Trading session status is only available for US listings; the label above is based on the quote time.</string>
+    <string name="stock_session_holiday">US market closed for %1$s.</string>
+    <string name="stock_session_open_named">US market open (%1$s session). Quotes are refreshed about once a minute while this app is open.</string>
+    <string name="stock_session_open">US market open. Quotes are refreshed about once a minute while this app is open.</string>
+    <string name="stock_session_closed">US market closed. The price shown is from the last trade the provider reported.</string>
+    <string name="stock_session_unknown">US market status unknown.</string>
+    <string name="stock_one_point">Only one price point was returned for this period.</string>
+    <string name="stock_change_over">%1$s over %2$s (%3$s to %4$s)</string>
+    <string name="stock_chart_description">Price chart for %1$s: from %2$s to %3$s, low %4$s, high %5$s</string>
+    <string name="stock_low_value">Low %1$s</string>
+    <string name="stock_high_value">High %1$s</string>
+    <plurals name="stock_points">
+        <item quantity="one">%1$d data point from %2$s. Times shown in %3$s.</item>
+        <item quantity="other">%1$d data points from %2$s. Times shown in %3$s.</item>
+    </plurals>
+    <string name="stock_range_1d">1 day</string>
+    <string name="stock_range_1w">1 week</string>
+    <string name="stock_range_1m">1 month</string>
+    <string name="stock_range_3m">3 months</string>
+    <string name="stock_range_1y">1 year</string>
+    <string name="stock_status_live">Real-time</string>
+    <string name="stock_status_delayed">Delayed</string>
+    <string name="stock_status_last_close">Last close</string>
+    <string name="stock_status_stale">Stale</string>
+    <string name="stock_status_unavailable">Unavailable</string>
+    <string name="stock_status_key_required">API key required</string>
+    <string name="stock_status_key_invalid">API key rejected</string>
+    <string name="stock_status_rate_limited">Rate limited</string>
+    <string name="stock_status_not_on_plan">Not included in plan</string>
+    <string name="stock_status_live_desc">Price from the last two minutes during an open session</string>
+    <string name="stock_status_delayed_desc">Price is several minutes old</string>
+    <string name="stock_status_last_close_desc">Market closed; last traded price</string>
+    <string name="stock_status_stale_desc">Price is old; it may not reflect the market</string>
+    <string name="stock_status_unavailable_desc">No price available</string>
+    <string name="stock_status_key_required_desc">Add an API key to load prices</string>
+    <string name="stock_status_key_invalid_desc">The API key was rejected</string>
+    <string name="stock_status_rate_limited_desc">Provider limit reached; updates paused</string>
+    <string name="stock_status_not_on_plan_desc">Your provider plan does not include this data</string>
+    <string name="stock_error_missing_key">Add a Finnhub API key in Stocks settings to load quotes.</string>
+    <string name="stock_error_invalid_key">The provider rejected the API key. Check it in Stocks settings.</string>
+    <string name="stock_error_rate_limited">Request limit reached. Updates pause for a while.</string>
+    <string name="stock_error_not_on_plan">Your provider plan does not include this data.</string>
+    <string name="stock_error_unknown_symbol">The provider does not recognize this symbol.</string>
+    <string name="stock_error_no_data">The provider returned no data for this period.</string>
+    <string name="stock_error_offline">No internet connection.</string>
+    <string name="stock_error_timeout">The provider did not respond in time.</string>
+    <string name="stock_error_unavailable">The market data provider is unavailable (HTTP %1$d).</string>
+    <string name="stock_error_malformed">The provider sent a response the app could not read.</string>
+    <string name="stock_tap_to_update">Tap to update it.</string>
+    <string name="stock_connect_title">Connect a market data provider</string>
+    <string name="stock_connect_body">Stock quotes come from Finnhub and need your own free or paid Finnhub API key. The rest of the app works without it.</string>
+    <string name="stock_setup_key">Set up API key</string>
+    <string name="stock_search">Search symbol or company</string>
+    <string name="stock_clear_search">Clear search</string>
+    <string name="stock_no_matches">No matching symbols.</string>
+    <string name="stock_add_symbol">Add %1$s to watchlist</string>
+    <string name="stock_watchlist">Watchlist</string>
+    <string name="stock_refresh_quotes">Refresh quotes</string>
+    <string name="stock_watchlist_empty_title">Your watchlist is empty</string>
+    <string name="stock_watchlist_empty_body">Search for a stock above and tap it to follow its price. Up to %1$d symbols.</string>
+    <string name="stock_settings">Market data settings</string>
+    <string name="stock_today">%1$s, %2$s today</string>
+    <string name="stock_no_price">No price</string>
+    <string name="stock_move_up">Move %1$s up</string>
+    <string name="stock_move_down">Move %1$s down</string>
+    <string name="stock_market_not_loaded">US market status not loaded yet</string>
+    <string name="stock_market_open_named">US market open (%1$s)</string>
+    <string name="stock_market_closed">US market closed</string>
+    <string name="stock_updated">updated %1$s</string>
+    <string name="stock_added">%1$s added</string>
+    <string name="stock_already_added">%1$s is already on your watchlist</string>
+    <string name="stock_limit_reached">The watchlist is limited to %1$s symbols to stay within provider limits</string>
+    <string name="stock_key_rejected">Finnhub rejected this key.</string>
+    <string name="stock_key_missing">Enter a key first.</string>
+    <string name="stock_key_unreachable">Could not reach Finnhub to check the key.</string>
+    <string name="stock_key_unconfirmed">Finnhub could not confirm the key right now.</string>
+    <string name="stock_why_key">Why a key is needed</string>
+    <string name="stock_why_key_body">Stock prices come from Finnhub, a market data service. Finnhub requires every user to have their own API key; the app does not include a shared key. You can create one on the Finnhub website. Finnhub offers a free plan; its limits and which exchanges and history it includes are set by Finnhub and can change, so check their pricing page.</string>
+    <string name="stock_how_used">How the app uses it: about one request per symbol per minute while the Stocks screen is open and the US market is open, no requests in the background, and automatic pauses when Finnhub reports its rate limit. Each quote is labelled from the Finnhub timestamp, so delayed or closing prices are never shown as real-time.</string>
+    <string name="stock_what_sent">What is sent: the key, the symbols on your watchlist and your search text. No financial data from the app.</string>
+    <string name="stock_open_finnhub">Open finnhub.io to get a key</string>
+    <string name="stock_replace_key">Replace API key</string>
+    <string name="stock_enter_key">Enter API key</string>
+    <string name="stock_key_label">Finnhub API key</string>
+    <string name="stock_save_unchecked">Save without checking</string>
+    <string name="stock_check_save">Check and save</string>
+    <string name="stock_key_storage">The key is encrypted with an Android Keystore key and stored only on this device. It is excluded from backups and never logged.</string>
+    <string name="stock_remove_key">Remove saved key</string>
+
+    <!-- Privacy policy -->
+    <string name="policy_open_online">Open the online version</string>
+    <string name="policy_summary_title">Summary</string>
+    <string name="policy_summary">Finances is a personal finance app that keeps your financial records on your device. It has no user accounts, no analytics, no advertising and no crash-reporting SDK. The only network requests are for exchange rates and, if you enable it with your own API key, stock market data.</string>
+    <string name="policy_storage_title">Data stored on your device</string>
+    <string name="policy_storage">Transactions, accounts, categories, keyword rules, budgets, receipt totals, notification processing results, exchange rates, your stock watchlist and cached quotes, and your settings are stored in the app’s private storage. Your PIN is never stored; only a salted PBKDF2 verifier bound to an Android Keystore key is kept. The market data API key is encrypted with an Android Keystore key.</string>
+    <string name="policy_backup_title">Backup</string>
+    <string name="policy_backup">Automatic Android cloud backup and device-to-device transfer are disabled for this app. Uninstalling the app or clearing its storage deletes the data permanently.</string>
+    <string name="policy_notifications_title">Notification access</string>
+    <string name="policy_notifications">If you enable it after reading the in-app disclosure, the app reads the title and text of notifications from supported banking and payment apps (Revolut, Google Wallet, OTP Bank, Wise, Erste Bank, MBH Bank) to recognize transactions on the device. Notifications from other apps are ignored. Promotional and security messages are rejected. Raw notification text is not stored; the recognized transaction and a short status record (app, time, outcome) are kept, the status records for 30 days. Notification contents are never sent anywhere. You can stop this in the app and revoke access in Android Settings.</string>
+    <string name="policy_camera_title">Camera and receipts</string>
+    <string name="policy_camera">The camera is used only when you start receipt scanning. Text recognition runs on the device with Google ML Kit. The app stores the merchant, date and amounts you confirm; it does not keep the photo or the recognized text.</string>
+    <string name="policy_rates_title">Exchange rates</string>
+    <string name="policy_rates">To convert between currencies the app requests reference rates from the Frankfurter API (European Central Bank data) and, if that fails, from open.er-api.com. These requests contain only currency codes. Like any web request they reveal your IP address to the service. You can turn automatic fetching off in Settings.</string>
+    <string name="policy_stocks_title">Stock market data</string>
+    <string name="policy_stocks">The Stocks feature is optional and off until you add your own Finnhub API key. When used, the app sends the symbols on your watchlist and the text you type into stock search to Finnhub, together with your API key and your IP address. The Finnhub privacy policy applies to that data. Watchlist and quotes are stored locally and are never combined with your financial records.</string>
+    <string name="policy_sharing_title">Sharing</string>
+    <string name="policy_sharing">The app does not sell or share your data. Apart from the requests described above, nothing leaves your device.</string>
+    <string name="policy_deleting_title">Deleting data</string>
+    <string name="policy_deleting">Settings &gt; Data management &gt; Delete all financial data removes your financial records while keeping the app lock and settings. Reset app completely removes everything, including the PIN, API key and watchlist.</string>
+    <string name="policy_permissions_title">Permissions</string>
+    <string name="policy_permissions">Internet (exchange rates, optional market data), camera (only during receipt scanning), notification access (only if you enable it), and biometric authentication (only if you enable biometric unlock).</string>
+    <string name="policy_contact_title">Contact</string>
+    <string name="policy_contact">Questions about this policy: %1$s</string>
+    <string name="policy_contact_missing">Contact details have not been configured for this build.</string>
+    <string name="analytics_summary">Summary</string>
 </resources>

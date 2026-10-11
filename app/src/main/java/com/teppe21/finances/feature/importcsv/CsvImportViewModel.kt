@@ -6,13 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.domain.model.Account
-import com.teppe21.finances.domain.model.TransactionSource
-import com.teppe21.finances.domain.usecase.DeduplicationStatus
-import com.teppe21.finances.domain.usecase.Fingerprints
-import com.teppe21.finances.domain.usecase.IngestionInput
+import com.teppe21.finances.native.csv.CsvImport
 import com.teppe21.finances.native.csv.CsvParseResult
 import com.teppe21.finances.native.csv.CsvParser
 import com.teppe21.finances.native.csv.CsvSkipReason
+import com.teppe21.finances.native.csv.ImportSummary
 import com.teppe21.finances.native.csv.ParsedCsvRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Why a file could not be imported at all; the screen turns it into text. */
+enum class CsvImportError { NO_ROWS, UNREADABLE_FILE }
 
 data class CsvImportUiState(
     val fileName: String? = null,
@@ -32,11 +33,12 @@ data class CsvImportUiState(
     val selectedAccountId: String? = null,
     /** Rows already imported earlier into the selected account (same file row). */
     val alreadyImportedCount: Int = 0,
-    val importedCount: Int = 0,
-    val importComplete: Boolean = false,
-    val errorMessage: String? = null
+    /** Set when an import has finished; the screen shows it until the next file. */
+    val summary: ImportSummary? = null,
+    val error: CsvImportError? = null
 ) {
     val newCount: Int get() = parsedRows.size - alreadyImportedCount
+    val importComplete: Boolean get() = summary != null
 }
 
 class CsvImportViewModel : ViewModel() {
@@ -61,7 +63,7 @@ class CsvImportViewModel : ViewModel() {
     }
 
     fun loadFromUri(context: Context, uri: Uri, fileName: String?) {
-        _uiState.value = _uiState.value.copy(isAnalyzing = true, fileName = fileName, errorMessage = null, importComplete = false)
+        _uiState.value = _uiState.value.copy(isAnalyzing = true, fileName = fileName, error = null, summary = null)
         viewModelScope.launch {
             try {
                 val accountCurrency = selectedAccount()?.currency ?: "HUF"
@@ -74,8 +76,7 @@ class CsvImportViewModel : ViewModel() {
                         isAnalyzing = false,
                         parsedRows = emptyList(),
                         skipped = result.skipped,
-                        errorMessage = "No readable transaction rows were found." +
-                            if (result.skippedCount > 0) " ${result.skippedCount} rows could not be read." else ""
+                        error = CsvImportError.NO_ROWS
                     )
                     return@launch
                 }
@@ -87,10 +88,7 @@ class CsvImportViewModel : ViewModel() {
                 )
                 recountDuplicates()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isAnalyzing = false,
-                    errorMessage = "The file could not be read as CSV."
-                )
+                _uiState.value = _uiState.value.copy(isAnalyzing = false, error = CsvImportError.UNREADABLE_FILE)
             }
         }
     }
@@ -98,52 +96,39 @@ class CsvImportViewModel : ViewModel() {
     private fun selectedAccount(): Account? =
         _uiState.value.accounts.firstOrNull { it.id == _uiState.value.selectedAccountId }
 
-    /** Fingerprints per row; identical rows in one file get increasing occurrence numbers. */
-    private fun fingerprints(accountId: String, rows: List<ParsedCsvRow>): List<String> {
-        val seen = mutableMapOf<String, Int>()
-        return rows.map { row ->
-            val base = "${row.date}|${row.amountMinor}|${row.currency}|${row.description}"
-            val occurrence = seen.getOrDefault(base, 0)
-            seen[base] = occurrence + 1
-            Fingerprints.csvRow(accountId, row.date, row.amountMinor, row.currency, row.description, occurrence)
-        }
-    }
-
     private suspend fun recountDuplicates() {
         val accountId = _uiState.value.selectedAccountId ?: return
         val rows = _uiState.value.parsedRows
         val existing = withContext(Dispatchers.IO) {
-            fingerprints(accountId, rows).count { txRepo.findByFingerprint(it) != null }
+            CsvImport.fingerprints(accountId, rows).count { txRepo.findByFingerprint(it) != null }
         }
         _uiState.value = _uiState.value.copy(alreadyImportedCount = existing)
     }
 
-    fun executeImport(onSuccess: () -> Unit) {
+    fun executeImport() {
         val state = _uiState.value
         val accountId = state.selectedAccountId ?: return
+        if (state.isImporting) return
         _uiState.value = state.copy(isImporting = true)
         viewModelScope.launch {
-            var imported = 0
-            withContext(Dispatchers.IO) {
-                state.parsedRows.zip(fingerprints(accountId, state.parsedRows)).forEach { (row, fp) ->
-                    val output = ingestUseCase.execute(
-                        IngestionInput(
-                            accountId = accountId,
-                            date = row.date,
-                            amountMinor = row.amountMinor,
-                            currency = row.currency,
-                            direction = row.direction,
-                            description = row.description,
-                            merchant = row.merchant,
-                            source = TransactionSource.CSV,
-                            fingerprint = fp
-                        )
-                    )
-                    if (output.status != DeduplicationStatus.EXACT_DUPLICATE) imported++
+            val outputs = withContext(Dispatchers.IO) {
+                val rows = state.parsedRows
+                rows.zip(CsvImport.fingerprints(accountId, rows)).map { (row, fp) ->
+                    ingestUseCase.execute(CsvImport.input(row, accountId, fp))
                 }
             }
-            _uiState.value = _uiState.value.copy(isImporting = false, importComplete = true, importedCount = imported)
-            onSuccess()
+            _uiState.value = _uiState.value.copy(
+                isImporting = false,
+                summary = ImportSummary.of(outputs, unreadable = state.skipped.values.sum()),
+                parsedRows = emptyList(),
+                alreadyImportedCount = 0
+            )
         }
     }
+
+    /** Clears the finished import so another file can be chosen. */
+    fun reset() {
+        _uiState.value = CsvImportUiState(accounts = _uiState.value.accounts, selectedAccountId = _uiState.value.selectedAccountId)
+    }
+
 }

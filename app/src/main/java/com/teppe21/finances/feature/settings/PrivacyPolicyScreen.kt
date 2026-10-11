@@ -1,5 +1,9 @@
 package com.teppe21.finances.feature.settings
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import com.teppe21.finances.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -35,11 +39,14 @@ fun PrivacyPolicyScreen() {
     ) {
         item { Spacer(Modifier.height(4.dp)) }
         items(PrivacyPolicy.sections) { (heading, body) ->
-            Column {
-                Text(heading, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Text(body, style = MaterialTheme.typography.bodyMedium)
-            }
+            PolicySection(stringResource(heading), stringResource(body))
+        }
+        item {
+            PolicySection(
+                stringResource(R.string.policy_contact_title),
+                if (BuildConfig.PRIVACY_CONTACT.isNotBlank()) stringResource(R.string.policy_contact, BuildConfig.PRIVACY_CONTACT)
+                else stringResource(R.string.policy_contact_missing)
+            )
         }
         if (BuildConfig.PRIVACY_POLICY_URL.isNotBlank()) {
             item {
@@ -48,56 +55,37 @@ fun PrivacyPolicyScreen() {
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.PRIVACY_POLICY_URL)))
                     }
-                }) { Text("Open the online version") }
+                }) { Text(stringResource(R.string.policy_open_online)) }
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
+@Composable
+private fun PolicySection(title: String, body: String) {
+    Column {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(4.dp))
+        Text(body, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/**
+ * The in-app policy, section by section, as string resources (English and Hungarian). The
+ * English text matches docs/privacy-policy.html; the Hungarian one is a translation of it.
+ */
 object PrivacyPolicy {
-    val sections: List<Pair<String, String>> = listOf(
-        "Summary" to
-            "Finances is a personal finance app that keeps your financial records on your device. It has no user accounts, " +
-            "no analytics, no advertising and no crash-reporting SDK. The only network requests are for exchange rates and, " +
-            "if you enable it with your own API key, stock market data.",
-        "Data stored on your device" to
-            "Transactions, accounts, categories, keyword rules, budgets, receipt totals, notification processing results, " +
-            "exchange rates, your stock watchlist and cached quotes, and your settings are stored in the app's private storage. " +
-            "Your PIN is never stored; only a salted PBKDF2 verifier bound to an Android Keystore key is kept. The market data " +
-            "API key is encrypted with an Android Keystore key.",
-        "Backup" to
-            "Automatic Android cloud backup and device-to-device transfer are disabled for this app. Uninstalling the app or " +
-            "clearing its storage deletes the data permanently.",
-        "Notification access" to
-            "If you enable it after reading the in-app disclosure, the app reads the title and text of notifications from " +
-            "supported banking and payment apps (Revolut, Google Wallet, OTP Bank, Wise, Erste Bank, MBH Bank) to recognize " +
-            "transactions on the device. Notifications from other apps are ignored. Promotional and security messages are " +
-            "rejected. Raw notification text is not stored; the recognized transaction and a short status record (app, time, " +
-            "outcome) are kept, the status records for 30 days. Notification contents are never sent anywhere. You can stop " +
-            "this in the app and revoke access in Android Settings.",
-        "Camera and receipts" to
-            "The camera is used only when you start receipt scanning. Text recognition runs on the device with Google ML Kit. " +
-            "The app stores the merchant, date and amounts you confirm; it does not keep the photo or the recognized text.",
-        "Exchange rates" to
-            "To convert between currencies the app requests reference rates from the Frankfurter API (European Central Bank " +
-            "data) and, if that fails, from open.er-api.com. These requests contain only currency codes. Like any web request " +
-            "they reveal your IP address to the service. You can turn automatic fetching off in Settings.",
-        "Stock market data" to
-            "The Stocks feature is optional and off until you add your own Finnhub API key. When used, the app sends the " +
-            "symbols on your watchlist and the text you type into stock search to Finnhub, together with your API key and your " +
-            "IP address. Finnhub's own privacy policy applies to that data. Watchlist and quotes are stored locally and are " +
-            "never combined with your financial records.",
-        "Sharing" to
-            "The app does not sell or share your data. Apart from the requests described above, nothing leaves your device.",
-        "Deleting data" to
-            "Settings > Data management > Delete all financial data removes your financial records while keeping the app " +
-            "lock and settings. Reset app completely removes everything, including the PIN, API key and watchlist.",
-        "Permissions" to
-            "Internet (exchange rates, optional market data), camera (only during receipt scanning), notification access " +
-            "(only if you enable it), and biometric authentication (only if you enable biometric unlock).",
-        "Contact" to
-            if (BuildConfig.PRIVACY_CONTACT.isNotBlank()) "Questions about this policy: ${BuildConfig.PRIVACY_CONTACT}"
-            else "Contact details have not been configured for this build."
+    val sections: List<Pair<Int, Int>> = listOf(
+        R.string.policy_summary_title to R.string.policy_summary,
+        R.string.policy_storage_title to R.string.policy_storage,
+        R.string.policy_backup_title to R.string.policy_backup,
+        R.string.policy_notifications_title to R.string.policy_notifications,
+        R.string.policy_camera_title to R.string.policy_camera,
+        R.string.policy_rates_title to R.string.policy_rates,
+        R.string.policy_stocks_title to R.string.policy_stocks,
+        R.string.policy_sharing_title to R.string.policy_sharing,
+        R.string.policy_deleting_title to R.string.policy_deleting,
+        R.string.policy_permissions_title to R.string.policy_permissions
     )
 }

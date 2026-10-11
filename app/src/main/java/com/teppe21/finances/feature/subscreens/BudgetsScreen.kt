@@ -1,5 +1,9 @@
 package com.teppe21.finances.feature.subscreens
 
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.teppe21.finances.R
+import com.teppe21.finances.feature.categories.categoryLabel
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.animation.animateColorAsState
@@ -49,6 +53,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.core.money.Money
+import com.teppe21.finances.core.ui.CurrencyChips
+import com.teppe21.finances.core.ui.DialogColumn
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.core.utils.CurrencyFormatter
@@ -67,7 +73,9 @@ import kotlin.math.abs
 
 data class BudgetRow(
     val id: String,
-    val categoryName: String,
+    /** The category (null if it was deleted), named on screen in the app language. */
+    val category: Category?,
+    val categoryId: String,
     val limitMinor: Long,
     val currency: String,
     /** Confirmed expenses this month in the budget currency. */
@@ -100,7 +108,7 @@ class BudgetsViewModel : ViewModel() {
                 val converted = table.convert(abs(t.amountMinor), t.currency, currency)
                 if (converted == null) missing++ else spent += converted
             }
-            BudgetRow(b.id, categories.firstOrNull { it.id == b.categoryId }?.displayName() ?: b.categoryId, b.amountMinor, currency, spent, missing)
+            BudgetRow(b.id, categories.firstOrNull { it.id == b.categoryId }, b.categoryId, b.amountMinor, currency, spent, missing)
         }
         BudgetsState(rows, categories.filter { !it.isIncome }, prefs.currency)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BudgetsState())
@@ -127,12 +135,13 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
             if (state.rows.isEmpty()) {
                 item {
                     EmptyState(
-                        "No budgets yet",
-                        "Set a monthly limit for a spending category to see how much of it you have used this month."
+                        stringResource(R.string.budgets_empty_title),
+                        stringResource(R.string.budgets_empty_desc)
                     )
                 }
             }
             items(state.rows, key = { it.id }) { row ->
+                val name = row.category?.let { categoryLabel(it) } ?: row.categoryId
                 val ratio = if (row.limitMinor > 0) (row.spentMinor.toFloat() / row.limitMinor).coerceIn(0f, 1f) else 0f
                 val shownRatio = animatedFraction(ratio, "budgetUsed")
                 val barColor by animateColorAsState(
@@ -143,11 +152,11 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
                 // smoothly; the figures above them are always exact.
                 SectionCard(modifier = Modifier.animateItemPlacement(Motion.medium()).animateContentSize(Motion.medium())) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(row.categoryName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { viewModel.delete(row.id) }) { Icon(Icons.Default.Delete, contentDescription = "Delete budget for ${row.categoryName}") }
+                        Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { viewModel.delete(row.id) }) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.budget_delete, name)) }
                     }
                     Text(
-                        "${CurrencyFormatter.format(row.spentMinor, row.currency)} of ${CurrencyFormatter.format(row.limitMinor, row.currency)} this month",
+                        stringResource(R.string.budget_progress, CurrencyFormatter.format(row.spentMinor, row.currency), CurrencyFormatter.format(row.limitMinor, row.currency)),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(Modifier.height(8.dp))
@@ -158,11 +167,11 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     if (row.spentMinor > row.limitMinor) {
-                        Text("Over budget", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.budget_over), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                     }
                     if (row.unconverted > 0) {
                         Text(
-                            "${row.unconverted} expenses not included: no exchange rate to ${row.currency}.",
+                            pluralStringResource(R.plurals.budget_unconverted, row.unconverted, row.unconverted, row.currency),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -172,7 +181,7 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
             item { Spacer(Modifier.height(88.dp)) }
         }
         FloatingActionButton(onClick = { showAdd = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-            Icon(Icons.Default.Add, contentDescription = "Add budget")
+            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.budget_add))
         }
     }
 
@@ -183,25 +192,21 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
         val parsed = Money.parseUserInput(amount)?.takeIf { it > 0 }
         AlertDialog(
             onDismissRequest = { showAdd = false },
-            title = { Text("Monthly budget") },
+            title = { Text(stringResource(R.string.budget_dialog_title)) },
             text = {
-                androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Category", style = MaterialTheme.typography.labelMedium)
+                DialogColumn {
+                    Text(stringResource(R.string.category), style = MaterialTheme.typography.labelMedium)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(state.categories, key = { it.id }) { cat ->
-                            FilterChip(selected = categoryId == cat.id, onClick = { categoryId = cat.id }, label = { Text(cat.displayName()) })
+                            FilterChip(selected = categoryId == cat.id, onClick = { categoryId = cat.id }, label = { Text(categoryLabel(cat)) })
                         }
                     }
-                    Text("Currency", style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SupportedCurrencies.ALL.forEach { c ->
-                            FilterChip(selected = currency == c.code, onClick = { currency = c.code }, label = { Text(c.code) })
-                        }
-                    }
+                    Text(stringResource(R.string.currency), style = MaterialTheme.typography.labelMedium)
+                    CurrencyChips(selected = currency, onSelect = { currency = it })
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15) },
-                        label = { Text("Limit per month ($currency)") },
+                        label = { Text(stringResource(R.string.budget_limit, currency)) },
                         isError = amount.isNotBlank() && parsed == null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true
@@ -212,9 +217,9 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
                 Button(enabled = parsed != null && categoryId != null, onClick = {
                     viewModel.add(categoryId!!, parsed!!, currency)
                     showAdd = false
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.save)) }
             },
-            dismissButton = { TextButton(onClick = { showAdd = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showAdd = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 }

@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.notifications
 
+import androidx.annotation.StringRes
+import com.teppe21.finances.R
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -37,7 +39,12 @@ data class NotificationUiState(
 )
 
 /** Result of the in-app sample test; nothing is stored. */
-data class SampleResult(val title: String, val details: String)
+/** What the sample run or a failed settings launch showed; the screen turns it into text. */
+sealed interface SampleResult {
+    data class Recognized(val amountMinor: Long, val currency: String, val merchant: String?) : SampleResult
+    data class Rejected(val code: NotificationStatusCode) : SampleResult
+    data object SettingsUnavailable : SampleResult
+}
 
 class NotificationViewModel : ViewModel() {
 
@@ -92,10 +99,7 @@ class NotificationViewModel : ViewModel() {
     fun openSystemSettings(context: Context) {
         app.appLock.expectExternalActivity()
         if (!NotificationHelper.openNotificationListenerSettings(context)) {
-            _sample.value = SampleResult(
-                "Settings could not be opened",
-                "Open Android Settings > Notifications > Device & app notifications (or Notification access) and enable Finances."
-            )
+            _sample.value = SampleResult.SettingsUnavailable
         }
     }
 
@@ -120,12 +124,8 @@ class NotificationViewModel : ViewModel() {
             else -> RawNotification("com.revolut.revolut", "Sample Grocery", "You spent HUF4,590\nHUF balance: HUF120,000.00", null, now)
         }
         _sample.value = when (val r = NotificationRecognizer().recognize(raw)) {
-            is Recognition.Recognized -> SampleResult(
-                "Recognized as a transaction",
-                "Amount: ${com.teppe21.finances.core.utils.CurrencyFormatter.formatSigned(r.transaction.amountMinor, r.transaction.currency)}\n" +
-                    "Merchant: ${r.transaction.merchant ?: "unknown"}\nThe balance line was ignored. This sample was not saved."
-            )
-            is Recognition.Rejected -> SampleResult("Rejected: ${statusLabel(r.code)}", "Nothing would be stored except this status code.")
+            is Recognition.Recognized -> SampleResult.Recognized(r.transaction.amountMinor, r.transaction.currency, r.transaction.merchant)
+            is Recognition.Rejected -> SampleResult.Rejected(r.code)
         }
     }
 
@@ -188,21 +188,22 @@ class ReviewViewModel(
     }
 }
 
-fun statusLabel(code: NotificationStatusCode?): String = when (code) {
-    NotificationStatusCode.ACCEPTED_EXPENSE -> "Expense recorded"
-    NotificationStatusCode.ACCEPTED_INCOME -> "Income recorded"
-    NotificationStatusCode.ACCEPTED_TRANSFER -> "Transfer recorded"
-    NotificationStatusCode.ACCEPTED_REFUND -> "Refund recorded"
-    NotificationStatusCode.REJECTED_PROMOTIONAL -> "Promotion ignored"
-    NotificationStatusCode.REJECTED_SECURITY_MESSAGE -> "Security message ignored"
-    NotificationStatusCode.REJECTED_UNSUPPORTED_PACKAGE -> "Unsupported app"
-    NotificationStatusCode.REJECTED_NON_TRANSACTION -> "Not a transaction"
-    NotificationStatusCode.REJECTED_MALFORMED_TRANSACTION -> "Could not read amount"
-    NotificationStatusCode.DUPLICATE_EXISTING_TRANSACTION -> "Duplicate of an existing transaction"
-    NotificationStatusCode.PENDING_POSSIBLE_DUPLICATE -> "Possible duplicate, needs review"
-    NotificationStatusCode.PENDING_ACCOUNT_REVIEW -> "Account unclear, needs review"
-    NotificationStatusCode.PENDING_LOW_CONFIDENCE -> "Needs review"
-    NotificationStatusCode.PROCESSING_TIMEOUT -> "Not recorded: processing timed out"
-    NotificationStatusCode.PROCESSING_ERROR -> "Not recorded: processing failed"
-    null -> "Unknown"
+@StringRes
+fun statusLabel(code: NotificationStatusCode?): Int = when (code) {
+    NotificationStatusCode.ACCEPTED_EXPENSE -> R.string.status_accepted_expense
+    NotificationStatusCode.ACCEPTED_INCOME -> R.string.status_accepted_income
+    NotificationStatusCode.ACCEPTED_TRANSFER -> R.string.status_accepted_transfer
+    NotificationStatusCode.ACCEPTED_REFUND -> R.string.status_accepted_refund
+    NotificationStatusCode.REJECTED_PROMOTIONAL -> R.string.status_rejected_promotional
+    NotificationStatusCode.REJECTED_SECURITY_MESSAGE -> R.string.status_rejected_security
+    NotificationStatusCode.REJECTED_UNSUPPORTED_PACKAGE -> R.string.status_rejected_unsupported
+    NotificationStatusCode.REJECTED_NON_TRANSACTION -> R.string.status_rejected_non_transaction
+    NotificationStatusCode.REJECTED_MALFORMED_TRANSACTION -> R.string.status_rejected_malformed
+    NotificationStatusCode.DUPLICATE_EXISTING_TRANSACTION -> R.string.status_duplicate
+    NotificationStatusCode.PENDING_POSSIBLE_DUPLICATE -> R.string.status_pending_duplicate
+    NotificationStatusCode.PENDING_ACCOUNT_REVIEW -> R.string.status_pending_account
+    NotificationStatusCode.PENDING_LOW_CONFIDENCE -> R.string.status_pending_low_confidence
+    NotificationStatusCode.PROCESSING_TIMEOUT -> R.string.status_timeout
+    NotificationStatusCode.PROCESSING_ERROR -> R.string.status_error
+    null -> R.string.status_unknown
 }

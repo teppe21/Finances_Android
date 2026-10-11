@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.settings
 
+import com.teppe21.finances.core.theme.Radii
+
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.compose.foundation.clickable
@@ -43,6 +45,9 @@ import com.teppe21.finances.BuildConfig
 import com.teppe21.finances.data.fx.FxSyncState
 import com.teppe21.finances.data.local.preferences.LockType
 import com.teppe21.finances.data.local.preferences.PinCheck
+import com.teppe21.finances.core.ui.DialogColumn
+import com.teppe21.finances.core.ui.ChipFlow
+import com.teppe21.finances.core.ui.CurrencyChips
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.core.ui.pressClickable
 import androidx.compose.ui.draw.clip
@@ -53,11 +58,11 @@ import com.teppe21.finances.domain.model.SupportedCurrencies
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import android.content.Context
+import androidx.compose.ui.res.stringResource
+import com.teppe21.finances.R
+import com.teppe21.finances.core.utils.DateFormatter
 
-private val DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.US)
-private val DATE_TIME = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.US)
 
 @Composable
 fun SettingsScreen(
@@ -77,7 +82,7 @@ fun SettingsScreen(
 
     LaunchedEffect(message) {
         message?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(it), Toast.LENGTH_SHORT).show()
             viewModel.consumeMessage()
         }
     }
@@ -93,79 +98,74 @@ fun SettingsScreen(
         item { Spacer(Modifier.height(4.dp)) }
 
         item {
-            SectionCard(title = "Appearance") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (key, label) ->
-                        FilterChip(selected = prefs.theme == key, onClick = { viewModel.setTheme(key) }, label = { Text(label) })
+            SectionCard(title = stringResource(R.string.settings_appearance)) {
+                ChipFlow {
+                    listOf("system" to R.string.settings_theme_system, "light" to R.string.settings_theme_light, "dark" to R.string.settings_theme_dark).forEach { (key, label) ->
+                        FilterChip(selected = prefs.theme == key, onClick = { viewModel.setTheme(key) }, label = { Text(stringResource(label)) })
                     }
                 }
             }
         }
 
         item {
-            SectionCard(title = "Currency") {
-                Text("Display currency", style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SupportedCurrencies.ALL.forEach { c ->
-                        FilterChip(selected = prefs.currency == c.code, onClick = { viewModel.setCurrency(c.code) }, label = { Text(c.code) })
-                    }
-                }
+            SectionCard(title = stringResource(R.string.currency)) {
+                Text(stringResource(R.string.settings_display_currency), style = MaterialTheme.typography.bodyMedium)
+                CurrencyChips(selected = prefs.currency, onSelect = { viewModel.setCurrency(it) })
                 Spacer(Modifier.height(12.dp))
-                Text("Exchange rates", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                Text(rateSummary(table, sync), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.settings_exchange_rates), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                Text(rateSummary(table, sync, LocalContext.current), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 lastFetch?.let {
                     Text(
-                        "Last fetched ${it.atZone(ZoneId.systemDefault()).format(DATE_TIME)}",
+                        stringResource(R.string.settings_last_fetched, DateFormatter.dateTime(it.atZone(ZoneId.systemDefault()))),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Text(
-                    "Totals use the latest rate for every transaction, not the historical rate on the transaction date. " +
-                        "Only currency codes are sent to the rate service.",
+                    stringResource(R.string.settings_rates_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 SwitchRow(
-                    title = "Fetch rates automatically",
-                    subtitle = "When off, the app makes no exchange-rate requests; cached and manual rates are used.",
+                    title = stringResource(R.string.settings_auto_rates),
+                    subtitle = stringResource(R.string.settings_auto_rates_desc),
                     checked = prefs.autoSyncFxRates,
                     onChange = { viewModel.setAutoSyncFxRates(it) }
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { viewModel.refreshExchangeRates() }, enabled = sync != FxSyncState.SYNCING) {
-                        Text(if (sync == FxSyncState.SYNCING) "Updating..." else "Update now")
+                        Text(stringResource(if (sync == FxSyncState.SYNCING) R.string.settings_updating else R.string.settings_update_now))
                     }
-                    OutlinedButton(onClick = { dialog = SettingsDialog.ManualRates }) { Text("Manual rates") }
+                    OutlinedButton(onClick = { dialog = SettingsDialog.ManualRates }) { Text(stringResource(R.string.settings_manual_rates)) }
                 }
             }
         }
 
         item {
-            SectionCard(title = "Security") {
+            SectionCard(title = stringResource(R.string.settings_security)) {
                 val lockLabel = when {
-                    !prefs.lockEnabled -> "Off"
-                    prefs.appLockType == LockType.BIOMETRIC -> "PIN and biometrics"
-                    else -> "PIN"
+                    !prefs.lockEnabled -> stringResource(R.string.settings_lock_off)
+                    prefs.appLockType == LockType.BIOMETRIC -> stringResource(R.string.settings_lock_pin_biometric)
+                    else -> stringResource(R.string.settings_lock_pin)
                 }
-                Text("App lock: $lockLabel", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.settings_app_lock, lockLabel), style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "The app locks whenever you leave it. While the lock is on, screenshots and the Recents preview are blocked.",
+                    stringResource(R.string.settings_lock_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { dialog = SettingsDialog.SetPin }) { Text(if (prefs.hasPin) "Change PIN" else "Set PIN") }
+                    Button(onClick = { dialog = SettingsDialog.SetPin }) { Text(stringResource(if (prefs.hasPin) R.string.settings_change_pin else R.string.settings_set_pin)) }
                     if (prefs.lockEnabled) {
-                        OutlinedButton(onClick = { dialog = SettingsDialog.DisableLock }) { Text("Turn off") }
+                        OutlinedButton(onClick = { dialog = SettingsDialog.DisableLock }) { Text(stringResource(R.string.settings_turn_off)) }
                     }
                 }
                 if (prefs.hasPin) {
                     SwitchRow(
-                        title = "Unlock with biometrics",
-                        subtitle = if (biometricAvailable) "Your PIN remains the fallback." else "No biometric unlock is set up on this device.",
+                        title = stringResource(R.string.settings_biometric),
+                        subtitle = stringResource(if (biometricAvailable) R.string.settings_biometric_desc else R.string.settings_biometric_unavailable),
                         checked = prefs.appLockType == LockType.BIOMETRIC,
                         enabled = biometricAvailable,
                         onChange = { viewModel.setBiometric(it) }
@@ -175,68 +175,58 @@ fun SettingsScreen(
         }
 
         item {
-            SectionCard(title = "Notifications") {
-                LinkRow("Notification recognition", "Access, supported apps, account mapping and recent results", onOpenNotifications)
+            SectionCard(title = stringResource(R.string.settings_notifications)) {
+                LinkRow(stringResource(R.string.notif_title), stringResource(R.string.settings_notifications_desc), onOpenNotifications)
             }
         }
 
         item {
-            SectionCard(title = "Market data") {
+            SectionCard(title = stringResource(R.string.settings_market_data)) {
                 LinkRow(
-                    "Stocks API key",
-                    if (prefs.hasStocksApiKey) "Finnhub key saved on this device" else "Not set. Required for stock quotes.",
+                    stringResource(R.string.settings_stocks_key),
+                    stringResource(if (prefs.hasStocksApiKey) R.string.settings_stocks_key_saved else R.string.settings_stocks_key_missing),
                     onOpenMarketData
                 )
             }
         }
 
         item {
-            SectionCard(title = "Data management") {
+            SectionCard(title = stringResource(R.string.settings_data)) {
                 Text(
-                    "Demo data adds clearly labelled sample accounts and transactions for trying the app.",
+                    stringResource(R.string.settings_demo_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { viewModel.loadDemoData() }) { Text("Add demo data") }
-                    OutlinedButton(onClick = { viewModel.clearDemoData() }) { Text("Remove demo data") }
+                    OutlinedButton(onClick = { viewModel.loadDemoData() }) { Text(stringResource(R.string.settings_demo_add)) }
+                    OutlinedButton(onClick = { viewModel.clearDemoData() }) { Text(stringResource(R.string.settings_demo_remove)) }
                 }
                 HorizontalDivider(Modifier.padding(vertical = 12.dp))
                 OutlinedButton(onClick = { dialog = SettingsDialog.DeleteFinancial }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Delete all financial data", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_delete_data), color = MaterialTheme.colorScheme.error)
                 }
                 Spacer(Modifier.height(4.dp))
                 TextButton(onClick = { dialog = SettingsDialog.FullReset }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Reset app completely", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_reset_app), color = MaterialTheme.colorScheme.error)
                 }
             }
         }
 
         item {
-            SectionCard(title = "Privacy") {
-                Text(
-                    "Your transactions, accounts, categories and receipts are stored only in this app's private storage " +
-                        "and are excluded from Android backup and device transfer. The app has no account system, " +
-                        "analytics or advertising SDK.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            SectionCard(title = stringResource(R.string.settings_privacy)) {
+                Text(stringResource(R.string.settings_privacy_storage), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    "Network use: exchange rates (currency codes only) from the Frankfurter API with open.er-api.com as fallback, " +
-                        "and, if you add an API key, stock symbols and search text sent to Finnhub.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(stringResource(R.string.settings_privacy_network), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(8.dp))
-                LinkRow("Privacy policy", "Read the full policy", onOpenPrivacyPolicy)
+                LinkRow(stringResource(R.string.privacy_policy), stringResource(R.string.settings_privacy_read), onOpenPrivacyPolicy)
             }
         }
 
         item {
-            SectionCard(title = "About") {
-                Text("Finances ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium)
+            SectionCard(title = stringResource(R.string.settings_about)) {
+                Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "Exchange rates: European Central Bank reference rates via Frankfurter. Market data: Finnhub. " +
-                        "Stock information is for monitoring only and is not investment advice.",
+                    stringResource(R.string.settings_about_sources),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -251,20 +241,16 @@ fun SettingsScreen(
         SettingsDialog.DisableLock -> DisableLockDialog(viewModel, hasPin = prefs.hasPin, onClose = { dialog = null })
         SettingsDialog.ManualRates -> ManualRatesDialog(table, viewModel, onClose = { dialog = null })
         SettingsDialog.DeleteFinancial -> ConfirmDialog(
-            title = "Delete all financial data?",
-            body = "This permanently deletes every transaction, account, category, keyword rule, budget, recurring rule, " +
-                "receipt record and notification result on this device, and the bank-to-account mappings. Default accounts " +
-                "and categories are recreated empty.\n\nKept: app lock and PIN, settings, exchange rates, stock watchlist " +
-                "and API key.\n\nThis cannot be undone.",
-            confirm = "Delete",
+            title = stringResource(R.string.settings_delete_title),
+            body = stringResource(R.string.settings_delete_body),
+            confirm = stringResource(R.string.delete),
             onConfirm = { viewModel.deleteFinancialData() },
             onClose = { dialog = null }
         )
         SettingsDialog.FullReset -> ConfirmDialog(
-            title = "Reset the app?",
-            body = "This deletes all financial data, the stock watchlist, the market data API key, the app lock and every " +
-                "setting, returning the app to its first-launch state. This cannot be undone.",
-            confirm = "Reset everything",
+            title = stringResource(R.string.settings_reset_title),
+            body = stringResource(R.string.settings_reset_body),
+            confirm = stringResource(R.string.settings_reset_confirm),
             onConfirm = { viewModel.fullReset() },
             onClose = { dialog = null }
         )
@@ -274,22 +260,24 @@ fun SettingsScreen(
 
 private enum class SettingsDialog { SetPin, DisableLock, ManualRates, DeleteFinancial, FullReset }
 
-private fun rateSummary(table: RateTable, sync: FxSyncState): String {
+private fun rateSummary(table: RateTable, sync: FxSyncState, context: Context): String {
     if (table.isEmpty) {
-        return when (sync) {
-            FxSyncState.SYNCING -> "Fetching rates..."
-            FxSyncState.DISABLED -> "No rates yet and automatic fetching is off. Amounts in other currencies cannot be converted."
-            else -> "No rates available yet. Amounts in other currencies cannot be converted until rates are fetched or entered."
-        }
+        return context.getString(
+            when (sync) {
+                FxSyncState.SYNCING -> R.string.settings_rates_fetching
+                FxSyncState.DISABLED -> R.string.settings_rates_none_off
+                else -> R.string.settings_rates_none
+            }
+        )
     }
     val manual = table.quotes.filterValues { it.origin == RateOrigin.MANUAL }.keys
     val fetched = table.quotes.values.filter { it.origin != RateOrigin.MANUAL }
     val parts = mutableListOf<String>()
     fetched.maxByOrNull { it.asOf }?.let {
-        parts += "${it.provider}, rates of ${it.asOf.atZone(ZoneId.of("UTC")).format(DATE)}"
+        parts += context.getString(R.string.settings_rates_of, it.provider, DateFormatter.format(it.asOf.atZone(ZoneId.of("UTC")).toLocalDate()))
     }
-    if (manual.isNotEmpty()) parts += "manual: ${manual.sorted().joinToString()}"
-    if (sync == FxSyncState.FAILED) parts += "last update failed, using stored rates"
+    if (manual.isNotEmpty()) parts += context.getString(R.string.settings_rates_manual, manual.sorted().joinToString())
+    if (sync == FxSyncState.FAILED) parts += context.getString(R.string.settings_rates_failed)
     return parts.joinToString("; ")
 }
 
@@ -309,7 +297,7 @@ private fun LinkRow(title: String, subtitle: String, onClick: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(Radii.control)
             .pressClickable(onClick = onClick)
             .padding(vertical = 8.dp)
     ) {
@@ -334,6 +322,7 @@ private fun PinField(value: String, label: String, onChange: (String) -> Unit) {
 @Composable
 private fun SetPinDialog(viewModel: SettingsViewModel, requireCurrent: Boolean, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var current by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -342,12 +331,12 @@ private fun SetPinDialog(viewModel: SettingsViewModel, requireCurrent: Boolean, 
 
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text(if (requireCurrent) "Change PIN" else "Set PIN") },
+        title = { Text(stringResource(if (requireCurrent) R.string.settings_change_pin else R.string.settings_set_pin)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (requireCurrent) PinField(current, "Current PIN") { current = it }
-                PinField(pin, "New PIN (4 to 8 digits)") { pin = it }
-                PinField(confirm, "Repeat new PIN") { confirm = it }
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (requireCurrent) PinField(current, stringResource(R.string.pin_current)) { current = it }
+                PinField(pin, stringResource(R.string.pin_new)) { pin = it }
+                PinField(confirm, stringResource(R.string.pin_repeat)) { confirm = it }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         },
@@ -358,32 +347,33 @@ private fun SetPinDialog(viewModel: SettingsViewModel, requireCurrent: Boolean, 
                     if (requireCurrent) {
                         when (val check = viewModel.checkPin(current)) {
                             PinCheck.Success -> Unit
-                            is PinCheck.LockedOut -> { error = "Too many attempts. Wait ${check.remaining.seconds} s."; busy = false; return@launch }
-                            else -> { error = "Current PIN is incorrect."; busy = false; return@launch }
+                            is PinCheck.LockedOut -> { error = context.getString(R.string.pin_error_wait, check.remaining.seconds); busy = false; return@launch }
+                            else -> { error = context.getString(R.string.pin_error_current_wrong); busy = false; return@launch }
                         }
                     }
-                    error = viewModel.savePin(pin, confirm)
+                    error = viewModel.savePin(pin, confirm)?.let { context.getString(it) }
                     busy = false
                     if (error == null) onClose()
                 }
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
 @Composable
 private fun DisableLockDialog(viewModel: SettingsViewModel, hasPin: Boolean, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Turn off app lock?") },
+        title = { Text(stringResource(R.string.settings_lock_off_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Anyone with access to this phone will be able to open Finances.")
-                if (hasPin) PinField(pin, "Current PIN") { pin = it }
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.settings_lock_off_body))
+                if (hasPin) PinField(pin, stringResource(R.string.pin_current)) { pin = it }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         },
@@ -393,16 +383,16 @@ private fun DisableLockDialog(viewModel: SettingsViewModel, hasPin: Boolean, onC
                     if (hasPin) {
                         when (viewModel.checkPin(pin)) {
                             PinCheck.Success -> Unit
-                            is PinCheck.LockedOut -> { error = "Too many attempts. Try again later."; return@launch }
-                            else -> { error = "Incorrect PIN."; return@launch }
+                            is PinCheck.LockedOut -> { error = context.getString(R.string.pin_error_later); return@launch }
+                            else -> { error = context.getString(R.string.pin_error_wrong); return@launch }
                         }
                     }
                     viewModel.disableLock()
                     onClose()
                 }
-            }) { Text("Turn off") }
+            }) { Text(stringResource(R.string.settings_turn_off)) }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
@@ -412,11 +402,11 @@ private fun ManualRatesDialog(table: RateTable, viewModel: SettingsViewModel, on
     val inputs = remember { mutableStateOf(codes.associateWith { code -> table.quotes[code]?.takeIf { it.origin == RateOrigin.MANUAL }?.rate?.toPlainString().orEmpty() }) }
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Manual exchange rates") },
+        title = { Text(stringResource(R.string.settings_manual_rates_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Rates are per 1 EUR. A manual rate overrides fetched rates for that currency. Leave empty to use fetched rates.",
+                    stringResource(R.string.settings_manual_rates_note),
                     style = MaterialTheme.typography.bodySmall
                 )
                 codes.forEach { code ->
@@ -424,8 +414,8 @@ private fun ManualRatesDialog(table: RateTable, viewModel: SettingsViewModel, on
                     OutlinedTextField(
                         value = inputs.value.getValue(code),
                         onValueChange = { v -> inputs.value = inputs.value + (code to v.filter { it.isDigit() || it == '.' }.take(14)) },
-                        label = { Text("1 EUR = ? $code") },
-                        placeholder = { Text(fetched ?: "no fetched rate") },
+                        label = { Text(stringResource(R.string.settings_rate_label, code)) },
+                        placeholder = { Text(fetched ?: stringResource(R.string.settings_no_fetched_rate)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
@@ -441,9 +431,9 @@ private fun ManualRatesDialog(table: RateTable, viewModel: SettingsViewModel, on
                     else if (text.isBlank()) viewModel.clearManualRate(code)
                 }
                 onClose()
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
@@ -459,6 +449,6 @@ private fun ConfirmDialog(title: String, body: String, confirm: String, onConfir
                 onClose()
             }) { Text(confirm, color = MaterialTheme.colorScheme.error) }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.cancel)) } }
     )
 }

@@ -2,7 +2,6 @@ package com.teppe21.finances.core.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -25,7 +24,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +34,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 
@@ -63,13 +60,8 @@ fun FloatingTabBar(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(30.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
-            shadowElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-        ) {
+        // Floating glass chrome (tinted, lightly translucent, no blur): see Glass.kt.
+        Box(Modifier.glassChrome(RoundedCornerShape(30.dp))) {
             BoxWithConstraints(Modifier.padding(6.dp).widthIn(max = 440.dp).fillMaxWidth()) {
                 val itemWidth = maxWidth / items.size
                 val indicatorX by animateDpAsState(itemWidth * selectedIndex, Motion.sheet(), label = "tabIndicator")
@@ -106,6 +98,12 @@ private fun TabBarButton(item: TabBarItem, selected: Boolean, onClick: () -> Uni
         if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         Motion.short(), label = "tabTint"
     )
+    // The label is small text: on the accent pill the accent colour is under 4.5:1 in the light theme, so a
+    // selected label uses the main text colour and the icon, pill and weight carry the selection.
+    val labelColor by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        Motion.short(), label = "tabLabel"
+    )
     Column(
         modifier
             .height(TAB_HEIGHT)
@@ -123,14 +121,13 @@ private fun TabBarButton(item: TabBarItem, selected: Boolean, onClick: () -> Uni
     ) {
         Icon(item.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(2.dp))
-        Text(
+        // The tab width is fixed, so a long label ("Transactions", "Tranzakciók") shrinks at large
+        // font scales instead of being cut off.
+        ShrinkToFitText(
             item.label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = tint,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
+            color = labelColor,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

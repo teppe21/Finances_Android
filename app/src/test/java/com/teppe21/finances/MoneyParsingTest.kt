@@ -3,6 +3,8 @@ package com.teppe21.finances
 import com.teppe21.finances.core.money.AmountParser
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.utils.CurrencyFormatter
+import com.teppe21.finances.core.utils.DateFormatter
+import com.teppe21.finances.core.utils.DisplayLocale
 import com.teppe21.finances.native.notification.parsing.MoneyMentions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -64,11 +66,24 @@ class MoneyParsingTest {
 
     @Test
     fun `formatter uses exact decimals and currency precision`() {
-        assertEquals("14,500 Ft", CurrencyFormatter.format(1450000L, "HUF"))
-        assertEquals("1,001 Ft", CurrencyFormatter.format(100050L, "HUF")) // 1000.50 rounds half up
+        assertEquals("14,500 Ft", CurrencyFormatter.format(1450000L, "HUF"))
+        assertEquals("1,001 Ft", CurrencyFormatter.format(100050L, "HUF")) // 1000.50 rounds half up
         assertEquals("€12.50", CurrencyFormatter.format(1250L, "EUR"))
         assertEquals("-$25.00", CurrencyFormatter.formatSigned(-2500L, "USD"))
         assertEquals("£0.00", CurrencyFormatter.format(0L, "GBP"))
-        assertEquals("CHF 90,071,992,547,409.93", CurrencyFormatter.format(9_007_199_254_740_993L, "CHF"))
+        assertEquals("CHF 90,071,992,547,409.93", CurrencyFormatter.format(9_007_199_254_740_993L, "CHF"))
+    }
+
+    @Test
+    fun `hungarian amounts group with a non-breaking space and use a decimal comma`() {
+        DisplayLocale.set(java.util.Locale.forLanguageTag("hu-HU"))
+        try {
+            assertEquals("447 348 Ft", CurrencyFormatter.format(44_734_800L, "HUF"))
+            assertEquals("-12,50 €", CurrencyFormatter.formatSigned(-1250L, "EUR"))
+            assertEquals("1 234,00 CHF", CurrencyFormatter.format(123_400L, "CHF"))
+            assertEquals("2026. szept. 15.", DateFormatter.format(java.time.LocalDate.of(2026, 9, 15)))
+        } finally {
+            DisplayLocale.set(java.util.Locale.US)
+        }
     }
 }

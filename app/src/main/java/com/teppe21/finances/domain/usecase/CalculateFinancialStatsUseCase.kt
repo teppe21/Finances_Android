@@ -43,6 +43,10 @@ class CalculateFinancialStatsUseCase {
         var income = 0L
         var expense = 0L
         var transfers = 0L
+        var transferCount = 0
+        var personalSent = 0L
+        var personalReceived = 0L
+        var personalCount = 0
         var unconverted = 0
         var expenseCount = 0
         var maxExpense = MaxExpenseItem()
@@ -64,7 +68,14 @@ class CalculateFinancialStatsUseCase {
                         maxExpense = MaxExpenseItem(t.merchant ?: t.description, amt)
                     }
                 }
-                t.direction == TransactionDirection.TRANSFER -> transfers += amt
+                t.direction == TransactionDirection.TRANSFER -> {
+                    transferCount++
+                    if (converted < 0) transfers += amt
+                }
+                t.direction == TransactionDirection.PERSONAL_TRANSFER -> {
+                    personalCount++
+                    if (converted < 0) personalSent += amt else personalReceived += amt
+                }
             }
         }
 
@@ -73,6 +84,10 @@ class CalculateFinancialStatsUseCase {
             expenseMinor = expense,
             balanceMinor = income - expense,
             transfersMinor = transfers,
+            transferCount = transferCount,
+            personalSentMinor = personalSent,
+            personalReceivedMinor = personalReceived,
+            personalCount = personalCount,
             savingsRate = calculateSavingsRate(income, expense),
             transactionCount = confirmed.size,
             maxExpenseItem = maxExpense,
@@ -154,7 +169,7 @@ class CalculateFinancialStatsUseCase {
                 percentage = if (totalExpense > 0L) (sum.toFloat() / totalExpense.toFloat()) * 100f else 0f,
                 transactionCount = counts[catId] ?: 0
             )
-        }.sortedByDescending { it.totalMinor }
+        }.sortedWith(compareByDescending<CategoryBreakdown> { it.totalMinor }.thenBy { it.categoryId }) // stable order for the chart
     }
 
     /**

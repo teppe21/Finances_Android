@@ -4,7 +4,15 @@ import java.time.Instant
 import java.time.LocalDate
 
 enum class TransactionDirection {
-    INCOME, EXPENSE, TRANSFER, REFUND, ADJUSTMENT, UNKNOWN;
+    INCOME, EXPENSE,
+    /** Money moved between the user's own accounts, a currency exchange, a top-up or a cash withdrawal. */
+    TRANSFER,
+    REFUND, ADJUSTMENT, UNKNOWN,
+    /** Money sent to or received from another person. Like [TRANSFER], never income or spending. */
+    PERSONAL_TRANSFER;
+
+    /** True for kinds that never count as income or spending. */
+    val isTransfer: Boolean get() = this == TRANSFER || this == PERSONAL_TRANSFER
 
     fun getDisplayName(): String {
         return when (this) {
@@ -14,6 +22,7 @@ enum class TransactionDirection {
             REFUND -> "Refund"
             ADJUSTMENT -> "Adjustment"
             UNKNOWN -> "Unknown"
+            PERSONAL_TRANSFER -> "Personal transfer"
         }
     }
 }
@@ -60,7 +69,9 @@ data class Transaction(
     val importedAt: Instant = Instant.now(),
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
-    val cardLast4: String? = null
+    val cardLast4: String? = null,
+    /** The user chose this category (manual entry, receipt, or a change by hand); rules never overwrite it. */
+    val categorySetByUser: Boolean = false
 ) {
     /** True when the transaction has not been assigned to an account yet. */
     val isUnassigned: Boolean get() = accountId.isBlank()

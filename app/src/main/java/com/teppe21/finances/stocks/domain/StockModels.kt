@@ -94,19 +94,6 @@ fun MarketDataError.toStatus(): DataStatus = when (this) {
     else -> DataStatus.UNAVAILABLE
 }
 
-fun MarketDataError.userMessage(): String = when (this) {
-    MarketDataError.MissingKey -> "Add a Finnhub API key in Stocks settings to load quotes."
-    MarketDataError.InvalidKey -> "The provider rejected the API key. Check it in Stocks settings."
-    is MarketDataError.RateLimited -> "Request limit reached. Updates pause for a while."
-    MarketDataError.NotOnPlan -> "Your provider plan does not include this data."
-    MarketDataError.UnknownSymbol -> "The provider does not recognize this symbol."
-    MarketDataError.NoData -> "The provider returned no data for this period."
-    MarketDataError.Offline -> "No internet connection."
-    MarketDataError.Timeout -> "The provider did not respond in time."
-    is MarketDataError.ProviderUnavailable -> "The market data provider is unavailable (HTTP $httpCode)."
-    MarketDataError.MalformedResponse -> "The provider sent a response the app could not read."
-}
-
 /** Operations the watchlist needs from a market data provider. */
 interface MarketDataProvider {
     val name: String

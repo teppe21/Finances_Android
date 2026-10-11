@@ -35,6 +35,8 @@ Notification ─┘        (sign + merchant normalization, fingerprints)
 
 `TransactionStore.insertIfAbsent` maps to a Room `@Insert(onConflict = IGNORE)`. Rows are never replaced, so a fingerprint collision can no longer delete an existing transaction (the old code used `REPLACE` with a unique fingerprint index).
 
+The categorize step (`CategorizeTransactionUseCase.classify`) picks the category from the user and built-in keyword rules, the bank's type and category columns for CSV rows, and the sign; the category then decides the kind (income, expense, own-account transfer or personal transfer). A category the caller supplies (manual entry, receipt) is the user's choice and is kept with its direction. Own-account transfer legs in two accounts are linked with a shared `transferId`. `Recategorizer` (re-apply rules, rules from a transaction, categories set by hand) uses the same classifier on stored rows. Details: [IMPORT_FORMATS.md](IMPORT_FORMATS.md#categorization).
+
 Fingerprints are source-specific: a random value for manual entries, the receipt id for receipts, a hash of account, date, amount, currency, description and occurrence index for CSV rows, and a hash of package, notification key, post time, amount, currency and direction for notifications.
 
 ## Notification pipeline

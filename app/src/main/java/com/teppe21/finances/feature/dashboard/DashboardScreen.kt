@@ -1,5 +1,16 @@
 package com.teppe21.finances.feature.dashboard
 
+import com.teppe21.finances.core.theme.Radii
+
+import com.teppe21.finances.core.theme.Spacing
+import com.teppe21.finances.core.theme.Sizes
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.foundation.layout.BoxWithConstraints
+import com.teppe21.finances.feature.categories.categoryLabel
+import com.teppe21.finances.core.utils.DateFormatter
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -54,6 +65,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.theme.tabular
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import com.teppe21.finances.core.ui.AmountRowLayout
+import com.teppe21.finances.core.ui.AmountText
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.InfoBanner
@@ -66,12 +83,8 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.domain.model.CategoryBreakdown
 import com.teppe21.finances.domain.model.MonthlyTrend
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.max
 
-private val MONTH_TITLE = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
-private val MONTH_SHORT = DateTimeFormatter.ofPattern("MMM", Locale.US)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -119,6 +132,7 @@ private fun DashboardContent(
     onNavigateToSettings: () -> Unit,
     onAddTransaction: () -> Unit
 ) {
+    val resources = LocalContext.current.resources
 
     LazyColumn(
         modifier = Modifier
@@ -142,8 +156,7 @@ private fun DashboardContent(
         if (state.reviewCount > 0) {
             item(key = "review-banner") {
                 InfoBanner(
-                    text = if (state.reviewCount == 1) "1 transaction needs review before it is counted."
-                    else "${state.reviewCount} transactions need review before they are counted.",
+                    text = pluralStringResource(R.plurals.dashboard_review, state.reviewCount, state.reviewCount),
                     icon = Icons.Default.PendingActions,
                     onClick = onNavigateToReview,
                     modifier = place()
@@ -155,8 +168,7 @@ private fun DashboardContent(
         if (unconverted > 0) {
             item(key = "rate-banner") {
                 InfoBanner(
-                    text = "Some amounts are not included because no exchange rate to ${state.currency} is available. " +
-                        "Refresh rates or enter a manual rate in Settings.",
+                    text = stringResource(R.string.dashboard_unconverted, state.currency),
                     onClick = onNavigateToSettings,
                     modifier = place()
                 )
@@ -164,18 +176,21 @@ private fun DashboardContent(
         }
 
         item(key = "quick-actions") {
-            Row(place().fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                QuickAction(Modifier.weight(1f), stringResource(R.string.add_transaction), Icons.Default.Add, onAddTransaction)
-                QuickAction(Modifier.weight(1f), stringResource(R.string.scan_receipt), Icons.Default.CameraAlt, onNavigateToScanReceipt)
-                QuickAction(Modifier.weight(1f), stringResource(R.string.import_statement), Icons.Default.FileOpen, onNavigateToImportCsv)
-            }
+            QuickActions(
+                listOf(
+                    QuickActionItem(stringResource(R.string.add_transaction), Icons.Default.Add, onAddTransaction),
+                    QuickActionItem(stringResource(R.string.scan_receipt), Icons.Default.CameraAlt, onNavigateToScanReceipt),
+                    QuickActionItem(stringResource(R.string.import_statement), Icons.Default.FileOpen, onNavigateToImportCsv)
+                ),
+                place()
+            )
         }
 
         if (!state.hasAnyTransactions) {
             item(key = "empty") {
                 EmptyState(
-                    title = "No transactions yet",
-                    body = "Add one manually, scan a receipt, import a bank CSV, or enable notification recognition under More.",
+                    title = stringResource(R.string.no_transactions_title),
+                    body = stringResource(R.string.no_transactions_desc),
                     modifier = place(),
                     action = { TextButton(onClick = onAddTransaction) { Text(stringResource(R.string.add_transaction)) } }
                 )
@@ -185,7 +200,10 @@ private fun DashboardContent(
         if (state.hasAnyTransactions) {
             item(key = "trends") { MonthlyTrendsChartCard(state.monthlyTrends, state.currency, place()) }
             if (state.categoryBreakdown.isNotEmpty()) {
-                item(key = "breakdown") { CategoryBreakdownCard(state.categoryBreakdown, state.currency, state.month, place()) }
+                item(key = "breakdown") { CategoryBreakdownCard(
+                    state.categoryBreakdown.map { b -> state.categories.firstOrNull { it.id == b.categoryId }?.let { b.copy(categoryName = categoryLabel(it, resources)) } ?: b },
+                    state.currency, state.month, place()
+                ) }
             }
             item(key = "recent-header") {
                 Row(
@@ -202,6 +220,7 @@ private fun DashboardContent(
                     transaction = tx,
                     displayCurrency = state.currency,
                     convertedAmountMinor = state.recentConverted[tx.id],
+                    categoryName = state.categories.firstOrNull { it.id == tx.categoryId }?.let { categoryLabel(it) },
                     onClick = onNavigateToTransactions,
                     modifier = place()
                 )
@@ -213,7 +232,7 @@ private fun DashboardContent(
         if (state.ratesAsOf != null && state.hasAnyTransactions) {
             item(key = "rates-note") {
                 Text(
-                    text = "Converted amounts use the latest available exchange rates, not the rate on each transaction date.",
+                    text = stringResource(R.string.dashboard_rates_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = place()
@@ -242,43 +261,50 @@ private fun BalanceHero(
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: "Unavailable",
+            text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: stringResource(R.string.unavailable),
             style = MaterialTheme.typography.displayLarge.tabular(),
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1
         )
         Text(
-            text = "All accounts: opening balances plus recorded transactions",
+            text = stringResource(R.string.dashboard_balance_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(20.dp))
         Text(
-            month.format(MONTH_TITLE),
+            DateFormatter.monthYear(month),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SummaryTile(
-                Modifier.weight(1f),
-                stringResource(R.string.income),
-                "+" + CurrencyFormatter.format(incomeMinor, currency),
-                MaterialTheme.finances.income,
-                Icons.Default.ArrowDownward
-            )
-            SummaryTile(
-                Modifier.weight(1f),
-                stringResource(R.string.expenses),
-                "-" + CurrencyFormatter.format(expenseMinor, currency),
-                MaterialTheme.finances.expense,
-                Icons.Default.ArrowUpward
-            )
+        val incomeText = CurrencyFormatter.formatSigned(incomeMinor, currency)
+        val expenseText = CurrencyFormatter.formatSigned(-expenseMinor, currency)
+        // Side by side when both amounts fit in half the width; stacked otherwise (large amounts,
+        // large font scales, narrow screens), so an amount is never cut.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val measurer = rememberTextMeasurer()
+            val style = MaterialTheme.typography.titleMedium.tabular()
+            val density = LocalDensity.current
+            val needed = with(density) {
+                maxOf(measurer.measure(incomeText, style).size.width, measurer.measure(expenseText, style).size.width).toDp()
+            }
+            val available = (maxWidth - Spacing.m) / 2 - SummaryTileChrome
+            val tiles: @Composable (Modifier) -> Unit = { tileModifier ->
+                SummaryTile(tileModifier, stringResource(R.string.income), incomeText, MaterialTheme.finances.income, Icons.Default.ArrowDownward)
+                SummaryTile(tileModifier, stringResource(R.string.expenses), expenseText, MaterialTheme.finances.expense, Icons.Default.ArrowUpward)
+            }
+            if (needed <= available) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.m)) { tiles(Modifier.weight(1f)) }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) { tiles(Modifier.fillMaxWidth()) }
+            }
         }
     }
 }
 
 /** A month figure: a soft tint of its colour, an icon, a word and a signed value, so colour is never the only cue. */
+/** Horizontal space a summary tile uses besides its amount: padding, icon and gap. */private val SummaryTileChrome = 70.dp
 @Composable
 private fun SummaryTile(
     modifier: Modifier,
@@ -309,30 +335,75 @@ private fun SummaryTile(
     }
 }
 
+class QuickActionItem(val title: String, val icon: ImageVector, val onClick: () -> Unit)
+
+private val QuickTilePadding = 4.dp
+private val QuickTileGap = 8.dp
+
+/**
+ * The dashboard shortcuts. They sit side by side while the longest word of every label fits its
+ * tile (so a label wraps at spaces, never in the middle of a word); at a large font scale or with
+ * a long Hungarian word they stack as full-width rows instead, so the text keeps the user's size.
+ */
 @Composable
-private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, onClick: () -> Unit) {
+fun QuickActions(items: List<QuickActionItem>, modifier: Modifier = Modifier) {
+    val style = MaterialTheme.typography.labelMedium
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val tileWidth = (maxWidth - QuickTileGap * (items.size - 1)) / items.size
+        val textWidthPx = with(LocalDensity.current) { (tileWidth - QuickTilePadding * 2).roundToPx() }
+        val sideBySide = items.all { item ->
+            item.title.split(' ').all { word -> measurer.measure(word, style).size.width <= textWidthPx }
+        }
+        if (sideBySide) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(QuickTileGap)) {
+                items.forEach { QuickActionTile(Modifier.weight(1f), it, stacked = false) }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(QuickTileGap)) {
+                items.forEach { QuickActionTile(Modifier.fillMaxWidth(), it, stacked = true) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionTile(modifier: Modifier, item: QuickActionItem, stacked: Boolean) {
     Surface(
         modifier = modifier
-            .height(84.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+            .heightIn(min = if (stacked) Sizes.row else 84.dp)
+            .then(if (stacked) Modifier else Modifier.fillMaxHeight())
+            .clip(Radii.card)
+            .pressClickable(onClick = item.onClick),
+        shape = Radii.card,
         color = MaterialTheme.colorScheme.surface
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(6.dp))
-            Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 1, textAlign = TextAlign.Center)
+        if (stacked) {
+            Row(
+                modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.s),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(item.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(Spacing.m))
+                Text(item.title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(horizontal = QuickTilePadding, vertical = Spacing.s),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(item.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.height(6.dp))
+                Text(item.title, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            }
         }
     }
 }
 
 @Composable
 fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     SectionCard(modifier = modifier, title = stringResource(R.string.six_months_trends)) {
         val maxVal = max(trends.maxOfOrNull { max(it.incomeMinor, it.expenseMinor) } ?: 0L, 1L)
         Row(
@@ -341,8 +412,7 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
                 .height(110.dp)
                 .semantics {
                     contentDescription = trends.joinToString("; ") {
-                        "${YearMonth.parse(it.month).format(MONTH_SHORT)}: income ${CurrencyFormatter.format(it.incomeMinor, currency)}, " +
-                            "expenses ${CurrencyFormatter.format(it.expenseMinor, currency)}"
+                        context.getString(R.string.trend_point, DateFormatter.monthShort(YearMonth.parse(it.month)), CurrencyFormatter.format(it.incomeMinor, currency), CurrencyFormatter.format(it.expenseMinor, currency))
                     }
                 },
             verticalAlignment = Alignment.Bottom
@@ -359,7 +429,7 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        YearMonth.parse(item.month).format(MONTH_SHORT),
+                        DateFormatter.monthShort(YearMonth.parse(item.month)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -368,8 +438,8 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Legend("Income", MaterialTheme.finances.income)
-            Legend("Expenses", MaterialTheme.finances.expense)
+            Legend(stringResource(R.string.income), MaterialTheme.finances.income)
+            Legend(stringResource(R.string.expenses), MaterialTheme.finances.expense)
         }
     }
 }
@@ -404,21 +474,28 @@ private fun CategoryBreakdownCard(
     month: YearMonth,
     modifier: Modifier = Modifier
 ) {
-    SectionCard(modifier = modifier, title = "Spending by category, ${month.format(MONTH_TITLE)}") {
+    SectionCard(modifier = modifier, title = stringResource(R.string.dashboard_spending_month, DateFormatter.monthYear(month))) {
         breakdown.take(5).forEach { cat ->
             val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
             val shown = animatedFraction((cat.percentage / 100f).coerceIn(0f, 1f), "categoryShare")
-            Column(Modifier.padding(vertical = 5.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-                    Spacer(Modifier.width(8.dp))
-                    Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
-                    Text(
-                        "${CurrencyFormatter.format(cat.totalMinor, currency)} · ${cat.percentage.toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+            Column(Modifier.padding(vertical = 5.dp).semantics(mergeDescendants = true) {}) {
+                // The figure is measured first and never truncated; the name takes what is left (two
+                // lines) or the figure moves under it at a large font scale.
+                AmountRowLayout(
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+                            Spacer(Modifier.width(8.dp))
+                            Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    },
+                    amount = {
+                        AmountText(
+                            "${CurrencyFormatter.format(cat.totalMinor, currency)} · ${CurrencyFormatter.formatPercent(cat.percentage)}",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular()
+                        )
+                    }
+                )
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { shown },
@@ -434,17 +511,17 @@ private fun CategoryBreakdownCard(
 @Composable
 private fun StocksEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier.fillMaxWidth().clip(Radii.card).pressClickable(onClick = onClick),
+        shape = Radii.card,
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Stocks", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.stocks_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Watchlist of market quotes. Kept separate from your accounts.",
+                    stringResource(R.string.dashboard_stocks_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

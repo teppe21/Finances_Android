@@ -1,5 +1,30 @@
 package com.teppe21.finances.feature.analytics
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.teppe21.finances.core.ui.ShrinkToFitText
+import androidx.compose.ui.text.rememberTextMeasurer
+import com.teppe21.finances.domain.model.FinancialStats
+import com.teppe21.finances.core.ui.SectionCard
+import com.teppe21.finances.core.ui.ValueRow
+import com.teppe21.finances.core.ui.ListRow
+import com.teppe21.finances.core.ui.AmountText
+import com.teppe21.finances.core.theme.amountLarge
+import com.teppe21.finances.core.theme.Spacing
+import com.teppe21.finances.core.theme.Radii
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import com.teppe21.finances.core.ui.pressSelectable
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.Crossfade
@@ -53,6 +78,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import com.teppe21.finances.feature.categories.categoryLabel
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +89,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
+import com.teppe21.finances.core.theme.tabular
 import com.teppe21.finances.core.ui.InfoBanner
 import com.teppe21.finances.core.ui.Motion
 import com.teppe21.finances.core.ui.rememberReveal
@@ -79,12 +107,32 @@ import kotlin.math.atan2
 import kotlin.math.sqrt
 
 
+/** Ring stroke; the selected segment is drawn [DONUT_SELECTED_STROKE] times as thick. */
+internal val DONUT_STROKE = 28.dp
+internal const val DONUT_SELECTED_STROKE = 1.3f
+
+/**
+ * The ring grows with the font scale (up to what fits a 360 dp card), so the text in the hole can
+ * follow the user's font size instead of being capped: the hole is what the centre text has to fit.
+ */
+internal const val DONUT_CENTRE_TAG = "donutCentre"
+
+internal fun donutRingSize(fontScale: Float): Dp = (220f + 60f * (fontScale - 1f)).coerceIn(220f, 280f).dp
+
+/** Diameter of the open hole, measured inside the thickest (selected) segment. */
+internal fun donutHoleDiameter(ringSize: Dp): Dp = ringSize - DONUT_STROKE * (2f * DONUT_SELECTED_STROKE)
+
+/** Width of the text column in the hole: narrower than the hole, so a stack of lines stays inside the circle. */
+internal fun donutCentreWidth(ringSize: Dp): Dp = donutHoleDiameter(ringSize) * 0.82f
+
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val resources = LocalContext.current.resources
 
     LazyColumn(
         modifier = Modifier
@@ -120,7 +168,7 @@ fun AnalyticsScreen(
         if (state.stats.unconvertedCount > 0) {
             item(key = "unconverted-banner") {
                 InfoBanner(
-                    "${state.stats.unconvertedCount} transactions are not included: no exchange rate to ${state.currency} is available.",
+                    pluralStringResource(R.plurals.unconverted_banner, state.stats.unconvertedCount, state.stats.unconvertedCount, state.currency),
                     modifier = Modifier.animateItemPlacement(Motion.medium())
                 )
             }
@@ -128,56 +176,31 @@ fun AnalyticsScreen(
 
         // Headline Metrics Grid
         item(key = "headline") {
-            Card(
-                modifier = Modifier.fillMaxWidth().animateItemPlacement(Motion.medium()),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = stringResource(R.string.analytics_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+            SectionCard(title = stringResource(R.string.analytics_summary), modifier = Modifier.animateItemPlacement(Motion.medium())) {
+                ValueRow(stringResource(R.string.income), CurrencyFormatter.format(state.stats.incomeMinor, state.currency), valueColor = MaterialTheme.finances.income)
+                ValueRow(stringResource(R.string.expenses), CurrencyFormatter.format(state.stats.expenseMinor, state.currency), valueColor = MaterialTheme.finances.expense)
+                ValueRow(
+                    stringResource(R.string.net_balance),
+                    CurrencyFormatter.formatSigned(state.stats.balanceMinor, state.currency),
+                    valueColor = if (state.stats.balanceMinor >= 0) MaterialTheme.finances.income else MaterialTheme.finances.expense
+                )
+                HorizontalDivider(Modifier.padding(vertical = Spacing.xs), color = MaterialTheme.colorScheme.outlineVariant)
+                ValueRow(stringResource(R.string.avg_expense), CurrencyFormatter.format(state.stats.avgExpenseMinor, state.currency))
+                val largest = state.stats.maxExpenseItem
+                if (largest.amountMinor > 0) {
+                    ValueRow(
+                        stringResource(R.string.largest_expense),
+                        CurrencyFormatter.format(largest.amountMinor, state.currency),
+                        detail = largest.description
                     )
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.net_balance), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = CurrencyFormatter.formatSigned(state.stats.balanceMinor, state.currency),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = if (state.stats.balanceMinor >= 0) MaterialTheme.finances.income else MaterialTheme.finances.expense
-                        )
-                    }
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.avg_expense), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = CurrencyFormatter.format(state.stats.avgExpenseMinor, state.currency),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.largest_expense), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        val maxName = state.stats.maxExpenseItem.description.ifBlank { "-" }
-                        Text(
-                            text = if (state.stats.maxExpenseItem.amountMinor > 0) "$maxName: ${CurrencyFormatter.format(state.stats.maxExpenseItem.amountMinor, state.currency)}" else "-",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.transfer_volume), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = CurrencyFormatter.format(state.stats.transfersMinor, state.currency),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
+            }
+        }
+
+        // Transfers stay visible but apart: they are never income, spending or a merchant.
+        if (state.stats.transferCount + state.stats.personalCount > 0) {
+            item(key = "transfers") {
+                TransfersCard(stats = state.stats, currency = state.currency, modifier = Modifier.animateItemPlacement(Motion.medium()))
             }
         }
 
@@ -185,7 +208,9 @@ fun AnalyticsScreen(
         item(key = "donut") {
             SpendingDonutChartCard(
                 modifier = Modifier.animateItemPlacement(Motion.medium()),
-                breakdown = state.categoryBreakdown,
+                breakdown = state.categoryBreakdown.map { b ->
+                    state.categories.firstOrNull { it.id == b.categoryId }?.let { b.copy(categoryName = categoryLabel(it, resources)) } ?: b
+                },
                 totalExpenseMinor = state.stats.expenseMinor,
                 selectedCategoryId = state.selectedCategoryId,
                 currency = state.currency,
@@ -230,7 +255,7 @@ fun AnalyticsScreen(
     }
 }
 
-private val MONTH_TITLE = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.US)
+
 
 @Composable
 fun MonthNavigator(
@@ -246,10 +271,10 @@ fun MonthNavigator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.previous_month))
         }
         Crossfade(
-            targetState = month.format(MONTH_TITLE),
+            targetState = DateFormatter.monthYear(month),
             animationSpec = Motion.short(),
             modifier = Modifier.weight(1f),
             label = "monthTitle"
@@ -263,9 +288,9 @@ fun MonthNavigator(
             )
         }
         IconButton(onClick = onNext, enabled = !isCurrent) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.next_month))
         }
-        TextButton(onClick = onCurrent, enabled = !isCurrent) { Text("This month") }
+        TextButton(onClick = onCurrent, enabled = !isCurrent) { Text(stringResource(R.string.filter_this_month)) }
     }
 }
 
@@ -289,7 +314,7 @@ fun PeriodFilterRow(
             FilterChip(
                 selected = currentPeriod == AnalyticsPeriod.MONTH,
                 onClick = { onSelectPeriod(AnalyticsPeriod.MONTH) },
-                label = { Text("Month") },
+                label = { Text(stringResource(R.string.period_month)) },
                 colors = FilterChipDefaults.filterChipColors()
             )
             FilterChip(
@@ -356,317 +381,185 @@ fun SpendingDonutChartCard(
     onCategoryClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val selectedItem = breakdown.find { it.categoryId == selectedCategoryId }
     // The ring draws in clockwise whenever the data set changes; the figures never animate.
     val reveal = rememberReveal(breakdown to totalExpenseMinor)
+    // The hint is shown until the first tap on a category; after that it has done its job.
+    var hintSeen by rememberSaveable { mutableStateOf(false) }
+    val select: (String) -> Unit = { id ->
+        hintSeen = true
+        onCategoryClick(id)
+    }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    SectionCard(
+        modifier = modifier,
+        title = stringResource(R.string.spending_distribution),
+        subtitle = if (!hintSeen && breakdown.size > 1) stringResource(R.string.tap_to_filter) else null
     ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        if (breakdown.isEmpty() || totalExpenseMinor <= 0L) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    text = stringResource(R.string.spending_distribution),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    text = stringResource(R.string.no_analytics_data),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (selectedCategoryId != null) {
-                    Text(
-                        text = stringResource(R.string.tap_to_filter),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+            }
+            return@SectionCard
+        }
+
+        val segments = remember(breakdown) { donutSegments(breakdown.map { it.totalMinor }) }
+        val chartDescription = stringResource(
+            R.string.analytics_donut_description,
+            CurrencyFormatter.format(totalExpenseMinor, currency),
+            breakdown.joinToString("; ") { "${it.categoryName} ${CurrencyFormatter.formatPercent(it.percentage)}" }
+        )
+        val ringTarget = donutRingSize(LocalDensity.current.fontScale)
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = Spacing.s), contentAlignment = Alignment.Center) {
+        val ringSize = minOf(maxWidth, ringTarget)
+        Box(
+            modifier = Modifier.size(ringSize),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics { contentDescription = chartDescription }
+                    .pointerInput(segments, selectedCategoryId) {
+                        detectTapGestures { offset ->
+                            val dx = offset.x - size.width / 2f
+                            val dy = offset.y - size.height / 2f
+                            val dist = sqrt(dx * dx + dy * dy)
+                            val outer = size.width / 2f
+                            if (dist < outer * 0.6f) {
+                                // The centre clears the selection.
+                                selectedCategoryId?.let(select)
+                            } else if (dist <= outer) {
+                                val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat() + 90f
+                                segments.indexAt(angle)?.let { select(breakdown[it].categoryId) }
+                            }
+                        }
+                    }
+            ) {
+                val stroke = DONUT_STROKE.toPx()
+                val diameter = size.minDimension - stroke * DONUT_SELECTED_STROKE
+                val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+                val arcSize = Size(diameter, diameter)
+                val revealed = 360f * reveal.value
+                segments.forEachIndexed { i, segment ->
+                    val visible = (revealed - segment.start).coerceIn(0f, segment.sweep)
+                    if (visible <= 0f) return@forEachIndexed
+                    val item = breakdown[i]
+                    val dimmed = selectedCategoryId != null && item.categoryId != selectedCategoryId
+                    drawArc(
+                        color = CategoryColorProvider.getColor(item.categoryId, item.color).copy(alpha = if (dimmed) 0.35f else 1f),
+                        startAngle = segment.start - 90f,
+                        sweepAngle = visible,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        // Flat ends: round caps bulged over the neighbours and overstated small shares.
+                        style = Stroke(width = if (item.categoryId == selectedCategoryId) stroke * DONUT_SELECTED_STROKE else stroke, cap = StrokeCap.Butt)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            if (breakdown.isEmpty() || totalExpenseMinor <= 0L) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.no_analytics_data),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Interactive Compose Canvas Donut Chart
-                val slices = remember(breakdown, totalExpenseMinor) {
-                    var currentStart = -90f
-                    breakdown.map { item ->
-                        val sweep = (item.totalMinor.toFloat() / totalExpenseMinor.toFloat()) * 360f
-                        val sliceData = Triple(item, currentStart, sweep)
-                        currentStart += sweep
-                        sliceData
-                    }
-                }
-
-                Box(
-                    modifier = Modifier.size(240.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(slices) {
-                                detectTapGestures { offset ->
-                                    val cx = size.width / 2f
-                                    val cy = size.height / 2f
-                                    val dx = offset.x - cx
-                                    val dy = offset.y - cy
-                                    val dist = sqrt(dx * dx + dy * dy)
-                                    val outerRadius = size.width / 2f
-
-                                    // Inner hole ~ 50% radius
-                                    if (dist < outerRadius * 0.45f) {
-                                        // Tap in center clears selection
-                                        if (selectedCategoryId != null) {
-                                            onCategoryClick(selectedCategoryId)
-                                        }
-                                    } else if (dist <= outerRadius * 1.1f) {
-                                        // Calculate angle in degrees [0, 360) starting from -90° (top)
-                                        var angleDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-                                        // Adjust to start at -90
-                                        var touchAngle = (angleDeg + 90f + 360f) % 360f
-
-                                        for ((cat, start, sweep) in slices) {
-                                            val normalizedStart = (start + 90f + 360f) % 360f
-                                            val sliceEnd = normalizedStart + sweep
-                                            if (sliceEnd <= 360f) {
-                                                if (touchAngle >= normalizedStart && touchAngle < sliceEnd) {
-                                                    onCategoryClick(cat.categoryId)
-                                                    break
-                                                }
-                                            } else {
-                                                // Wraps around 360
-                                                if (touchAngle >= normalizedStart || touchAngle < (sliceEnd % 360f)) {
-                                                    onCategoryClick(cat.categoryId)
-                                                    break
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                    ) {
-                        val strokeWidth = 32.dp.toPx()
-                        val diameter = size.minDimension - strokeWidth
-                        val topLeftOffset = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f)
-                        val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
-
-                        val revealedDegrees = 360f * reveal.value
-                        slices.forEach { (cat, start, sweep) ->
-                            val visibleSweep = (revealedDegrees - (start + 90f)).coerceIn(0f, sweep)
-                            if (visibleSweep <= 0f) return@forEach
-                            val isSelected = cat.categoryId == selectedCategoryId
-                            val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
-                            val currentStroke = if (isSelected) strokeWidth * 1.25f else strokeWidth
-
-                            drawArc(
-                                color = color,
-                                startAngle = start + 0.75f,
-                                sweepAngle = (visibleSweep - 1.5f).coerceAtLeast(0.5f),
-                                useCenter = false,
-                                topLeft = topLeftOffset,
-                                size = arcSize,
-                                style = Stroke(width = currentStroke, cap = StrokeCap.Round)
-                            )
-                        }
-                    }
-
-                    // Centered Hole Text
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .padding(24.dp)
-                            .clickable {
-                                if (selectedCategoryId != null) onCategoryClick(selectedCategoryId)
-                            }
-                    ) {
-                        if (selectedItem != null) {
-                            val catColor = CategoryColorProvider.getColor(selectedItem.categoryId, selectedItem.color)
-                            Text(
-                                text = selectedItem.categoryName,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = CurrencyFormatter.format(selectedItem.totalMinor, currency),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "${"%.1f".format(selectedItem.percentage)}%",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = catColor
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.expenses),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = CurrencyFormatter.format(totalExpenseMinor, currency),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = stringResource(R.string.tap_to_filter),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Category Breakdown list with tap selection
+            // The centre shows the total, or the selected category; tapping it clears the selection.
+            // The text follows the user's font scale; the ring grows with it (see donutRingSize) so
+            // the hole keeps room for the label, the total and the share.
+            run {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .testTag(DONUT_CENTRE_TAG)
+                        .width(donutCentreWidth(ringSize))
+                        .clip(Radii.control)
+                        .clickable(enabled = selectedCategoryId != null) { selectedCategoryId?.let(select) }
+                        .padding(horizontal = Spacing.s)
                 ) {
-                    breakdown.forEach { item ->
-                        val isSelected = item.categoryId == selectedCategoryId
-                        val color = CategoryColorProvider.getColor(item.categoryId, item.color)
-                        val name = item.categoryName
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                    else Color.Transparent
-                                )
-                                .clickable { onCategoryClick(item.categoryId) }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                    val txSuffix = if (item.transactionCount == 1) "transaction" else "transactions"
-                                    Text(
-                                        text = "${item.transactionCount} $txSuffix • ${"%.1f".format(item.percentage)}%",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = CurrencyFormatter.format(item.totalMinor, currency),
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                    Text(
+                        text = selectedItem?.categoryName ?: stringResource(R.string.expenses),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                    // A long total steps down in size instead of being cut.
+                    ShrinkToFitText(
+                        CurrencyFormatter.format(selectedItem?.totalMinor ?: totalExpenseMinor, currency),
+                        style = MaterialTheme.typography.amountLarge,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (selectedItem != null) {
+                        Text(
+                            CurrencyFormatter.formatPercent(selectedItem.percentage),
+                            style = MaterialTheme.typography.labelMedium.tabular(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
+        }
+        }
+
+        Spacer(Modifier.height(Spacing.s))
+        breakdown.forEach { item ->
+            val isSelected = item.categoryId == selectedCategoryId
+            val count = pluralStringResource(R.plurals.transaction_count, item.transactionCount, item.transactionCount)
+            ListRow(
+                title = item.categoryName,
+                subtitle = "$count · ${CurrencyFormatter.formatPercent(item.percentage)}",
+                amount = CurrencyFormatter.format(item.totalMinor, currency),
+                titleWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                modifier = Modifier
+                    .clip(Radii.control)
+                    .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                    .pressSelectable(selected = isSelected, role = Role.Button) { select(item.categoryId) }
+                    .padding(horizontal = Spacing.s),
+                leading = {
+                    Box(Modifier.size(12.dp).clip(CircleShape).background(CategoryColorProvider.getColor(item.categoryId, item.color)))
+                }
+            )
         }
     }
 }
 
 @Composable
 fun TopMerchantsCard(
-    merchants: List<com.teppe21.finances.feature.analytics.MerchantSpending>,
+    merchants: List<MerchantSpending>,
     currency: String,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = stringResource(R.string.top_merchants),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            merchants.forEachIndexed { index, item ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "${index + 1}.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.width(24.dp)
-                        )
-                        Column {
-                            Text(
-                                text = item.merchant,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            val txSuffix = if (item.count == 1) "transaction" else "transactions"
-                            Text(
-                                text = "${item.count} $txSuffix",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
+    SectionCard(modifier = modifier, title = stringResource(R.string.top_merchants)) {
+        merchants.forEachIndexed { index, item ->
+            ListRow(
+                title = item.merchant,
+                subtitle = pluralStringResource(R.plurals.transaction_count, item.count, item.count),
+                amount = CurrencyFormatter.format(item.totalMinor, currency),
+                leading = {
                     Text(
-                        text = CurrencyFormatter.format(item.totalMinor, currency),
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelLarge.tabular(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.widthIn(min = 20.dp)
                     )
                 }
-            }
+            )
+        }
+    }
+}
+
+/** Own-account moves and money exchanged with people, kept out of every spending figure. */
+@Composable
+private fun TransfersCard(stats: FinancialStats, currency: String, modifier: Modifier = Modifier) {
+    SectionCard(modifier = modifier, title = stringResource(R.string.analytics_transfers_title), subtitle = stringResource(R.string.analytics_transfers_desc)) {
+        if (stats.transferCount > 0) {
+            ValueRow(stringResource(R.string.analytics_own_transfers), CurrencyFormatter.format(stats.transfersMinor, currency))
+        }
+        if (stats.personalCount > 0) {
+            ValueRow(stringResource(R.string.analytics_people_sent), CurrencyFormatter.format(stats.personalSentMinor, currency))
+            ValueRow(stringResource(R.string.analytics_people_received), CurrencyFormatter.format(stats.personalReceivedMinor, currency))
         }
     }
 }
@@ -741,3 +634,4 @@ fun CustomDateRangeDialog(
         }
     )
 }
+

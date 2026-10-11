@@ -1,5 +1,7 @@
 package com.teppe21.finances.core.ui
 
+import com.teppe21.finances.core.theme.Radii
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -134,7 +136,7 @@ fun SwipeActionBox(
     modifier: Modifier = Modifier,
     swipeRight: SwipeAction? = null,
     swipeLeft: SwipeAction? = null,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = Radii.card,
     content: @Composable () -> Unit
 ) {
     val scope = rememberCoroutineScope()

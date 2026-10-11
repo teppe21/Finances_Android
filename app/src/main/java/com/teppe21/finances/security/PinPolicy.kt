@@ -10,15 +10,16 @@ object PinPolicy {
     private val BASE_LOCKOUT: Duration = Duration.ofSeconds(30)
     private val MAX_LOCKOUT: Duration = Duration.ofMinutes(15)
 
-    /** Returns a user-facing error, or null if the PIN is acceptable. */
-    fun validateNewPin(pin: String): String? {
-        if (pin.length !in MIN_LENGTH..MAX_LENGTH || !pin.all { it in '0'..'9' }) {
-            return "Use $MIN_LENGTH to $MAX_LENGTH digits."
-        }
-        if (pin.toSet().size == 1) return "Avoid repeating the same digit."
+    /** Why a new PIN is not acceptable; the screen turns it into text. */
+    enum class Problem { LENGTH, REPEATED_DIGIT, SEQUENCE }
+
+    /** Returns the problem with [pin], or null if it is acceptable. */
+    fun validateNewPin(pin: String): Problem? {
+        if (pin.length !in MIN_LENGTH..MAX_LENGTH || !pin.all { it in '0'..'9' }) return Problem.LENGTH
+        if (pin.toSet().size == 1) return Problem.REPEATED_DIGIT
         val ascending = pin.zipWithNext().all { (a, b) -> b - a == 1 }
         val descending = pin.zipWithNext().all { (a, b) -> a - b == 1 }
-        if (ascending || descending) return "Avoid simple sequences such as 1234."
+        if (ascending || descending) return Problem.SEQUENCE
         return null
     }
 

@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.more
 
+import com.teppe21.finances.core.theme.Radii
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Repeat
@@ -51,7 +54,8 @@ fun MoreScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToBudgets: () -> Unit,
     onNavigateToRecurring: () -> Unit,
-    onNavigateToCategories: () -> Unit
+    onNavigateToCategories: () -> Unit,
+    onNavigateToUncategorized: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -63,8 +67,8 @@ fun MoreScreen(
 
         item {
             MoreNavigationItem(
-                title = "Stocks",
-                subtitle = "Watchlist and price history from your market data provider",
+                title = stringResource(R.string.stocks_title),
+                subtitle = stringResource(R.string.more_stocks_sub),
                 icon = Icons.AutoMirrored.Filled.ShowChart,
                 onClick = onNavigateToStocks
             )
@@ -73,7 +77,7 @@ fun MoreScreen(
         item {
             MoreNavigationItem(
                 title = stringResource(R.string.accounts_title),
-                subtitle = "Balances, opening amounts and currencies",
+                subtitle = stringResource(R.string.more_accounts_sub),
                 icon = Icons.Default.AccountBalance,
                 onClick = onNavigateToAccounts
             )
@@ -126,6 +130,15 @@ fun MoreScreen(
 
         item {
             MoreNavigationItem(
+                title = stringResource(R.string.uncategorized_title),
+                subtitle = stringResource(R.string.more_uncategorized_sub),
+                icon = Icons.AutoMirrored.Filled.Label,
+                onClick = onNavigateToUncategorized
+            )
+        }
+
+        item {
+            MoreNavigationItem(
                 title = stringResource(R.string.settings),
                 subtitle = stringResource(R.string.more_settings_sub),
                 icon = Icons.Default.Settings,
@@ -147,9 +160,9 @@ fun MoreNavigationItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(Radii.card)
             .pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = Radii.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -164,7 +177,7 @@ fun MoreNavigationItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = Radii.control,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.size(42.dp)
                 ) {

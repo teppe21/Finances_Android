@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.accounts
 
+import com.teppe21.finances.feature.categories.accountTypeLabel
+import com.teppe21.finances.feature.categories.accountLabel
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +57,18 @@ import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.domain.model.SupportedCurrencies
 import androidx.compose.material3.FilterChip
 import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.AmountRowLayout
+import com.teppe21.finances.core.ui.AmountText
+import com.teppe21.finances.core.ui.ChipFlow
+import com.teppe21.finances.core.ui.CurrencyChips
+import com.teppe21.finances.core.ui.DialogColumn
+import com.teppe21.finances.core.theme.Radii
+import com.teppe21.finances.core.theme.Sizes
+import com.teppe21.finances.core.theme.Spacing
+import com.teppe21.finances.core.theme.tabular
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import com.teppe21.finances.domain.model.AccountType
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -84,7 +98,7 @@ fun AccountsScreen(
 
             item {
                 Text(
-                    "Balances are the opening balance plus every confirmed transaction recorded for the account.",
+                    stringResource(R.string.accounts_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -132,63 +146,71 @@ fun AccountCard(row: AccountRow, modifier: Modifier = Modifier) {
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = Radii.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(Spacing.l)
+                .semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(42.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Text(
-                        text = account.getDisplayName(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = account.institution,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            Surface(
+                shape = Radii.control,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(Sizes.leadingIcon + Spacing.xs + Spacing.xxs)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = CurrencyFormatter.formatSigned(row.balanceMinor, account.currency),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+            Spacer(modifier = Modifier.width(Spacing.m))
+
+            // The balance is never squeezed: the name gets what is left, and the balance moves under it
+            // when the name would be too narrow (large font, long figure). The status line sits below.
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                AmountRowLayout(
+                    label = {
+                        Column {
+                            Text(
+                                text = accountLabel(account),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = account.institution,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    },
+                    amount = {
+                        AmountText(
+                            text = CurrencyFormatter.formatSigned(row.balanceMinor, account.currency),
+                            style = MaterialTheme.typography.titleMedium.tabular()
+                        )
+                    }
                 )
                 if (row.unconvertedCount > 0) {
                     Text(
-                        "Incomplete: ${row.unconvertedCount} without exchange rate",
+                        stringResource(R.string.accounts_incomplete, row.unconvertedCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error
                     )
                 } else if (row.pendingCount > 0) {
                     Text(
-                        "${row.pendingCount} awaiting review",
+                        stringResource(R.string.accounts_awaiting_review, row.pendingCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -215,7 +237,7 @@ fun AddAccountDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.add_account)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -230,31 +252,27 @@ fun AddAccountDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Type", style = MaterialTheme.typography.labelMedium)
-                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(AccountType.values().toList()) { t ->
-                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.getDisplayName()) })
+                Text(stringResource(R.string.account_type), style = MaterialTheme.typography.labelMedium)
+                ChipFlow {
+                    AccountType.values().forEach { t ->
+                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(accountTypeLabel(t)) })
                     }
                 }
-                Text("Currency", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SupportedCurrencies.ALL.forEach { c ->
-                        FilterChip(selected = currency == c.code, onClick = { currency = c.code }, label = { Text(c.code) })
-                    }
-                }
+                Text(stringResource(R.string.currency), style = MaterialTheme.typography.labelMedium)
+                CurrencyChips(selected = currency, onSelect = { currency = it })
                 OutlinedTextField(
                     value = balanceText,
                     onValueChange = { balanceText = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15) },
                     label = { Text(stringResource(R.string.opening_balance) + " ($currency)") },
                     isError = parsed == null,
-                    supportingText = { if (parsed == null) Text("Use digits with up to two decimals") },
+                    supportingText = { if (parsed == null) Text(stringResource(R.string.amount_format_error)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Checkbox(checked = negative, onCheckedChange = { negative = it })
-                    Text("Opening balance is negative (debt)", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.accounts_negative_opening), style = MaterialTheme.typography.bodySmall)
                 }
             }
         },

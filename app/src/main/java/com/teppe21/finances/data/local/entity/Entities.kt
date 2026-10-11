@@ -1,5 +1,6 @@
 package com.teppe21.finances.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -47,7 +48,8 @@ data class TransactionEntity(
     val importedAt: Instant,
     val createdAt: Instant,
     val updatedAt: Instant,
-    val cardLast4: String? = null
+    val cardLast4: String? = null,
+    @ColumnInfo(defaultValue = "0") val categorySetByUser: Boolean = false
 )
 
 @Entity(tableName = "accounts")

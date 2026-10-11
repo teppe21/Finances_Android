@@ -1,5 +1,13 @@
 package com.teppe21.finances
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.TopAppBarState
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.view.WindowManager
@@ -108,6 +116,8 @@ import com.teppe21.finances.feature.analytics.AnalyticsScreen
 import com.teppe21.finances.feature.categories.CategoriesScreen
 import com.teppe21.finances.feature.dashboard.DashboardScreen
 import com.teppe21.finances.feature.importcsv.CsvImportScreen
+import com.teppe21.finances.core.utils.DisplayLocale
+import com.teppe21.finances.feature.categories.UncategorizedScreen
 import com.teppe21.finances.feature.more.MoreScreen
 import com.teppe21.finances.feature.notifications.NotificationAutomationScreen
 import com.teppe21.finances.feature.notifications.ReviewScreen
@@ -133,6 +143,8 @@ class MainActivity : FragmentActivity() {
         // insets handling identical everywhere. The theme-aware style is applied once preferences load.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Dates and amounts follow the language the resources resolved to (English or Hungarian).
+        DisplayLocale.set(resources.configuration.locales[0])
         setContent {
             val prefs by app.preferencesRepository.preferencesFlow.collectAsState(initial = null)
             val unlocked by app.appLock.unlocked.collectAsState()
@@ -223,10 +235,10 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
             }
         )
         val builder = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Finances")
-            .setSubtitle("Confirm it is you to view your finances")
+            .setTitle(activity.getString(R.string.lock_biometric_title))
+            .setSubtitle(activity.getString(R.string.lock_biometric_subtitle))
         if (prefs.hasPin) {
-            builder.setAllowedAuthenticators(BIOMETRIC_WEAK).setNegativeButtonText("Use PIN")
+            builder.setAllowedAuthenticators(BIOMETRIC_WEAK).setNegativeButtonText(activity.getString(R.string.lock_use_pin))
         } else {
             // Lock created by version 2.0.0 without a PIN: allow the device screen lock as fallback.
             builder.setAllowedAuthenticators(BIOMETRIC_WEAK or DEVICE_CREDENTIAL)
@@ -253,15 +265,15 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
             when (val result = app.preferencesRepository.verifyPin(pin)) {
                 PinCheck.Success -> app.appLock.markUnlocked()
                 is PinCheck.Wrong -> message = if (result.attemptsBeforeLockout > 0) {
-                    "Incorrect PIN. ${result.attemptsBeforeLockout} attempts left before a temporary lockout."
+                    activity.resources.getQuantityString(R.plurals.lock_wrong_pin_left, result.attemptsBeforeLockout, result.attemptsBeforeLockout)
                 } else {
-                    "Incorrect PIN."
+                    activity.getString(R.string.pin_error_wrong)
                 }
                 is PinCheck.LockedOut -> {
                     lockedSeconds = result.remaining.seconds.coerceAtLeast(1)
-                    message = "Too many attempts. Try again in a moment."
+                    message = activity.getString(R.string.lock_too_many)
                 }
-                PinCheck.NoPinSet -> message = "No PIN is set. Use biometric unlock."
+                PinCheck.NoPinSet -> message = activity.getString(R.string.lock_no_pin)
             }
             pin = ""
             checking = false
@@ -283,14 +295,14 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
         ) {
             Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(16.dp))
-            Text("Finances is locked", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.lock_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(24.dp))
 
             if (prefs.hasPin) {
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { input -> if (input.length <= 8 && input.all { it.isDigit() }) pin = input },
-                    label = { Text("PIN") },
+                    label = { Text(stringResource(R.string.settings_lock_pin)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
@@ -303,7 +315,7 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
                     onClick = { submit() },
                     enabled = pin.length >= 4 && lockedSeconds == 0L && !checking,
                     modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth()
-                ) { Text(if (lockedSeconds > 0) "Locked for ${lockedSeconds}s" else "Unlock") }
+                ) { Text(if (lockedSeconds > 0) stringResource(R.string.lock_locked_for, lockedSeconds) else stringResource(R.string.lock_unlock)) }
             }
 
             if (useBiometric) {
@@ -311,7 +323,7 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
                 OutlinedButton(onClick = launchBiometric, modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth()) {
                     Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Use biometrics")
+                    Text(stringResource(R.string.lock_use_biometrics))
                 }
             }
 
@@ -335,28 +347,26 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
             }
 
             Spacer(Modifier.height(24.dp))
-            TextButton(onClick = { showReset = true }) { Text("Forgot PIN?") }
+            TextButton(onClick = { showReset = true }) { Text(stringResource(R.string.lock_forgot)) }
         }
     }
 
     if (showReset) {
         AlertDialog(
             onDismissRequest = { showReset = false },
-            title = { Text("Reset Finances?") },
+            title = { Text(stringResource(R.string.lock_reset_title)) },
             text = {
                 Text(
-                    "The PIN cannot be recovered. Resetting erases every transaction, account, category, " +
-                        "receipt record, the stock watchlist, the market data API key and all settings on this device. " +
-                        "This cannot be undone."
+                    stringResource(R.string.lock_reset_body)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showReset = false
                     scope.launch { AppReset.fullReset(app) }
-                }) { Text("Erase everything", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.lock_erase), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showReset = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showReset = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 }
@@ -399,7 +409,15 @@ fun MainAppNavigation() {
             (from in topLevelRoutes && to in topLevelRoutes) ||
             from == Screen.ScanReceipt.route || to == Screen.ScanReceipt.route
 
+    // The bar takes the card tone only while content is scrolled under it, and the content gets a
+    // short fade at its top edge then, so cards no longer end in a hard cut under the title.
+    val barState = remember(currentRoute) { TopAppBarState(-Float.MAX_VALUE, 0f, 0f) }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(barState)
+    val scrolledBarColor = MaterialTheme.colorScheme.surface
+    val pageColor = MaterialTheme.colorScheme.background
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AnimatedVisibility(
                 visible = !hideBars,
@@ -409,7 +427,7 @@ fun MainAppNavigation() {
                 TopAppBar(
                     title = {
                         Crossfade(targetState = screenTitle(currentRoute), animationSpec = Motion.short(), label = "title") { title ->
-                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     },
                     navigationIcon = {
@@ -423,7 +441,11 @@ fun MainAppNavigation() {
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = scrolledBarColor
+                    )
                 )
             }
         },
@@ -442,7 +464,29 @@ fun MainAppNavigation() {
         }
     ) { innerPadding ->
         Box(
-            Modifier.fillMaxSize().padding(if (hideBars) PaddingValues() else innerPadding),
+            Modifier
+                .fillMaxSize()
+                .padding(if (hideBars) PaddingValues() else innerPadding)
+                .drawWithContent {
+                    drawContent()
+                    // Read in the draw phase only: scrolling never recomposes the screen.
+                    val fraction = barState.overlappedFraction
+                    if (!hideBars && fraction > 0f) {
+                        drawRect(
+                            Brush.verticalGradient(listOf(scrolledBarColor.copy(alpha = fraction), Color.Transparent), endY = 12.dp.toPx()),
+                            size = Size(size.width, 12.dp.toPx())
+                        )
+                    }
+                    // Above the floating tab bar the content dissolves into the page instead of ending in a hard cut.
+                    if (!hideBars && isTopLevel) {
+                        val h = 16.dp.toPx()
+                        drawRect(
+                            Brush.verticalGradient(listOf(Color.Transparent, pageColor), startY = size.height - h, endY = size.height),
+                            topLeft = Offset(0f, size.height - h),
+                            size = Size(size.width, h)
+                        )
+                    }
+                },
             contentAlignment = Alignment.TopCenter
         ) {
             // On tablets, unfolded foldables and landscape the content keeps a readable width; the camera is full width.
@@ -507,7 +551,8 @@ fun MainAppNavigation() {
                         onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                         onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) },
                         onNavigateToRecurring = { navController.navigate(Screen.Recurring.route) },
-                        onNavigateToCategories = { navController.navigate(Screen.Categories.route) }
+                        onNavigateToCategories = { navController.navigate(Screen.Categories.route) },
+                        onNavigateToUncategorized = { navController.navigate(Screen.Uncategorized.route) }
                     )
                 }
                 composable(Screen.ScanReceipt.route) { ScanReceiptScreen(onNavigateBack = { navController.popBackStack() }) }
@@ -516,11 +561,15 @@ fun MainAppNavigation() {
                 }
                 composable(Screen.Review.route) { ReviewScreen() }
                 composable(Screen.CsvImport.route) {
-                    CsvImportScreen(onImportFinished = { navigateTab(Screen.Transactions.route) })
+                    CsvImportScreen(
+                        onViewTransactions = { navigateTab(Screen.Transactions.route) },
+                        onReviewUncategorized = { navController.navigate(Screen.Uncategorized.route) }
+                    )
                 }
                 composable(Screen.Budgets.route) { BudgetsScreen() }
                 composable(Screen.Recurring.route) { RecurringScreen() }
                 composable(Screen.Categories.route) { CategoriesScreen() }
+                composable(Screen.Uncategorized.route) { UncategorizedScreen() }
                 composable(Screen.Settings.route) {
                     SettingsScreen(
                         onOpenNotifications = { navController.navigate(Screen.NotificationAutomation.route) },
@@ -554,15 +603,16 @@ private fun screenTitle(route: String?): String = when (route) {
     Screen.Accounts.route -> stringResource(R.string.accounts_title)
     Screen.More.route -> stringResource(R.string.more_title)
     Screen.NotificationAutomation.route -> stringResource(R.string.notif_title)
-    Screen.Review.route -> "Review queue"
+    Screen.Review.route -> stringResource(R.string.review_title)
     Screen.CsvImport.route -> stringResource(R.string.import_title)
     Screen.Budgets.route -> stringResource(R.string.budgets)
     Screen.Recurring.route -> stringResource(R.string.recurring)
+    Screen.Uncategorized.route -> stringResource(R.string.uncategorized_title)
     Screen.Categories.route -> stringResource(R.string.categories)
     Screen.Settings.route -> stringResource(R.string.settings)
-    Screen.Stocks.route -> "Stocks"
-    Screen.StockDetail.route -> "Stock details"
-    Screen.StocksSetup.route -> "Market data"
-    Screen.PrivacyPolicy.route -> "Privacy policy"
+    Screen.Stocks.route -> stringResource(R.string.stocks_title)
+    Screen.StockDetail.route -> stringResource(R.string.stock_details_title)
+    Screen.StocksSetup.route -> stringResource(R.string.settings_market_data)
+    Screen.PrivacyPolicy.route -> stringResource(R.string.privacy_policy)
     else -> stringResource(R.string.app_name)
 }

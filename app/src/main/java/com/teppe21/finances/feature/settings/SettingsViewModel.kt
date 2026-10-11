@@ -3,6 +3,7 @@ package com.teppe21.finances.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
+import com.teppe21.finances.R
 import com.teppe21.finances.core.AppReset
 import com.teppe21.finances.data.fx.FxSyncState
 import com.teppe21.finances.data.local.database.clearSampleData
@@ -33,8 +34,9 @@ class SettingsViewModel : ViewModel() {
     val syncState: StateFlow<FxSyncState> = fxRepo.syncStateFlow
     val lastFetch: StateFlow<Instant?> = fxRepo.lastFetchFlow
 
-    private val _message = MutableStateFlow<String?>(null)
-    val message: StateFlow<String?> = _message.asStateFlow()
+    /** A string resource to show once. */
+    private val _message = MutableStateFlow<Int?>(null)
+    val message: StateFlow<Int?> = _message.asStateFlow()
 
     fun consumeMessage() {
         _message.value = null
@@ -51,7 +53,7 @@ class SettingsViewModel : ViewModel() {
 
     fun refreshExchangeRates() = viewModelScope.launch {
         val result = fxRepo.refreshRates(forceOnline = true)
-        _message.value = if (result.isSuccess) "Exchange rates updated." else "Could not reach the exchange-rate service."
+        _message.value = if (result.isSuccess) R.string.settings_msg_rates_updated else R.string.settings_msg_rates_failed
     }
 
     fun setManualRate(currency: String, rate: BigDecimal) = viewModelScope.launch {
@@ -62,10 +64,16 @@ class SettingsViewModel : ViewModel() {
 
     // ---- App lock -------------------------------------------------------------------
 
-    /** Returns an error message, or null when the PIN was saved. */
-    suspend fun savePin(pin: String, confirmation: String): String? {
-        PinPolicy.validateNewPin(pin)?.let { return it }
-        if (pin != confirmation) return "The PINs do not match."
+    /** Returns why the PIN was not saved (a string resource), or null when it was. */
+    suspend fun savePin(pin: String, confirmation: String): Int? {
+        PinPolicy.validateNewPin(pin)?.let { problem ->
+            return when (problem) {
+                PinPolicy.Problem.LENGTH -> R.string.pin_error_length
+                PinPolicy.Problem.REPEATED_DIGIT -> R.string.pin_error_repeated
+                PinPolicy.Problem.SEQUENCE -> R.string.pin_error_sequence
+            }
+        }
+        if (pin != confirmation) return R.string.pin_error_mismatch
         prefsRepo.setPin(pin)
         // The user just proved knowledge of the PIN; do not lock them out of the current session.
         app.appLock.markUnlocked()
@@ -75,7 +83,7 @@ class SettingsViewModel : ViewModel() {
     suspend fun checkPin(pin: String): PinCheck = prefsRepo.verifyPin(pin)
 
     fun setBiometric(enabled: Boolean) = viewModelScope.launch {
-        if (!prefsRepo.setBiometricEnabled(enabled)) _message.value = "Set a PIN first."
+        if (!prefsRepo.setBiometricEnabled(enabled)) _message.value = R.string.settings_msg_set_pin_first
         app.appLock.markUnlocked()
     }
 
@@ -85,17 +93,17 @@ class SettingsViewModel : ViewModel() {
 
     fun loadDemoData() = viewModelScope.launch {
         loadSampleData(app.database)
-        _message.value = "Demo data added. Every demo row is marked \"Demo data\"."
+        _message.value = R.string.settings_msg_demo_added
     }
 
     fun clearDemoData() = viewModelScope.launch {
         clearSampleData(app.database)
-        _message.value = "Demo data removed."
+        _message.value = R.string.settings_msg_demo_removed
     }
 
     fun deleteFinancialData(onComplete: () -> Unit = {}) = viewModelScope.launch {
         AppReset.deleteFinancialData(app)
-        _message.value = "Financial data deleted. App lock and settings were kept."
+        _message.value = R.string.settings_msg_data_deleted
         onComplete()
     }
 

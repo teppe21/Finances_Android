@@ -1,5 +1,6 @@
 package com.teppe21.finances.feature.notifications
 
+import com.teppe21.finances.feature.categories.accountLabel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,10 +50,12 @@ import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.domain.model.Account
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.teppe21.finances.R
+import com.teppe21.finances.core.utils.CurrencyFormatter
+import com.teppe21.finances.core.utils.DateFormatter
 
-private val EVENT_TIME = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.US)
 
 @Composable
 fun NotificationAutomationScreen(
@@ -82,27 +85,26 @@ fun NotificationAutomationScreen(
         item { Spacer(Modifier.height(4.dp)) }
 
         item {
-            SectionCard(title = "Status") {
-                StatusLine("Android notification access", state.accessGranted)
-                StatusLine("In-app disclosure accepted", state.disclosureAccepted)
+            SectionCard(title = stringResource(R.string.notif_status)) {
+                StatusLine(stringResource(R.string.notif_status_access), state.accessGranted)
+                StatusLine(stringResource(R.string.notif_status_disclosure), state.disclosureAccepted)
                 Spacer(Modifier.height(8.dp))
                 val active = state.accessGranted && state.disclosureAccepted
                 Text(
-                    if (active) "Supported notifications are being processed on this device."
-                    else "Notifications are not being processed.",
+                    stringResource(if (active) R.string.notif_active else R.string.notif_inactive),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
                 if (!state.disclosureAccepted) {
                     Button(onClick = { showDisclosure = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Set up notification access")
+                        Text(stringResource(R.string.notif_setup))
                     }
                 } else {
                     OutlinedButton(onClick = { viewModel.openSystemSettings(context) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (state.accessGranted) "Manage access in Android settings" else "Grant access in Android settings")
+                        Text(stringResource(if (state.accessGranted) R.string.notif_manage_access else R.string.notif_grant_access))
                     }
-                    TextButton(onClick = { showWithdraw = true }) { Text("Stop using notifications") }
+                    TextButton(onClick = { showWithdraw = true }) { Text(stringResource(R.string.notif_stop)) }
                 }
             }
         }
@@ -110,7 +112,7 @@ fun NotificationAutomationScreen(
         if (state.reviewCount > 0) {
             item {
                 InfoBanner(
-                    text = "${state.reviewCount} recognized transactions are waiting for review.",
+                    text = pluralStringResource(R.plurals.notif_review_waiting, state.reviewCount, state.reviewCount),
                     icon = Icons.Default.PendingActions,
                     onClick = onOpenReview
                 )
@@ -118,9 +120,9 @@ fun NotificationAutomationScreen(
         }
 
         item {
-            SectionCard(title = "Supported apps") {
+            SectionCard(title = stringResource(R.string.notif_supported_apps)) {
                 Text(
-                    "Only notifications from these exact Android packages are read. Everything else is ignored without being stored.",
+                    stringResource(R.string.notif_supported_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -128,8 +130,7 @@ fun NotificationAutomationScreen(
                     Spacer(Modifier.height(10.dp))
                     Text(source.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                     Text(
-                        if (source.verifiedFixtures) "Tested with real notification samples"
-                        else "Recognized transactions always go to the review queue (patterns not yet verified on real notifications)",
+                        stringResource(if (source.verifiedFixtures) R.string.notif_source_verified else R.string.notif_source_unverified),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -138,11 +139,9 @@ fun NotificationAutomationScreen(
         }
 
         item {
-            SectionCard(title = "Accounts for recognized transactions") {
+            SectionCard(title = stringResource(R.string.notif_accounts)) {
                 Text(
-                    "Choose which account receives each bank's transactions. Without a choice, a transaction is assigned " +
-                        "automatically only when exactly one account belongs to that bank; otherwise it waits for review. " +
-                        "Wallet payments use the account of the card's bank.",
+                    stringResource(R.string.notif_accounts_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -154,31 +153,31 @@ fun NotificationAutomationScreen(
         }
 
         item {
-            SectionCard(title = "Try it without a real notification") {
+            SectionCard(title = stringResource(R.string.notif_try)) {
                 Text(
-                    "Runs the recognizer on a built-in sample. Nothing is saved.",
+                    stringResource(R.string.notif_try_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { viewModel.runSample("purchase") }) { Text("Purchase") }
-                    OutlinedButton(onClick = { viewModel.runSample("promo") }) { Text("Promotion") }
-                    OutlinedButton(onClick = { viewModel.runSample("otp") }) { Text("Login code") }
+                    OutlinedButton(onClick = { viewModel.runSample("purchase") }) { Text(stringResource(R.string.notif_sample_purchase)) }
+                    OutlinedButton(onClick = { viewModel.runSample("promo") }) { Text(stringResource(R.string.notif_sample_promo)) }
+                    OutlinedButton(onClick = { viewModel.runSample("otp") }) { Text(stringResource(R.string.notif_sample_login)) }
                 }
             }
         }
 
         item {
-            SectionCard(title = "Recent processing results") {
+            SectionCard(title = stringResource(R.string.notif_recent)) {
                 Text(
-                    "Only the app, time and outcome are kept (for 30 days). Notification text is never stored.",
+                    stringResource(R.string.notif_recent_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (state.recentEvents.isEmpty()) {
                     Spacer(Modifier.height(8.dp))
-                    Text("Nothing processed yet.", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.notif_recent_empty), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -187,10 +186,10 @@ fun NotificationAutomationScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(event.sourceBank ?: event.packageName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text(statusLabel(event.statusCode), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(statusLabel(event.statusCode)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(
-                    event.postedAt.atZone(ZoneId.systemDefault()).format(EVENT_TIME),
+                    DateFormatter.dayTime(event.postedAt.atZone(ZoneId.systemDefault())),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -214,30 +213,47 @@ fun NotificationAutomationScreen(
     if (showWithdraw) {
         AlertDialog(
             onDismissRequest = { showWithdraw = false },
-            title = { Text("Stop using notifications?") },
+            title = { Text(stringResource(R.string.notif_stop_title)) },
             text = {
-                Text(
-                    "Finances will stop processing notifications immediately. To also remove the Android permission, " +
-                        "turn Finances off on the notification access screen that opens next."
-                )
+                Text(stringResource(R.string.notif_stop_body))
             },
             confirmButton = {
                 TextButton(onClick = {
                     showWithdraw = false
                     viewModel.withdrawConsent()
                     viewModel.openSystemSettings(context)
-                }) { Text("Stop and open settings") }
+                }) { Text(stringResource(R.string.notif_stop_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { showWithdraw = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showWithdraw = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 
     sample?.let { result ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissSample() },
-            title = { Text(result.title) },
-            text = { Text(result.details) },
-            confirmButton = { TextButton(onClick = { viewModel.dismissSample() }) { Text("OK") } }
+            title = {
+                Text(
+                    when (result) {
+                        is SampleResult.Recognized -> stringResource(R.string.sample_recognized_title)
+                        is SampleResult.Rejected -> stringResource(R.string.sample_rejected_title, stringResource(statusLabel(result.code)))
+                        SampleResult.SettingsUnavailable -> stringResource(R.string.sample_settings_title)
+                    }
+                )
+            },
+            text = {
+                Text(
+                    when (result) {
+                        is SampleResult.Recognized -> stringResource(
+                            R.string.sample_recognized_body,
+                            CurrencyFormatter.formatSigned(result.amountMinor, result.currency),
+                            result.merchant ?: stringResource(R.string.unknown)
+                        )
+                        is SampleResult.Rejected -> stringResource(R.string.sample_rejected_body)
+                        SampleResult.SettingsUnavailable -> stringResource(R.string.sample_settings_body)
+                    }
+                )
+            },
+            confirmButton = { TextButton(onClick = { viewModel.dismissSample() }) { Text(stringResource(R.string.ok)) } }
         )
     }
 }
@@ -250,29 +266,18 @@ fun NotificationAutomationScreen(
 fun NotificationDisclosureDialog(onNotNow: () -> Unit, onContinue: () -> Unit) {
     AlertDialog(
         onDismissRequest = onNotNow,
-        title = { Text("Notification access") },
+        title = { Text(stringResource(R.string.notif_disclosure_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Finances uses Android Notification Access to recognize transactions from supported banking and " +
-                        "payment apps: Revolut, Google Wallet, OTP Bank, Wise, Erste Bank (George) and MBH Bank."
-                )
-                Text(
-                    "Notification contents can contain sensitive financial information. Finances reads the title and " +
-                        "text of notifications from those apps only, and processes them on this device to find the amount, " +
-                        "currency, merchant, card ending and time of a payment."
-                )
-                Text(
-                    "Notifications from all other apps are ignored. Promotional messages and security messages such as " +
-                        "login codes are rejected and never stored. Raw notification text is not saved; only the recognized " +
-                        "transaction and a short status record (app, time, outcome) are kept on this device."
-                )
-                Text("Notification contents are not sent to any server.")
-                Text("You can stop this here at any time, and revoke Notification Access in Android Settings.")
+                Text(stringResource(R.string.notif_disclosure_1))
+                Text(stringResource(R.string.notif_disclosure_2))
+                Text(stringResource(R.string.notif_disclosure_3))
+                Text(stringResource(R.string.notif_disclosure_4))
+                Text(stringResource(R.string.notif_disclosure_5))
             }
         },
-        confirmButton = { Button(onClick = onContinue) { Text("Continue") } },
-        dismissButton = { TextButton(onClick = onNotNow) { Text("Not now") } }
+        confirmButton = { Button(onClick = onContinue) { Text(stringResource(R.string.continue_label)) } },
+        dismissButton = { TextButton(onClick = onNotNow) { Text(stringResource(R.string.not_now)) } }
     )
 }
 
@@ -286,7 +291,7 @@ private fun StatusLine(label: String, ok: Boolean) {
             modifier = Modifier.size(18.dp)
         )
         Spacer(Modifier.width(8.dp))
-        Text("$label: ${if (ok) "yes" else "no"}", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.notif_status_line, label, stringResource(if (ok) R.string.yes else R.string.no)), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -297,11 +302,11 @@ private fun MappingRow(institution: String, accounts: List<Account>, selectedId:
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(institution, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Column {
-            TextButton(onClick = { expanded = true }) { Text(selected?.getDisplayName() ?: "Automatic") }
+            TextButton(onClick = { expanded = true }) { Text(selected?.let { accountLabel(it) } ?: stringResource(R.string.notif_mapping_automatic)) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 accounts.forEach { acc ->
                     DropdownMenuItem(
-                        text = { Text(acc.getDisplayName()) },
+                        text = { Text(accountLabel(acc)) },
                         onClick = {
                             expanded = false
                             onSelect(acc.id)

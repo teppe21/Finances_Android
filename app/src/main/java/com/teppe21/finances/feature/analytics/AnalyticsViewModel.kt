@@ -46,6 +46,8 @@ data class AnalyticsUiState(
     val showCustomDateDialog: Boolean = false,
     val stats: FinancialStats = FinancialStats(),
     val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
+    /** For translated category names; the breakdown carries ids. */
+    val categories: List<Category> = emptyList(),
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
     val topMerchants: List<MerchantSpending> = emptyList(),
     val selectedCategoryId: String? = null,
@@ -153,6 +155,7 @@ class AnalyticsViewModel : ViewModel() {
             showCustomDateDialog = periodState.showDialog,
             stats = stats,
             categoryBreakdown = breakdown,
+            categories = categories,
             monthlyTrends = trends,
             topMerchants = topMerchants,
             selectedCategoryId = periodState.selectedCatId,

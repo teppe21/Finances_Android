@@ -16,23 +16,17 @@ data class Category(
      * English display name. Built-in categories map by id; legacy Hungarian names from
      * databases created by early versions are mapped to their English equivalents.
      */
-    fun displayName(): String = BUILT_IN_NAMES[id] ?: LEGACY_NAMES[name] ?: name
+    fun displayName(): String = if (hasDefaultName) BUILT_IN_NAMES[id] ?: LEGACY_NAMES[name] ?: name else name
+
+    /**
+     * True while the category still has a name the app gave it (current, legacy Hungarian or
+     * the schema-5 "Transfers"), so it may be shown translated. A name the user typed is kept.
+     */
+    val hasDefaultName: Boolean
+        get() = BUILT_IN_NAMES[id] == name || name in LEGACY_NAMES || (id == "transfers" && name == "Transfers")
 
     companion object {
-        val BUILT_IN_NAMES = mapOf(
-            "food" to "Food & Groceries",
-            "dining" to "Dining & Restaurants",
-            "transport" to "Transport & Fuel",
-            "subscriptions" to "Subscriptions",
-            "housing" to "Housing & Utilities",
-            "entertainment" to "Entertainment",
-            "savings" to "Savings",
-            "income" to "Income",
-            "health" to "Health & Pharmacy",
-            "shopping" to "Shopping",
-            "transfers" to "Transfers",
-            "other" to "Other / Uncategorized"
-        )
+        val BUILT_IN_NAMES: Map<String, String> = BuiltIns.categories.associate { it.id to it.name }
 
         private val LEGACY_NAMES = mapOf(
             "Élelmiszer" to "Food & Groceries",
@@ -60,12 +54,34 @@ data class Category(
     }
 }
 
+/**
+ * A keyword rule. [matchType] is `contains` (the keyword starts a word; keywords of three
+ * characters or fewer must be a whole word), `word` (whole word), `exact` (the whole merchant
+ * name or description) or `regex`. Higher [priority] wins; on a tie the longer keyword wins.
+ */
 data class CategoryRule(
     val id: String,
     val categoryId: String,
     val pattern: String,
     val matchType: String = "contains",
-    val priority: Int = 10,
+    val priority: Int = PRIORITY_MERCHANT,
     val isActive: Boolean = true,
     val createdAt: Instant = Instant.now()
-)
+) {
+    val isUserRule: Boolean get() = priority >= PRIORITY_USER
+
+    companion object {
+        /** Rules the user created always beat built-in ones. */
+        const val PRIORITY_USER = 50
+        /** Exchanges, own-account moves, top-ups, balance migrations. */
+        const val PRIORITY_OWN_TRANSFER = 30
+        const val PRIORITY_FEES = 22
+        const val PRIORITY_CASH = 20
+        /** The bank's own category column, when a CSV has one. */
+        const val PRIORITY_BANK_CATEGORY = 15
+        const val PRIORITY_MERCHANT = 10
+        /** "Átutalás", "Transfer to": only when nothing more specific matched. */
+        const val PRIORITY_GENERIC_TRANSFER = 5
+        const val PRIORITY_WEAK_INCOME = 4
+    }
+}

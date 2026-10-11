@@ -1,5 +1,8 @@
 package com.teppe21.finances.feature.importcsv
 
+import com.teppe21.finances.core.theme.Radii
+
+import com.teppe21.finances.feature.categories.accountLabel
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -30,6 +33,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.semantics
+import com.teppe21.finances.core.theme.tabular
+import com.teppe21.finances.core.ui.SectionCard
+import com.teppe21.finances.native.csv.ImportSummary
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -50,7 +59,8 @@ import androidx.compose.foundation.lazy.items
 
 @Composable
 fun CsvImportScreen(
-    onImportFinished: () -> Unit,
+    onViewTransactions: () -> Unit,
+    onReviewUncategorized: () -> Unit,
     viewModel: CsvImportViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -79,11 +89,22 @@ fun CsvImportScreen(
     ) {
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
+        state.summary?.let { summary ->
+            item(key = "summary") {
+                ImportSummaryCard(
+                    summary = summary,
+                    onReviewUncategorized = onReviewUncategorized,
+                    onViewTransactions = onViewTransactions,
+                    onImportAnother = viewModel::reset
+                )
+            }
+        }
+
         // 1. File Picker Card
-        item {
+        if (state.summary == null) item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = Radii.card,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
@@ -116,7 +137,7 @@ fun CsvImportScreen(
                             FinancesApp.instance.appLock.expectExternalActivity()
                             filePicker.launch(arrayOf("text/comma-separated-values", "text/csv", "text/plain", "*/*"))
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = Radii.control,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -143,15 +164,22 @@ fun CsvImportScreen(
         }
 
         // 3. Error Message
-        if (state.errorMessage != null) {
+        val error = state.error
+        if (error != null) {
             item {
+                val skippedCount = state.skipped.values.sum()
+                val message = when (error) {
+                    CsvImportError.NO_ROWS -> stringResource(R.string.import_error_no_rows) +
+                        if (skippedCount > 0) " " + stringResource(R.string.import_error_rows_unreadable, skippedCount) else ""
+                    CsvImportError.UNREADABLE_FILE -> stringResource(R.string.import_error_file)
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = Radii.card,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
                 ) {
                     Text(
-                        text = state.errorMessage!!,
+                        text = message,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
@@ -166,7 +194,7 @@ fun CsvImportScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = Radii.card,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
@@ -188,30 +216,21 @@ fun CsvImportScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Already imported into this account: ${state.alreadyImportedCount}",
+                            text = stringResource(R.string.import_already_imported, state.alreadyImportedCount),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.finances.warning
                         )
                         if (state.skipped.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
+                            val reasons = state.skipped.entries.map { (reason, count) -> skipReasonText(reason, count) }
                             Text(
-                                text = "Rows skipped because they could not be read exactly: " +
-                                    state.skipped.entries.joinToString { (reason, count) ->
-                                        "$count " + when (reason) {
-                                            CsvSkipReason.INVALID_DATE -> "with an unknown date format"
-                                            CsvSkipReason.AMBIGUOUS_DATE -> "with a day/month date that could be read either way"
-                                            CsvSkipReason.INVALID_AMOUNT -> "with an unreadable amount"
-                                            CsvSkipReason.ZERO_AMOUNT -> "with a zero amount"
-                                            CsvSkipReason.UNSUPPORTED_CURRENCY -> "in an unsupported currency"
-                                            CsvSkipReason.TOO_FEW_COLUMNS -> "with too few columns"
-                                        }
-                                    },
+                                text = stringResource(R.string.import_skipped_intro) + " " + reasons.joinToString(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         state.charset?.let {
-                            Text("Text encoding: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.import_encoding, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -227,7 +246,7 @@ fun CsvImportScreen(
                                 FilterChip(
                                     selected = state.selectedAccountId == acc.id,
                                     onClick = { viewModel.setSelectedAccount(acc.id) },
-                                    label = { Text("${acc.getDisplayName()} (${acc.currency})") }
+                                    label = { Text("${accountLabel(acc)} (${acc.currency})") }
                                 )
                             }
                         }
@@ -235,13 +254,9 @@ fun CsvImportScreen(
                         Spacer(modifier = Modifier.height(18.dp))
 
                         Button(
-                            onClick = {
-                                viewModel.executeImport {
-                                    onImportFinished()
-                                }
-                            },
+                            onClick = viewModel::executeImport,
                             enabled = !state.isImporting && state.newCount > 0,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = Radii.control,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -260,4 +275,84 @@ fun CsvImportScreen(
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
+}
+
+/** The result of an import: what was added, skipped, sorted, and what is left to sort. */
+@Composable
+private fun ImportSummaryCard(
+    summary: ImportSummary,
+    onReviewUncategorized: () -> Unit,
+    onViewTransactions: () -> Unit,
+    onImportAnother: () -> Unit
+) {
+    SectionCard(title = stringResource(R.string.import_done_title)) {
+        SummaryLine(stringResource(R.string.import_summary_imported), summary.imported)
+        SummaryLine(
+            stringResource(R.string.import_summary_skipped),
+            summary.skipped,
+            detail = stringResource(R.string.import_summary_skipped_detail, summary.alreadyImported, summary.unreadable).takeIf { summary.skipped > 0 }
+        )
+        SummaryLine(stringResource(R.string.import_summary_categorized), summary.categorized)
+        SummaryLine(
+            stringResource(R.string.import_summary_uncategorized),
+            summary.uncategorized,
+            emphasize = summary.uncategorized > 0
+        )
+        SummaryLine(
+            stringResource(R.string.import_summary_transfers),
+            summary.ownTransfers + summary.personalTransfers,
+            detail = stringResource(R.string.import_summary_transfers_detail, summary.ownTransfers, summary.personalTransfers)
+                .takeIf { summary.ownTransfers + summary.personalTransfers > 0 }
+        )
+        Spacer(Modifier.height(16.dp))
+        if (summary.uncategorized > 0) {
+            Button(onClick = onReviewUncategorized, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.import_review_uncategorized))
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        OutlinedButton(onClick = onViewTransactions, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.import_view_transactions))
+        }
+        TextButton(onClick = onImportAnother, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.import_another))
+        }
+    }
+}
+
+@Composable
+private fun SummaryLine(label: String, value: Int, detail: String? = null, emphasize: Boolean = false) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 40.dp)
+            .padding(vertical = 4.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            if (detail != null) {
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            value.toString(),
+            style = MaterialTheme.typography.titleMedium.tabular(),
+            fontWeight = FontWeight.SemiBold,
+            color = if (emphasize) MaterialTheme.finances.warning else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun skipReasonText(reason: CsvSkipReason, count: Int): String = when (reason) {
+    CsvSkipReason.INVALID_DATE -> stringResource(R.string.skip_invalid_date, count)
+    CsvSkipReason.AMBIGUOUS_DATE -> stringResource(R.string.skip_ambiguous_date, count)
+    CsvSkipReason.INVALID_AMOUNT -> stringResource(R.string.skip_invalid_amount, count)
+    CsvSkipReason.ZERO_AMOUNT -> stringResource(R.string.skip_zero_amount, count)
+    CsvSkipReason.UNSUPPORTED_CURRENCY -> stringResource(R.string.skip_unsupported_currency, count)
+    CsvSkipReason.TOO_FEW_COLUMNS -> stringResource(R.string.skip_too_few_columns, count)
+    CsvSkipReason.NOT_COMPLETED -> stringResource(R.string.skip_not_completed, count)
 }

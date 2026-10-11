@@ -16,6 +16,7 @@ sealed class Screen(val route: String) {
     data object Budgets : Screen("budgets")
     data object Recurring : Screen("recurring")
     data object Categories : Screen("categories")
+    data object Uncategorized : Screen("uncategorized")
     data object Settings : Screen("settings")
     data object Stocks : Screen("stocks")
     data object StockDetail : Screen("stock/{symbol}") {
