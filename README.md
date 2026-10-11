@@ -25,7 +25,6 @@ This repository contains only the Android app. It used to live in the `android-n
 <img height="500" alt="IMG_20261011_221309" src="https://github.com/user-attachments/assets/831c2007-2817-4032-9dd4-781f6cc3553e" />
 <img height="500" alt="IMG_20261011_221314" src="https://github.com/user-attachments/assets/b1206d11-382b-433c-a875-4b41ae1eab5f" />
 <img height="500" alt="IMG_20261011_221344" src="https://github.com/user-attachments/assets/3c3ef43f-f30b-4015-a01d-58a3d0e8e431" />
-<img height="500" alt="IMG_20261011_221353" src="https://github.com/user-attachments/assets/dc646e7b-f69f-4681-90a8-c244b8ccdd10" />
 
 
 
