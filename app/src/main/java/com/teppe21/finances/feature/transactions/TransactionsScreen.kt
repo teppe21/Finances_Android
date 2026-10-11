@@ -62,7 +62,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +94,7 @@ fun TransactionsScreen(
     val state by viewModel.uiState.collectAsState()
     var showAddModal by rememberSaveable { mutableStateOf(openAddDialog) }
     var showSortModal by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -117,7 +120,7 @@ fun TransactionsScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp)
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -355,6 +358,7 @@ fun TransactionsScreen(
                 defaultCurrency = state.currency,
                 onDismiss = { showAddModal = false },
                 onConfirm = { accId, amtMinor, curr, dir, desc, merch, catId, date ->
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     viewModel.addManualTransaction(accId, amtMinor, curr, dir, desc, merch, catId, date)
                     showAddModal = false
                 }

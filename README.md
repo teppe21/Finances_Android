@@ -122,7 +122,7 @@ Single-module app with a light layering: Compose screens and ViewModels in `feat
 
 ## Testing
 
-JVM unit tests in `app/src/test` (159) cover notification recognition and rejection, the notification pipeline including deduplication and account matching, the bounded notification queue and rebind policy, exact money parsing, currency conversion and statistics, CSV and receipt parsing, OCR orientation and resource lifecycle helpers, the ViewModels, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Instrumented tests in `app/src/androidTest` (27) cover the Room DAOs, default-data seeding, the migration to the current schema and the main Compose flows. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has been run.
+JVM unit tests in `app/src/test` (169) cover notification recognition and rejection, the notification pipeline including deduplication and account matching, the bounded notification queue and rebind policy, exact money parsing, currency conversion and statistics, CSV and receipt parsing, OCR orientation and resource lifecycle helpers, the ViewModels, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Instrumented tests in `app/src/androidTest` (33) cover the Room DAOs, default-data seeding, the migration to the current schema and the main Compose flows. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has been run.
 
 ## Build
 
@@ -142,7 +142,7 @@ The repository contains the pieces that can be prepared in code: target SDK 36, 
 
 ## Current status
 
-Unreleased (pre-1.0 quality bar). The Android CI workflow runs the JVM unit tests, Android lint, the debug build, compiles the instrumented tests and checks the committed Room schemas on every push to `main`; it also builds a release APK with a throwaway key to check R8 and 16 KB alignment. In a local run on 2026-10-11 the unit tests, lint, the debug and minified release builds, and the 27 instrumented tests on an Android 15 emulator passed (details in [docs/TESTING.md](docs/TESTING.md)). Not yet done: the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) on a physical phone, frame-rate measurements and TalkBack checks. No signed release has been published. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and existing transactions cannot be edited yet.
+Unreleased (pre-1.0 quality bar). The Android CI workflow runs the JVM unit tests, Android lint, the debug build, compiles the instrumented tests and checks the committed Room schemas on every push to `main`; it also builds a release APK with a throwaway key to check R8 and 16 KB alignment. In a local run on 2026-10-11 the unit tests, lint, the debug and minified release builds, and the 33 instrumented tests on an Android 15 emulator passed (details in [docs/TESTING.md](docs/TESTING.md)). Not yet done: the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) on a physical phone, frame-rate measurements and TalkBack checks. No signed release has been published. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and existing transactions cannot be edited yet.
 
 ## Project background
 
@@ -151,7 +151,7 @@ The project started as a React web dashboard for personal finances and grew a na
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
-- [Motion design](docs/MOTION_DESIGN.md)
+- [Design language and motion](docs/MOTION_DESIGN.md)
 - [Data model and migrations](docs/DATA_MODEL.md)
 - [Bank notification integration](docs/BANK_INTEGRATION.md)
 - [CSV import formats](docs/IMPORT_FORMATS.md)

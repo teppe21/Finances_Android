@@ -140,7 +140,8 @@ class ReviewViewModel(
     private val updateTransaction: suspend (Transaction) -> Unit,
     private val deleteTransaction: suspend (String) -> Unit,
     private val markProcessed: suspend (String) -> Unit,
-    private val clock: () -> Instant = Instant::now
+    private val clock: () -> Instant = Instant::now,
+    private val restoreTransaction: suspend (Transaction) -> Unit = {}
 ) : ViewModel() {
 
     /** Used by the default `viewModel()` factory: wires the app-level repositories. */
@@ -151,7 +152,8 @@ class ReviewViewModel(
         accountsFlow = app.accountRepository.getAllAccountsFlow(),
         updateTransaction = { app.transactionRepository.update(it) },
         deleteTransaction = { app.transactionRepository.deleteById(it) },
-        markProcessed = { app.notificationRepository.markProcessedForTransaction(it) }
+        markProcessed = { app.notificationRepository.markProcessedForTransaction(it) },
+        restoreTransaction = { app.transactionRepository.insertIfAbsent(it) }
     )
 
     val pending: StateFlow<List<Transaction>> = pendingFlow
@@ -173,6 +175,16 @@ class ReviewViewModel(
             deleteTransaction(tx.id)
             markProcessed(tx.id)
         }
+    }
+
+    /** Puts a just-confirmed transaction back in the queue exactly as it was. */
+    fun undoConfirm(original: Transaction) {
+        viewModelScope.launch { updateTransaction(original) }
+    }
+
+    /** Brings back a just-discarded transaction (never replaces one that exists again). */
+    fun undoDiscard(original: Transaction) {
+        viewModelScope.launch { restoreTransaction(original) }
     }
 }
 

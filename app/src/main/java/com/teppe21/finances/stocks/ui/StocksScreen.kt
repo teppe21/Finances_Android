@@ -112,7 +112,7 @@ fun StocksScreen(
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(18.dp)
                 )
             }
             search.message?.let { item { Text(it, style = MaterialTheme.typography.bodySmall) } }
@@ -229,10 +229,10 @@ private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () ->
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
             .pressClickable(onClick = onClick)
             .semantics { contentDescription = description },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {

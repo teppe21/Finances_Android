@@ -64,6 +64,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import com.teppe21.finances.core.ui.Motion
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -115,6 +117,7 @@ fun ScanReceiptScreen(
     }
 
     val view = LocalView.current
+    val haptics = LocalHapticFeedback.current
     val imageCapture = remember { ImageCapture.Builder().build() }
     val captureExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {
@@ -496,12 +499,13 @@ fun ScanReceiptScreen(
                                 categoryId = catId,
                                 currency = selectedCurrency
                             ) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onNavigateBack()
                             }
                         },
                         enabled = parsedTotal != null && state.selectedAccountId != null && merchant.isNotBlank() && !state.isSaving,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(18.dp)
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))

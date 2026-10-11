@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FileOpen
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
+import com.teppe21.finances.core.theme.tabular
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.InfoBanner
@@ -126,7 +129,7 @@ private fun DashboardContent(
         item { Spacer(Modifier.height(4.dp)) }
 
         item(key = "balance") {
-            BalanceCard(
+            BalanceHero(
                 totalBalanceMinor = state.totalBalanceMinor,
                 currency = state.currency,
                 incomeMinor = state.monthStats.incomeMinor,
@@ -223,7 +226,7 @@ private fun DashboardContent(
 }
 
 @Composable
-private fun BalanceCard(
+private fun BalanceHero(
     totalBalanceMinor: Long?,
     currency: String,
     incomeMinor: Long,
@@ -231,44 +234,78 @@ private fun BalanceCard(
     month: YearMonth,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(Modifier.padding(20.dp)) {
-            Text(
-                stringResource(R.string.total_balance),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text(
+            stringResource(R.string.total_balance),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: "Unavailable",
+            style = MaterialTheme.typography.displayLarge.tabular(),
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1
+        )
+        Text(
+            text = "All accounts: opening balances plus recorded transactions",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(20.dp))
+        Text(
+            month.format(MONTH_TITLE),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SummaryTile(
+                Modifier.weight(1f),
+                stringResource(R.string.income),
+                "+" + CurrencyFormatter.format(incomeMinor, currency),
+                MaterialTheme.finances.income,
+                Icons.Default.ArrowDownward
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: "Unavailable",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+            SummaryTile(
+                Modifier.weight(1f),
+                stringResource(R.string.expenses),
+                "-" + CurrencyFormatter.format(expenseMinor, currency),
+                MaterialTheme.finances.expense,
+                Icons.Default.ArrowUpward
             )
-            Text(
-                text = "All accounts, opening balances plus recorded transactions",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(month.format(MONTH_TITLE), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth()) {
-                MonthFigure(Modifier.weight(1f), stringResource(R.string.income), "+" + CurrencyFormatter.format(incomeMinor, currency), MaterialTheme.finances.income)
-                MonthFigure(Modifier.weight(1f), stringResource(R.string.expenses), "-" + CurrencyFormatter.format(expenseMinor, currency), MaterialTheme.finances.expense)
-            }
         }
     }
 }
 
+/** A month figure: a soft tint of its colour, an icon, a word and a signed value, so colour is never the only cue. */
 @Composable
-private fun MonthFigure(modifier: Modifier, label: String, value: String, color: androidx.compose.ui.graphics.Color) {
-    Column(modifier) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = color)
+private fun SummaryTile(
+    modifier: Modifier,
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+    icon: ImageVector
+) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(22.dp), color = color.copy(alpha = 0.10f)) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(32.dp).clip(CircleShape).background(color.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    value,
+                    style = MaterialTheme.typography.titleMedium.tabular(),
+                    color = color,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 
@@ -276,10 +313,10 @@ private fun MonthFigure(modifier: Modifier, label: String, value: String, color:
 private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, onClick: () -> Unit) {
     Surface(
         modifier = modifier
-            .height(72.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .height(84.dp)
+            .clip(RoundedCornerShape(20.dp))
             .pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -397,8 +434,8 @@ private fun CategoryBreakdownCard(
 @Composable
 private fun StocksEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).pressClickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
