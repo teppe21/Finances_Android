@@ -1,15 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A receipt: charcoal outline and item lines, one terracotta line for the total.
+     Kept inside the 72x72 safe zone of the 108x108 adaptive icon canvas. Source: docs/icon/ic_launcher.svg -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#2563EB"
-        android:pathData="M34,38h40c2.2,0 4,1.8 4,4v24c0,2.2 -1.8,4 -4,4H34c-2.2,0 -4,-1.8 -4,-4V42c0,-2.2 1.8,-4 4,-4z"/>
+        android:pathData="M36,26 H72 V82 L66,76 L60,82 L54,76 L48,82 L42,76 L36,82 Z"
+        android:strokeColor="#2B2B2B"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
     <path
-        android:fillColor="#60A5FA"
-        android:pathData="M64,50h14v8H64z"/>
+        android:pathData="M43,38 H65 M43,47 H57"
+        android:strokeColor="#2B2B2B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M68,54m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0"/>
+        android:pathData="M43,61 H65"
+        android:strokeColor="#C15F3C"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
 </vector>
