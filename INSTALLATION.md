@@ -8,11 +8,11 @@
 
 Finances is an Android app (Android 8.0 or newer). It is not on Google Play, so you install the APK file from GitHub.
 
-> **Status:** until the first signed release is published on the [Releases page](https://github.com/teppe21/Finances-Android/releases), there is nothing to download there. Developers can build the app themselves, see [DEVELOPMENT.md](DEVELOPMENT.md).
+> **Status:** only a personal-beta, debug-signed APK (a pre-release named like `Finances-X.Y.Z-beta.N-debug.apk`) is on the [Releases page](https://github.com/teppe21/Finances_Android/releases) so far; there is no signed production release yet. Developers can build the app themselves, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ### 1. Download the APK
 
-1. On your phone, open the [latest release](https://github.com/teppe21/Finances-Android/releases/latest).
+1. On your phone, open the [Releases page](https://github.com/teppe21/Finances_Android/releases) and the newest entry.
 2. Under **Assets**, tap `Finances-vX.Y.Z.apk`. (The `.sha256` file is only for checking the download.)
 3. If the browser warns that this type of file can harm your device, choose **Download anyway**. This warning appears for every APK from outside Google Play.
 
@@ -58,7 +58,7 @@ Install the newer APK over the old one (or use Obtainium below). Your data stays
 [Obtainium](https://github.com/ImranR98/Obtainium) installs and updates apps straight from GitHub Releases.
 
 1. Install Obtainium (see its own page for the download).
-2. Tap **Add App**, paste `https://github.com/teppe21/Finances-Android`, and tap **Add**.
+2. Tap **Add App**, paste `https://github.com/teppe21/Finances_Android`, and tap **Add**.
 3. Obtainium finds the latest release and offers the APK. Tap **Install**.
 4. It checks for new releases in the background and tells you when an update is available.
 
@@ -84,11 +84,11 @@ See [DEVELOPMENT.md](DEVELOPMENT.md).
 
 A Finances egy Android-alkalmazás (Android 8.0 vagy újabb). Nincs a Google Play-en, ezért az APK fájlt a GitHubról kell telepíteni.
 
-> **Állapot:** amíg az első aláírt kiadás meg nem jelenik a [Releases oldalon](https://github.com/teppe21/Finances-Android/releases), ott nincs mit letölteni. Fejlesztők maguk is megépíthetik az appot, lásd: [DEVELOPMENT.md](DEVELOPMENT.md).
+> **Állapot:** a [Releases oldalon](https://github.com/teppe21/Finances_Android/releases) egyelőre csak egy személyes béta, debug kulccsal aláírt APK található (előzetes kiadás, neve pl. `Finances-X.Y.Z-beta.N-debug.apk`); aláírt, éles kiadás még nincs. Fejlesztők maguk is megépíthetik az appot, lásd: [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ### 1. Az APK letöltése
 
-1. A telefonodon nyisd meg a [legfrissebb kiadást](https://github.com/teppe21/Finances-Android/releases/latest).
+1. A telefonodon nyisd meg a [Releases oldalt](https://github.com/teppe21/Finances_Android/releases), majd a legújabb bejegyzést.
 2. Az **Assets** alatt koppints a `Finances-vX.Y.Z.apk` fájlra. (A `.sha256` fájl csak a letöltés ellenőrzésére való.)
 3. Ha a böngésző figyelmeztet, hogy ez a fájltípus károsíthatja az eszközt, válaszd a **Letöltés mindenképp** lehetőséget. Ez a figyelmeztetés minden, Google Play-en kívüli APK-nál megjelenik.
 
@@ -134,7 +134,7 @@ Telepítsd az újabb APK-t a régi fölé (vagy használd lent az Obtainiumot). 
 Az [Obtainium](https://github.com/ImranR98/Obtainium) közvetlenül a GitHub Releases oldalról telepít és frissít appokat.
 
 1. Telepítsd az Obtainiumot (a letöltéshez lásd a saját oldalát).
-2. Koppints az **Add App** gombra, illeszd be: `https://github.com/teppe21/Finances-Android`, majd koppints az **Add** gombra.
+2. Koppints az **Add App** gombra, illeszd be: `https://github.com/teppe21/Finances_Android`, majd koppints az **Add** gombra.
 3. Az Obtainium megtalálja a legújabb kiadást, és felajánlja az APK-t. Koppints a **Telepítés** gombra.
 4. A háttérben ellenőrzi az új kiadásokat, és jelzi, ha van frissítés.
 

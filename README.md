@@ -1,15 +1,19 @@
 # Finances
 
-[![Android CI](https://github.com/teppe21/Finances-Android/actions/workflows/android.yml/badge.svg)](https://github.com/teppe21/Finances-Android/actions/workflows/android.yml)
+[![Android CI](https://github.com/teppe21/Finances_Android/actions/workflows/android.yml/badge.svg)](https://github.com/teppe21/Finances_Android/actions/workflows/android.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A privacy-first personal finance app for Android (Kotlin, Jetpack Compose) that keeps your data on the phone and can pick up card payments from supported banking notifications.
 
 *Co-developed with Claude Code (AI assistant); see [Built with AI assistance](#built-with-ai-assistance).*
 
-**[Download latest APK](https://github.com/teppe21/Finances-Android/releases/latest)** · [Installation guide / Telepítési útmutató](INSTALLATION.md) · [Development guide](DEVELOPMENT.md)
+## Download the Android app
 
-> The Releases page has an APK only once the first signed release is published. Until then, build the app yourself ([DEVELOPMENT.md](DEVELOPMENT.md)).
+**[Download the latest beta APK (GitHub Releases)](https://github.com/teppe21/Finances_Android/releases)** · [Installation guide / Telepítési útmutató](INSTALLATION.md) · [Development guide](DEVELOPMENT.md)
+
+> **Personal beta for testing only.** The current download is a **debug-signed APK** (`Finances-…-debug.apk`) published as a GitHub *pre-release*. It is not a production-signed release and is not on Google Play. So far it has been tried on an emulator and in automated tests, not on a physical phone. On the Releases page open the newest entry, tap the `.apk` under **Assets**, and allow installing from your browser or Files app when Android asks.
+
+Signed production releases will be published in the same place once a release key is set up. You can also build the app yourself ([DEVELOPMENT.md](DEVELOPMENT.md)).
 
 Finances keeps your transactions on the phone and tries to take some of the typing out of bookkeeping: it can pick up card payments from the notifications of a few banking apps, read the total from a paper receipt, and import bank statements in CSV format. It also has a small stock watchlist that shows market quotes from a provider you connect yourself.
 

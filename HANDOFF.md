@@ -64,8 +64,8 @@ User decisions already made:
 ## 3. Current repository state
 
 - Branch: `claude/categorization-layout-motion` (created from `claude/app-icon`, whose tip
-  `1b93a5a` is an earlier, unmerged app-icon commit). Not pushed. No PR.
-- Working tree: **not clean**. HEAD is still `dbd31b5`; the Stage 2, Stage 3 and Stage 3.1 work is all uncommitted (24 modified and 10 untracked files, listed in §17.6; nothing staged, committed or pushed). Everything below this line in §3 to §13 describes the state at the end of the first session and is kept for history; the current state is §17.
+  `1b93a5a` was an app-icon commit, since merged to `main` through PR #3). At that time not pushed and no PR; the branch is now merged into `main` (§18). The current state is §18
+- Working tree: *historical, see §18 (everything is now committed and on `main`)*. At the end of the earlier sessions HEAD was `dbd31b5` and the Stage 2, Stage 3 and Stage 3.1 work was uncommitted (24 modified and 10 untracked files, listed in §17.6; nothing staged, committed or pushed). Everything below this line in §3 to §13 describes the state at the end of the first session and is kept for history; the later state is in §17 and §18.
 - Commits made in this session (oldest first):
   - `36009d5` Recognize transfers and fix CSV categorization (Phase 1 code + tests)
   - `bac4710` Document categorization, transfer kinds and schema 6 (Phase 1 docs)
@@ -563,3 +563,39 @@ Observation: while the Transactions list is scrolled, the floating add button co
 - Modified (24): README.md, MainActivity.kt, Color.kt, Components.kt, Gestures.kt, Motion.kt, Rows.kt, TabBar.kt, AccountsScreen.kt, AnalyticsScreen.kt, CategoriesScreen.kt, DashboardScreen.kt, CsvImportScreen.kt, MoreScreen.kt, ScanReceiptScreen.kt, SettingsScreen.kt, BudgetsScreen.kt, SubScreens.kt, TransactionsScreen.kt, both `strings.xml`, docs/MOTION_DESIGN.md, docs/REAL_DEVICE_TEST_PLAN.md, docs/TESTING.md. Untracked (10): HANDOFF.md, Chips.kt, FitText.kt, Glass.kt, **QuickReturn.kt**, DonutGeometryTest.kt, GlassContrastTest.kt, ThemeContrastTest.kt, **QuickReturnAndDonutLayoutTest.kt**, LayoutUiTest.kt. Stage 3.1 touched AnalyticsScreen.kt, DashboardScreen.kt, TransactionsScreen.kt, QuickReturn.kt, LayoutUiTest.kt, QuickReturnAndDonutLayoutTest.kt, README.md, MOTION_DESIGN.md, TESTING.md and this file.
 - Still open: TalkBack never run (including whether a hidden Transactions header confuses it); no physical device and no frame-rate measurements; the raised-contrast tab bar never run; Hungarian wording and the Hungarian privacy policy unreviewed; Hungarian and dark screenshots of the screens in §15.6 "Not looked at"; tab labels still shrink individually; the quick-return header is tested on the scaffold with a plain list, not on the real Transactions screen; the donut's centre tap uses a fixed 0.6 radius, smaller than the hole at large scales (harmless: the legend rows also clear the selection).
 - Recommended next step: review the diff and commit in two or three commits (layout and accessibility; motion and glass; follow-up), then run the physical-device plan with TalkBack and a properly signed `assembleRelease`.
+
+## 18. Publication to `main` and the beta APK (2026-10-11)
+
+Scope: commit, merge, push and package only. No feature work, no dependency, Gradle, manifest, schema or domain change.
+
+### 18.1 Git result (verified against GitHub)
+- Remote `origin` = `https://github.com/teppe21/Finances_Android.git` (public, default branch `main`); `gh` authenticated as `teppe21`. Git identity used: Levente Lámfalusi `<lamfalusilevi@gmail.com>` (author and committer of every commit below; the commit messages also carry a `Co-Authored-By: Claude` trailer, which does not change the author).
+- `6e27b48` "Stabilize layout, accessibility and motion before device testing": all Stage 2, 3 and 3.1 work in one commit (34 files, staged by explicit path; the pieces are intertwined, so no artificial split).
+- `80f11cd` merge commit on `main` (normal `--no-ff` merge; before it, `origin/main` was `38f07d9`, the PR #3 merge of `claude/app-icon`, whose tree equals `1b93a5a`, already in this branch's history). Pushed as a fast-forward of `origin/main` (`38f07d9..80f11cd`), no force. The merged tree is identical to the tested tip `6e27b48`.
+- `claude/categorization-layout-motion` was kept and not pushed or deleted.
+- A follow-up docs commit on top of `80f11cd` carries the README download section, the repo-name fix in `README.md`/`INSTALLATION.md` and this section.
+
+### 18.2 Checks run on the tree that was merged (this machine, `--offline`)
+| Check | Result |
+| --- | --- |
+| `cleanTestDebugUnitTest testDebugUnitTest` | 224 tests, 0 failed, 0 errors, 0 skipped (XML summed, fresh) |
+| `lintDebug --rerun` (report deleted first) | 0 errors, 28 warnings |
+| `assembleDebug` | passed (up to date: the sources are identical to the earlier build) |
+| `connectedDebugAndroidTest`, API 35 emulator `finances_api35` (360 dp not forced; density and font scale reset to defaults) | 59 of 59 passed. This includes the layout tests at font scale 1.5 and 2.0 for the donut and the dashboard shortcuts, and the quick-return header test |
+| `release` tasks | Not run in this pass (no stable signing key exists; the project refuses release packaging without one). The earlier throwaway-key run (§17.5) is not a release |
+
+Open concerns, checked as far as possible: donut and dashboard shortcuts at 1.5 and 2.0 are covered by the passing `LayoutUiTest` cases; the Transactions quick-return header by its instrumented and unit tests (TalkBack behaviour of a hidden header is **not** verified); the floating add button covering part of an amount while scrolling is **pre-existing** (same placement in `HEAD` before this work), so it was documented, not changed.
+
+### 18.3 The APK
+- **Type: debug build, signed with the Android debug certificate** (`CN=Android Debug`, SHA-256 `714ea290…b747ed`), `debuggable`, not minified. There is no persistent release key (none in the repo or environment), so no release APK was built. Do not treat it as a production release.
+- `com.teppe21.finances`, versionName 2.1.0, versionCode 2, minSdk 26, target 36 (`aapt dump badging`). 62,758,165 bytes, SHA-256 `5e2c1eb161cb27425118022af564331ab27c734d6756851c34c6cd8d1f2fd048`. Contents scanned: only ML Kit OCR models and library metadata, no database, keystore or user data.
+- Local path: `app/build/outputs/apk/debug/app-debug.apk` (git-ignored). A copy named `Finances-2.1.0-beta.1-debug.apk` is the release asset.
+- Release: https://github.com/teppe21/Finances_Android/releases/tag/v2.1.0-beta.1 (pre-release, tag `v2.1.0-beta.1` at `80f11cd`). GitHub reports the asset's digest and size equal to the local file; the download URL answers 200 with `application/vnd.android.package-archive`. The APK was **not installed** on any phone or emulator by this pass.
+
+### 18.4 Remaining limitations and manual steps
+- Manual: install on a phone (allow "Install unknown apps" for the browser or Files app), then work through `docs/REAL_DEVICE_TEST_PLAN.md`: TalkBack, frame rates, raised system contrast, Hungarian and dark screens.
+- A debug build and a future release build are signed differently; installing one over the other needs an uninstall (data loss), so export or re-import data first once an export exists (it does not yet).
+- No release signing key: create one deliberately (and keep it outside the repository) before any distributable release; `lintRelease`/`assembleRelease` have not been run with a real key.
+- The repository is public, so the pre-release is publicly downloadable.
+- Hungarian wording and the Hungarian privacy policy remain unreviewed; ML Kit runtime network behaviour remains unchecked; the §15.8 questions are unanswered.
+- Before this pass the README's CI badge and download link, and several links in `INSTALLATION.md`, pointed at `teppe21/Finances-Android` (hyphen), which returns 404; they now use `Finances_Android`. `INSTALLATION.md` still describes the file as `Finances-vX.Y.Z.apk` plus a `.sha256` in step 1; the beta asset is named `Finances-2.1.0-beta.1-debug.apk` and has no separate checksum file (the SHA-256 is in the release notes).
