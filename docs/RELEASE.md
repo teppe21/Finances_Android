@@ -52,7 +52,7 @@ Expect `package: name='com.teppe21.finances'`, `versionCode='2'`, `sdkVersion:'2
 
 ## Optional build properties
 
-`-Pfinances.privacyPolicyUrl=...` adds an "Open the online version" button to the in-app policy, and `-Pfinances.privacyContact=...` fills in the contact line. Set them only with a verified public URL and a real contact address.
+`-Pfinances.privacyPolicyUrl=...` adds an "Open the online version" button to the in-app policy, and `-Pfinances.privacyContact=...` fills in the contact line (set to the developer contact in `gradle.properties`). Set the URL only once the policy is publicly hosted.
 
 ## Publishing a release (step by step)
 

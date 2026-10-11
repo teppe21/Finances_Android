@@ -9,7 +9,11 @@ import com.teppe21.finances.domain.model.Category
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
 import com.teppe21.finances.domain.model.TransactionSource
+import com.teppe21.finances.data.local.preferences.UserPreferences
+import com.teppe21.finances.domain.fx.RateTable
+import com.teppe21.finances.domain.usecase.DetectRecurringTransactionsUseCase
 import com.teppe21.finances.domain.usecase.IngestionInput
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,16 +48,30 @@ data class TransactionsUiState(
     val currency: String = "HUF"
 )
 
-class TransactionsViewModel : ViewModel() {
+class TransactionsViewModel(
+    private val transactionsFlow: Flow<List<Transaction>>,
+    private val categoriesFlow: Flow<List<Category>>,
+    private val accountsFlow: Flow<List<Account>>,
+    private val preferencesFlow: Flow<UserPreferences>,
+    private val ratesFlow: Flow<RateTable>,
+    private val recurringUseCase: DetectRecurringTransactionsUseCase,
+    private val ingest: suspend (IngestionInput) -> Unit,
+    private val delete: suspend (Transaction) -> Unit
+) : ViewModel() {
 
-    private val app = FinancesApp.instance
-    private val txRepo = app.transactionRepository
-    private val catRepo = app.categoryRepository
-    private val accountRepo = app.accountRepository
-    private val prefsRepo = app.preferencesRepository
-    private val fxRepo = app.exchangeRateRepository
-    private val ingestUseCase = app.ingestTransactionUseCase
-    private val recurringUseCase = app.detectRecurringUseCase
+    /** Used by the default `viewModel()` factory: wires the app-level repositories. */
+    constructor() : this(FinancesApp.instance)
+
+    private constructor(app: FinancesApp) : this(
+        transactionsFlow = app.transactionRepository.getAllTransactionsFlow(),
+        categoriesFlow = app.categoryRepository.getAllCategoriesFlow(),
+        accountsFlow = app.accountRepository.getAllAccountsFlow(),
+        preferencesFlow = app.preferencesRepository.preferencesFlow,
+        ratesFlow = app.exchangeRateRepository.tableFlow,
+        recurringUseCase = app.detectRecurringUseCase,
+        ingest = { app.ingestTransactionUseCase.execute(it) },
+        delete = { app.transactionRepository.deleteTransaction(it) }
+    )
 
     private val _selectedPeriod = MutableStateFlow("this_month")
     private val _selectedCategory = MutableStateFlow("All")
@@ -84,16 +102,16 @@ class TransactionsViewModel : ViewModel() {
         val transactions: List<Transaction>,
         val categories: List<Category>,
         val accounts: List<Account>,
-        val preferences: com.teppe21.finances.data.local.preferences.UserPreferences,
-        val rates: com.teppe21.finances.domain.fx.RateTable
+        val preferences: UserPreferences,
+        val rates: RateTable
     )
 
     private val _repoDataFlow = combine(
-        txRepo.getAllTransactionsFlow(),
-        catRepo.getAllCategoriesFlow(),
-        accountRepo.getAllAccountsFlow(),
-        prefsRepo.preferencesFlow,
-        fxRepo.tableFlow
+        transactionsFlow,
+        categoriesFlow,
+        accountsFlow,
+        preferencesFlow,
+        ratesFlow
     ) { txs, cats, accs, prefs, rates ->
         TransactionRepoData(txs, cats, accs, prefs, rates)
     }
@@ -207,7 +225,7 @@ class TransactionsViewModel : ViewModel() {
         date: LocalDate
     ) {
         viewModelScope.launch {
-            ingestUseCase.execute(
+            ingest(
                 IngestionInput(
                     accountId = accountId,
                     date = date,
@@ -226,7 +244,7 @@ class TransactionsViewModel : ViewModel() {
 
     fun deleteTransaction(tx: Transaction) {
         viewModelScope.launch {
-            txRepo.deleteTransaction(tx)
+            delete(tx)
             _selectedTransaction.value = null
         }
     }

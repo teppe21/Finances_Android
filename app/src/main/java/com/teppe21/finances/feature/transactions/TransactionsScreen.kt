@@ -1,5 +1,9 @@
 package com.teppe21.finances.feature.transactions
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +73,8 @@ import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.pressClickable
 import com.teppe21.finances.core.ui.TransactionRow
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.utils.CurrencyFormatter
@@ -77,7 +83,7 @@ import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
 import java.time.LocalDate
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun TransactionsScreen(
     openAddDialog: Boolean = false,
@@ -203,42 +209,50 @@ fun TransactionsScreen(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Transactions List
-            if (state.filteredTransactions.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.no_transactions),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (state.unconvertedCount > 0) {
-                        item {
-                            InfoBanner(
-                                "${state.unconvertedCount} transactions have no exchange rate to ${state.currency}; " +
-                                    "they are shown in their original currency."
-                            )
-                        }
-                    }
-                    items(state.filteredTransactions, key = { it.id }) { tx ->
-                        TransactionRow(
-                            transaction = tx,
-                            displayCurrency = state.currency,
-                            convertedAmountMinor = state.convertedAmounts[tx.id],
-                            onClick = { viewModel.selectTransaction(tx) }
+            // Transactions List: only the empty <-> non-empty switch is animated (a fade). Filter and
+            // sort changes keep the same list and just move rows, so scroll position is preserved.
+            AnimatedContent(
+                targetState = state.filteredTransactions.isEmpty(),
+                modifier = Modifier.weight(1f),
+                transitionSpec = { Motion.fadeInShort() togetherWith Motion.fadeOutShort() },
+                label = "transactionsEmpty"
+            ) { isEmpty ->
+                if (isEmpty) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.no_transactions),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(88.dp)) }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (state.unconvertedCount > 0) {
+                            item(key = "unconverted-banner") {
+                                InfoBanner(
+                                    "${state.unconvertedCount} transactions have no exchange rate to ${state.currency}; " +
+                                        "they are shown in their original currency.",
+                                    modifier = Modifier.animateItemPlacement(Motion.medium())
+                                )
+                            }
+                        }
+                        items(state.filteredTransactions, key = { it.id }) { tx ->
+                            TransactionRow(
+                                transaction = tx,
+                                displayCurrency = state.currency,
+                                convertedAmountMinor = state.convertedAmounts[tx.id],
+                                onClick = { viewModel.selectTransaction(tx) },
+                                modifier = Modifier.animateItemPlacement(Motion.medium())
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(88.dp)) }
+                    }
                 }
             }
         }
@@ -490,20 +504,24 @@ fun AddTransactionDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val expenseColor by animateColorAsState(
+                        if (isExpense) MaterialTheme.finances.expense else MaterialTheme.colorScheme.surfaceVariant,
+                        Motion.short(), label = "expenseToggle"
+                    )
+                    val incomeColor by animateColorAsState(
+                        if (!isExpense) MaterialTheme.finances.income else MaterialTheme.colorScheme.surfaceVariant,
+                        Motion.short(), label = "incomeToggle"
+                    )
                     Button(
                         onClick = { isExpense = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isExpense) MaterialTheme.finances.expense else MaterialTheme.colorScheme.surfaceVariant
-                        ),
+                        colors = ButtonDefaults.buttonColors(containerColor = expenseColor),
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(stringResource(R.string.expenses))
                     }
                     Button(
                         onClick = { isExpense = false },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (!isExpense) MaterialTheme.finances.income else MaterialTheme.colorScheme.surfaceVariant
-                        ),
+                        colors = ButtonDefaults.buttonColors(containerColor = incomeColor),
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(stringResource(R.string.income))

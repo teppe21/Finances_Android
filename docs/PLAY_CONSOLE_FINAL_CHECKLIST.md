@@ -27,7 +27,7 @@ Status legend: **PASS** (done in the repository and verified), **PASS WITH MANUA
 | --- | --- | --- |
 | App created with package `com.teppe21.finances` | PASS WITH MANUAL ACTION | |
 | Play App Signing and upload key | PASS WITH MANUAL ACTION | |
-| Privacy policy URL | BLOCKED | needs hosting and a real developer name/contact in `docs/privacy-policy.html` |
+| Privacy policy URL | BLOCKED | developer name and contact are filled in; still needs hosting and an effective date |
 | Data safety form | PASS WITH MANUAL ACTION | draft in PLAY_CONSOLE_COMPLIANCE.md |
 | Financial features declaration | PASS WITH MANUAL ACTION | reasoning in PLAY_FINANCIAL_FEATURES_DECLARATION.md |
 | Content rating questionnaire | PASS WITH MANUAL ACTION | |
@@ -39,7 +39,7 @@ Status legend: **PASS** (done in the repository and verified), **PASS WITH MANUA
 
 ## Hosting the privacy policy on GitHub Pages
 
-1. Replace the placeholders marked `[TO BE COMPLETED]` in `docs/privacy-policy.html` with the developer name and a contact email.
+1. The developer name and contact email are filled in. Replace the remaining `[TO BE COMPLETED on publication]` effective date in `docs/privacy-policy.html` on the day you publish.
 2. In the GitHub repository: Settings > Pages > Build and deployment > Source: "Deploy from a branch", branch `main`, folder `/docs`. Save.
 3. Wait for the deployment, then open `https://<user>.github.io/<repository>/privacy-policy.html` in a browser and in a private window.
 4. Use that URL in Play Console and build with `-Pfinances.privacyPolicyUrl=<url>` so the app links to it.

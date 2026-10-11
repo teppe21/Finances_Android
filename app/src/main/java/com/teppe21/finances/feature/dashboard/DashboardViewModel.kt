@@ -3,7 +3,13 @@ package com.teppe21.finances.feature.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
+import com.teppe21.finances.data.local.preferences.UserPreferences
+import com.teppe21.finances.domain.fx.RateTable
+import com.teppe21.finances.domain.model.Account
+import com.teppe21.finances.domain.model.Category
 import com.teppe21.finances.domain.model.CategoryBreakdown
+import com.teppe21.finances.domain.usecase.CalculateFinancialStatsUseCase
+import kotlinx.coroutines.flow.Flow
 import com.teppe21.finances.domain.model.FinancialStats
 import com.teppe21.finances.domain.model.MonthlyTrend
 import com.teppe21.finances.domain.model.Transaction
@@ -33,17 +39,33 @@ data class DashboardUiState(
     val isLoading: Boolean = true
 )
 
-class DashboardViewModel : ViewModel() {
+class DashboardViewModel(
+    transactions: Flow<List<Transaction>>,
+    categories: Flow<List<Category>>,
+    accounts: Flow<List<Account>>,
+    preferences: Flow<UserPreferences>,
+    rates: Flow<RateTable>,
+    private val stats: CalculateFinancialStatsUseCase = CalculateFinancialStatsUseCase()
+) : ViewModel() {
 
-    private val app = FinancesApp.instance
-    private val stats = app.calculateStatsUseCase
+    /** Used by the default `viewModel()` factory: wires the app-level repositories. */
+    constructor() : this(FinancesApp.instance)
+
+    private constructor(app: FinancesApp) : this(
+        transactions = app.transactionRepository.getAllTransactionsFlow(),
+        categories = app.categoryRepository.getAllCategoriesFlow(),
+        accounts = app.accountRepository.getAllAccountsFlow(),
+        preferences = app.preferencesRepository.preferencesFlow,
+        rates = app.exchangeRateRepository.tableFlow,
+        stats = app.calculateStatsUseCase
+    )
 
     val uiState: StateFlow<DashboardUiState> = combine(
-        app.transactionRepository.getAllTransactionsFlow(),
-        app.categoryRepository.getAllCategoriesFlow(),
-        app.accountRepository.getAllAccountsFlow(),
-        app.preferencesRepository.preferencesFlow,
-        app.exchangeRateRepository.tableFlow
+        transactions,
+        categories,
+        accounts,
+        preferences,
+        rates
     ) { transactions, categories, accounts, prefs, table ->
         val target = prefs.currency
         val converter: CurrencyAmountConverter = { amount, currency, _ -> table.convert(amount, currency, target) }

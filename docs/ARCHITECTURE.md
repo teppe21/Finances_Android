@@ -52,7 +52,7 @@ StatusBarNotification
   -> NotificationEvent with a sanitized status code
 ```
 
-`BankNotificationListenerService` does the Android part and serializes processing with a mutex so a wallet and a bank notification arriving together are compared deterministically. Everything after text extraction is `ProcessNotificationUseCase`, which is unit-tested end to end with an in-memory store. Details: [BANK_INTEGRATION.md](BANK_INTEGRATION.md).
+`BankNotificationListenerService` does the Android part. Supported notifications go through a bounded `SerialWorkQueue` (one worker, a 64-item backlog that drops rather than grows, a 20 s timeout per item), so a wallet and a bank notification arriving together are compared deterministically and a stuck item cannot pile up work. An item that fails or times out is recorded as `PROCESSING_ERROR` or `PROCESSING_TIMEOUT` (package and time only, never text) and never touches existing transactions; replays are safe because notification fingerprints are deterministic. After `onListenerDisconnected` the service asks Android to rebind through `RebindPolicy` (at most five requests per ten minutes with exponential backoff, reset by a connection that stays up for a minute). Everything after text extraction is `ProcessNotificationUseCase`, which is unit-tested end to end with an in-memory store. Details: [BANK_INTEGRATION.md](BANK_INTEGRATION.md).
 
 ## Currency conversion
 

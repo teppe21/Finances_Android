@@ -2,6 +2,8 @@ package com.teppe21.finances.feature.analytics
 
 import android.content.Context
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,6 +63,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.rememberReveal
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.TextButton
@@ -75,6 +79,7 @@ import kotlin.math.atan2
 import kotlin.math.sqrt
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = viewModel()
@@ -101,8 +106,9 @@ fun AnalyticsScreen(
         }
 
         if (state.period == AnalyticsPeriod.MONTH) {
-            item {
+            item(key = "month-navigator") {
                 MonthNavigator(
+                    modifier = Modifier.animateItemPlacement(Motion.medium()),
                     month = state.selectedMonth,
                     onPrevious = { viewModel.shiftMonth(-1) },
                     onNext = { viewModel.shiftMonth(1) },
@@ -112,17 +118,18 @@ fun AnalyticsScreen(
         }
 
         if (state.stats.unconvertedCount > 0) {
-            item {
+            item(key = "unconverted-banner") {
                 InfoBanner(
-                    "${state.stats.unconvertedCount} transactions are not included: no exchange rate to ${state.currency} is available."
+                    "${state.stats.unconvertedCount} transactions are not included: no exchange rate to ${state.currency} is available.",
+                    modifier = Modifier.animateItemPlacement(Motion.medium())
                 )
             }
         }
 
         // Headline Metrics Grid
-        item {
+        item(key = "headline") {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().animateItemPlacement(Motion.medium()),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
@@ -175,8 +182,9 @@ fun AnalyticsScreen(
         }
 
         // Interactive Donut Chart & Category Breakdown
-        item {
+        item(key = "donut") {
             SpendingDonutChartCard(
+                modifier = Modifier.animateItemPlacement(Motion.medium()),
                 breakdown = state.categoryBreakdown,
                 totalExpenseMinor = state.stats.expenseMinor,
                 selectedCategoryId = state.selectedCategoryId,
@@ -187,18 +195,23 @@ fun AnalyticsScreen(
 
         // Top Merchants Card
         if (state.topMerchants.isNotEmpty()) {
-            item {
+            item(key = "merchants") {
                 TopMerchantsCard(
                     merchants = state.topMerchants,
-                    currency = state.currency
+                    currency = state.currency,
+                    modifier = Modifier.animateItemPlacement(Motion.medium())
                 )
             }
         }
 
         // Monthly trends bar chart
         if (state.monthlyTrends.isNotEmpty()) {
-            item {
-                MonthlyTrendsChartCard(trends = state.monthlyTrends, currency = state.currency)
+            item(key = "trends") {
+                MonthlyTrendsChartCard(
+                    trends = state.monthlyTrends,
+                    currency = state.currency,
+                    modifier = Modifier.animateItemPlacement(Motion.medium())
+                )
             }
         }
 
@@ -224,23 +237,31 @@ fun MonthNavigator(
     month: java.time.YearMonth,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onCurrent: () -> Unit
+    onCurrent: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val isCurrent = month == java.time.YearMonth.now()
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onPrevious) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
         }
-        Text(
-            text = month.format(MONTH_TITLE),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.weight(1f)
-        )
+        Crossfade(
+            targetState = month.format(MONTH_TITLE),
+            animationSpec = Motion.short(),
+            modifier = Modifier.weight(1f),
+            label = "monthTitle"
+        ) { title ->
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         IconButton(onClick = onNext, enabled = !isCurrent) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
         }
@@ -332,13 +353,16 @@ fun SpendingDonutChartCard(
     totalExpenseMinor: Long,
     selectedCategoryId: String?,
     currency: String,
-    onCategoryClick: (String) -> Unit
+    onCategoryClick: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val selectedItem = breakdown.find { it.categoryId == selectedCategoryId }
+    // The ring draws in clockwise whenever the data set changes; the figures never animate.
+    val reveal = rememberReveal(breakdown to totalExpenseMinor)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -445,7 +469,10 @@ fun SpendingDonutChartCard(
                         val topLeftOffset = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f)
                         val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
 
+                        val revealedDegrees = 360f * reveal.value
                         slices.forEach { (cat, start, sweep) ->
+                            val visibleSweep = (revealedDegrees - (start + 90f)).coerceIn(0f, sweep)
+                            if (visibleSweep <= 0f) return@forEach
                             val isSelected = cat.categoryId == selectedCategoryId
                             val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
                             val currentStroke = if (isSelected) strokeWidth * 1.25f else strokeWidth
@@ -453,7 +480,7 @@ fun SpendingDonutChartCard(
                             drawArc(
                                 color = color,
                                 startAngle = start + 0.75f,
-                                sweepAngle = (sweep - 1.5f).coerceAtLeast(0.5f),
+                                sweepAngle = (visibleSweep - 1.5f).coerceAtLeast(0.5f),
                                 useCenter = false,
                                 topLeft = topLeftOffset,
                                 size = arcSize,
@@ -588,10 +615,11 @@ fun SpendingDonutChartCard(
 @Composable
 fun TopMerchantsCard(
     merchants: List<com.teppe21.finances.feature.analytics.MerchantSpending>,
-    currency: String
+    currency: String,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {

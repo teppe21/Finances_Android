@@ -92,7 +92,7 @@ fun InfoBanner(text: String, modifier: Modifier = Modifier, icon: ImageVector = 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(12.dp)).pressClickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.secondaryContainer
     ) {
@@ -117,7 +117,8 @@ fun TransactionRow(
     transaction: Transaction,
     displayCurrency: String,
     convertedAmountMinor: Long?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val isIncome = transaction.direction == TransactionDirection.INCOME ||
         (transaction.direction == TransactionDirection.REFUND && transaction.amountMinor > 0)
@@ -150,9 +151,10 @@ fun TransactionRow(
     }
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(14.dp))
+            .pressClickable(onClick = onClick)
             .semantics { contentDescription = "$directionLabel, $title, $primaryAmount, $details" },
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface

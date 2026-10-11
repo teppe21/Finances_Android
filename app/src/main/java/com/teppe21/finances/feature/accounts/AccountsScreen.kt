@@ -1,5 +1,6 @@
 package com.teppe21.finances.feature.accounts
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,8 +54,10 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.domain.model.SupportedCurrencies
 import androidx.compose.material3.FilterChip
+import com.teppe21.finances.core.ui.Motion
 import com.teppe21.finances.domain.model.AccountType
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AccountsScreen(
     viewModel: AccountsViewModel = viewModel()
@@ -88,7 +91,7 @@ fun AccountsScreen(
             }
 
             items(accounts, key = { it.account.id }) { row ->
-                AccountCard(row = row)
+                AccountCard(row = row, modifier = Modifier.animateItemPlacement(Motion.medium()))
             }
 
             item { Spacer(modifier = Modifier.height(88.dp)) }
@@ -118,7 +121,7 @@ fun AccountsScreen(
 }
 
 @Composable
-fun AccountCard(row: AccountRow) {
+fun AccountCard(row: AccountRow, modifier: Modifier = Modifier) {
     val account = row.account
     val icon = when (account.type) {
         AccountType.CASH -> Icons.Default.Wallet
@@ -128,7 +131,7 @@ fun AccountCard(row: AccountRow) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {

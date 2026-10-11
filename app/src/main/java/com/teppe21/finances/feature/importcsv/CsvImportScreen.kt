@@ -199,6 +199,7 @@ fun CsvImportScreen(
                                     state.skipped.entries.joinToString { (reason, count) ->
                                         "$count " + when (reason) {
                                             CsvSkipReason.INVALID_DATE -> "with an unknown date format"
+                                            CsvSkipReason.AMBIGUOUS_DATE -> "with a day/month date that could be read either way"
                                             CsvSkipReason.INVALID_AMOUNT -> "with an unreadable amount"
                                             CsvSkipReason.ZERO_AMOUNT -> "with a zero amount"
                                             CsvSkipReason.UNSUPPORTED_CURRENCY -> "in an unsupported currency"

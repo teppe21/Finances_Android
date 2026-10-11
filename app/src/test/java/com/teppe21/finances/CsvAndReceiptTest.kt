@@ -67,7 +67,9 @@ class CsvAndReceiptTest {
         """.trimIndent()
         val result = CsvParser.parseText(csv)
         assertEquals(listOf("Valid"), result.rows.map { it.description })
-        assertEquals(3, result.skipped[CsvSkipReason.INVALID_DATE])
+        assertEquals(2, result.skipped[CsvSkipReason.INVALID_DATE])
+        // 03/04/2026 reads as 3 April or 4 March and nothing else in the file decides which.
+        assertEquals(1, result.skipped[CsvSkipReason.AMBIGUOUS_DATE])
         assertEquals(1, result.skipped[CsvSkipReason.INVALID_AMOUNT])
         assertEquals(1, result.skipped[CsvSkipReason.ZERO_AMOUNT])
         assertEquals(1, result.skipped[CsvSkipReason.UNSUPPORTED_CURRENCY])
@@ -98,7 +100,9 @@ class CsvAndReceiptTest {
         assertEquals(LocalDate.of(2026, 3, 28), CsvParser.parseDate("2026.03.28."))
         assertEquals(LocalDate.of(2026, 3, 28), CsvParser.parseDate("28.03.2026"))
         assertEquals(LocalDate.of(2026, 3, 28), CsvParser.parseDate("2026-03-28T10:15:00"))
-        assertNull(CsvParser.parseDate("03/28/2026"))
+        // Only month-first gives a real date, so the cell itself proves the order.
+        assertEquals(LocalDate.of(2026, 3, 28), CsvParser.parseDate("03/28/2026"))
+        assertNull(CsvParser.parseDate("03/04/2026"))
         assertNull(CsvParser.parseDate(""))
     }
 
