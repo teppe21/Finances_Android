@@ -174,5 +174,7 @@ fun statusLabel(code: NotificationStatusCode?): String = when (code) {
     NotificationStatusCode.PENDING_POSSIBLE_DUPLICATE -> "Possible duplicate, needs review"
     NotificationStatusCode.PENDING_ACCOUNT_REVIEW -> "Account unclear, needs review"
     NotificationStatusCode.PENDING_LOW_CONFIDENCE -> "Needs review"
+    NotificationStatusCode.PROCESSING_TIMEOUT -> "Not recorded: processing timed out"
+    NotificationStatusCode.PROCESSING_ERROR -> "Not recorded: processing failed"
     null -> "Unknown"
 }

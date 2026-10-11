@@ -24,7 +24,11 @@ enum class NotificationStatusCode(val parseStatus: NotificationParseStatus) {
     DUPLICATE_EXISTING_TRANSACTION(NotificationParseStatus.IGNORED),
     PENDING_POSSIBLE_DUPLICATE(NotificationParseStatus.NEEDS_REVIEW),
     PENDING_ACCOUNT_REVIEW(NotificationParseStatus.NEEDS_REVIEW),
-    PENDING_LOW_CONFIDENCE(NotificationParseStatus.NEEDS_REVIEW);
+    PENDING_LOW_CONFIDENCE(NotificationParseStatus.NEEDS_REVIEW),
+
+    /** Processing did not finish in time or threw; nothing was stored for the notification. */
+    PROCESSING_TIMEOUT(NotificationParseStatus.FAILED),
+    PROCESSING_ERROR(NotificationParseStatus.FAILED);
 
     companion object {
         fun fromName(value: String?): NotificationStatusCode? =
