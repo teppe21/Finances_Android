@@ -183,7 +183,8 @@ class ReceiptViewModel(
                         merchant = merchant,
                         categoryId = categoryId,
                         source = TransactionSource.RECEIPT,
-                        receiptId = scan?.id
+                        receiptId = scan?.id,
+                        categorySetByUser = true
                     )
                 )
             } catch (e: CancellationException) {

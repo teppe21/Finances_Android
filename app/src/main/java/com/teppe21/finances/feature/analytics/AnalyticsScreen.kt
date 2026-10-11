@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
+import com.teppe21.finances.core.theme.tabular
 import com.teppe21.finances.core.ui.InfoBanner
 import com.teppe21.finances.core.ui.Motion
 import com.teppe21.finances.core.ui.rememberReveal
@@ -168,16 +169,14 @@ fun AnalyticsScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.transfer_volume), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            text = CurrencyFormatter.format(state.stats.transfersMinor, state.currency),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
+            }
+        }
+
+        // Transfers stay visible but apart: they are never income, spending or a merchant.
+        if (state.stats.transferCount + state.stats.personalCount > 0) {
+            item(key = "transfers") {
+                TransfersCard(stats = state.stats, currency = state.currency, modifier = Modifier.animateItemPlacement(Motion.medium()))
             }
         }
 
@@ -740,4 +739,39 @@ fun CustomDateRangeDialog(
             }
         }
     )
+}
+
+/** Own-account moves and money exchanged with people, kept out of every spending figure. */
+@Composable
+private fun TransfersCard(stats: com.teppe21.finances.domain.model.FinancialStats, currency: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.analytics_transfers_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                stringResource(R.string.analytics_transfers_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (stats.transferCount > 0) {
+                TransferLine(stringResource(R.string.analytics_own_transfers), CurrencyFormatter.format(stats.transfersMinor, currency))
+            }
+            if (stats.personalCount > 0) {
+                TransferLine(stringResource(R.string.analytics_people_sent), CurrencyFormatter.format(stats.personalSentMinor, currency))
+                TransferLine(stringResource(R.string.analytics_people_received), CurrencyFormatter.format(stats.personalReceivedMinor, currency))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransferLine(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        Text(value, style = MaterialTheme.typography.bodyLarge.tabular(), fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+    }
 }

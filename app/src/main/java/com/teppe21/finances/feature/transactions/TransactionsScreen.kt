@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
+import com.teppe21.finances.feature.categories.CategorizeDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -96,6 +97,7 @@ fun TransactionsScreen(
     var showSortModal by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
+    var categorizing by remember { mutableStateOf<Transaction?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -345,9 +347,25 @@ fun TransactionsScreen(
                     categoryName = state.categories.firstOrNull { it.id == selected.categoryId }?.displayName() ?: "Other / Uncategorized",
                     accountName = state.accounts.firstOrNull { it.id == selected.accountId }?.getDisplayName() ?: "Not assigned",
                     onDelete = { transactionToDelete = selected },
+                    onChangeCategory = { categorizing = selected },
                     onClose = { viewModel.selectTransaction(null) }
                 )
             }
+        }
+
+        categorizing?.let { tx ->
+            CategorizeDialog(
+                title = tx.merchant ?: tx.description,
+                categories = state.categories,
+                initialCategoryId = tx.categoryId,
+                suggestedKeyword = (tx.merchant ?: tx.description).trim().lowercase(),
+                offerRule = true,
+                onDismiss = { categorizing = null },
+                onApply = { categoryId, keyword ->
+                    categorizing = null
+                    viewModel.changeCategory(tx, categoryId, keyword)
+                }
+            )
         }
 
         // Add Transaction Modal
@@ -400,6 +418,7 @@ fun TransactionDetailContent(
     categoryName: String,
     accountName: String,
     onDelete: () -> Unit,
+    onChangeCategory: (() -> Unit)? = null,
     onClose: () -> Unit
 ) {
     Column(
@@ -440,7 +459,23 @@ fun TransactionDetailContent(
         }
 
         DetailRow(label = stringResource(R.string.date), value = DateFormatter.format(transaction.date))
-        DetailRow(label = stringResource(R.string.category), value = categoryName)
+        if (onChangeCategory != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.category), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(categoryName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    if (transaction.categorySetByUser) {
+                        Text(stringResource(R.string.category_set_by_you), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                TextButton(onClick = onChangeCategory) { Text(stringResource(R.string.change_category)) }
+            }
+        } else {
+            DetailRow(label = stringResource(R.string.category), value = categoryName)
+        }
         DetailRow(label = "Account", value = accountName)
         DetailRow(label = stringResource(R.string.source), value = transaction.source.getDisplayName())
         if (transaction.pending) {

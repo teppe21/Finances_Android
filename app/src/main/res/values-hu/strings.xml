@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Import summary -->
+    <string name="import_done_title">Az importálás kész</string>
+    <string name="import_summary_imported">Importálva</string>
+    <string name="import_summary_skipped">Kihagyva</string>
+    <string name="import_summary_skipped_detail">Már importálva: %1$d · nem olvasható vagy nem teljesült: %2$d</string>
+    <string name="import_summary_categorized">Kategorizálva</string>
+    <string name="import_summary_uncategorized">Még kategorizálatlan</string>
+    <string name="import_summary_transfers">Felismert átutalások</string>
+    <string name="import_summary_transfers_detail">Saját számlák között: %1$d · más személyekkel: %2$d</string>
+    <string name="import_review_uncategorized">Kategorizálatlanok áttekintése</string>
+    <string name="import_view_transactions">Tranzakciók megtekintése</string>
+    <string name="import_another">Másik fájl importálása</string>
+    <string name="import_already_imported">Ebbe a számlába már importálva: %1$d</string>
+    <string name="import_skipped_intro">Kihagyott sorok, mert nem olvashatók pontosan:</string>
+    <string name="import_encoding">Karakterkódolás: %1$s</string>
+    <string name="import_error_no_rows">Nem található olvasható tranzakciósor.</string>
+    <string name="import_error_rows_unreadable">Nem olvasható sorok: %1$d.</string>
+    <string name="import_error_file">A fájl nem olvasható CSV-ként.</string>
+    <string name="skip_invalid_date">ismeretlen dátumformátum: %1$d</string>
+    <string name="skip_ambiguous_date">kétféleképpen olvasható nap/hónap: %1$d</string>
+    <string name="skip_invalid_amount">olvashatatlan összeg: %1$d</string>
+    <string name="skip_zero_amount">nulla összeg: %1$d</string>
+    <string name="skip_unsupported_currency">nem támogatott pénznem: %1$d</string>
+    <string name="skip_too_few_columns">túl kevés oszlop: %1$d</string>
+    <string name="skip_not_completed">a bank visszavonta vagy elutasította: %1$d</string>
+
+    <!-- Uncategorized and rules -->
+    <string name="uncategorized_title">Kategorizálatlan</string>
+    <string name="more_uncategorized_sub">A szabályok által fel nem ismert tranzakciók rendezése</string>
+    <string name="uncategorized_intro">Azok a tranzakciók, amelyeket egyik szabály sem ismert fel, kereskedőnként csoportosítva. Válassz egyszer kategóriát, a többit egy szabály is elrendezheti.</string>
+    <string name="uncategorized_empty_title">Nincs mit rendezni</string>
+    <string name="uncategorized_empty_desc">Minden tranzakciónak van kategóriája.</string>
+    <string name="reapply_rules">Szabályok újraalkalmazása</string>
+    <string name="reapply_rules_desc">A szabályokat a meglévő tranzakciókra is lefuttatja. Az általad választott kategóriák sosem változnak.</string>
+    <string name="categorize_title">„%1$s” kategorizálása</string>
+    <string name="categorize_create_rule">Megjegyzés a jövőre</string>
+    <string name="categorize_create_rule_desc">Szabályt hoz létre ehhez a kulcsszóhoz, és minden egyező tranzakcióra alkalmazza.</string>
+    <string name="categorize_keyword">Kulcsszó</string>
+    <string name="change_category">Módosítás</string>
+    <string name="category_set_by_you">Te választottad</string>
+    <plurals name="transaction_count">
+        <item quantity="one">%1$d tranzakció</item>
+        <item quantity="other">%1$d tranzakció</item>
+    </plurals>
+    <plurals name="recategorize_updated">
+        <item quantity="one">%1$d tranzakció frissítve</item>
+        <item quantity="other">%1$d tranzakció frissítve</item>
+    </plurals>
+    <plurals name="recategorize_rule_saved">
+        <item quantity="one">Szabály mentve, %1$d tranzakció frissítve</item>
+        <item quantity="other">Szabály mentve, %1$d tranzakció frissítve</item>
+    </plurals>
+
+    <!-- Analytics: transfers -->
+    <string name="analytics_transfers_title">Átutalások</string>
+    <string name="analytics_transfers_desc">Nem számít bevételnek vagy költésnek.</string>
+    <string name="analytics_own_transfers">Saját számlák és készpénz között</string>
+    <string name="analytics_people_sent">Másoknak küldve</string>
+    <string name="analytics_people_received">Másoktól kapva</string>
+</resources>

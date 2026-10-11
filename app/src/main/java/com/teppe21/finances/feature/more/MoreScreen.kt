@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Repeat
@@ -51,7 +52,8 @@ fun MoreScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToBudgets: () -> Unit,
     onNavigateToRecurring: () -> Unit,
-    onNavigateToCategories: () -> Unit
+    onNavigateToCategories: () -> Unit,
+    onNavigateToUncategorized: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -121,6 +123,15 @@ fun MoreScreen(
                 subtitle = stringResource(R.string.more_categories_sub),
                 icon = Icons.Default.Category,
                 onClick = onNavigateToCategories
+            )
+        }
+
+        item {
+            MoreNavigationItem(
+                title = stringResource(R.string.uncategorized_title),
+                subtitle = stringResource(R.string.more_uncategorized_sub),
+                icon = Icons.AutoMirrored.Filled.Label,
+                onClick = onNavigateToUncategorized
             )
         }
 

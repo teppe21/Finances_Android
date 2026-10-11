@@ -56,7 +56,9 @@ class TransactionsViewModel(
     private val ratesFlow: Flow<RateTable>,
     private val recurringUseCase: DetectRecurringTransactionsUseCase,
     private val ingest: suspend (IngestionInput) -> Unit,
-    private val delete: suspend (Transaction) -> Unit
+    private val delete: suspend (Transaction) -> Unit,
+    private val recategorize: suspend (List<Transaction>, String) -> Unit = { _, _ -> },
+    private val createRuleAndApply: suspend (categoryId: String, keyword: String) -> Set<String>? = { _, _ -> null }
 ) : ViewModel() {
 
     /** Used by the default `viewModel()` factory: wires the app-level repositories. */
@@ -70,7 +72,9 @@ class TransactionsViewModel(
         ratesFlow = app.exchangeRateRepository.tableFlow,
         recurringUseCase = app.detectRecurringUseCase,
         ingest = { app.ingestTransactionUseCase.execute(it) },
-        delete = { app.transactionRepository.deleteTransaction(it) }
+        delete = { app.transactionRepository.deleteTransaction(it) },
+        recategorize = { txs, c -> app.recategorizer.setCategory(txs, c) },
+        createRuleAndApply = { c, k -> app.recategorizer.createRuleAndApply(c, k) }
     )
 
     private val _selectedPeriod = MutableStateFlow("this_month")
@@ -198,7 +202,8 @@ class TransactionsViewModel(
             searchQuery = filters.query,
             onlyRecurring = filters.onlyRecurring,
             sortOrder = filters.sortOrder,
-            selectedTransaction = selectedTx,
+            // The sheet shows the stored row, so a category change appears at once.
+            selectedTransaction = selectedTx?.let { s -> allTx.firstOrNull { it.id == s.id } ?: s },
             currency = targetCurrency
         )
     }.stateIn(
@@ -235,12 +240,24 @@ class TransactionsViewModel(
                     description = description,
                     merchant = merchant,
                     categoryId = categoryId,
-                    source = TransactionSource.MANUAL
+                    source = TransactionSource.MANUAL,
+                    categorySetByUser = categoryId != null
                 )
             )
         }
     }
 
+
+    /**
+     * The user puts [tx] in [categoryId]. With a [ruleKeyword] the choice also becomes a rule
+     * applied to every matching transaction whose category the user has not set.
+     */
+    fun changeCategory(tx: Transaction, categoryId: String, ruleKeyword: String?) {
+        viewModelScope.launch {
+            ruleKeyword?.let { createRuleAndApply(categoryId, it) }
+            recategorize(listOf(tx), categoryId)
+        }
+    }
 
     fun deleteTransaction(tx: Transaction) {
         viewModelScope.launch {

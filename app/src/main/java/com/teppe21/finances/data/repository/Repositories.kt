@@ -81,6 +81,10 @@ class TransactionRepository(private val transactionDao: TransactionDao) : Transa
         transactionDao.update(transaction.toEntity())
     }
 
+    suspend fun updateAll(transactions: List<Transaction>) {
+        transactionDao.updateAll(transactions.map { it.toEntity() })
+    }
+
     suspend fun deleteTransaction(transaction: Transaction) {
         transactionDao.delete(transaction.toEntity())
     }
@@ -177,11 +181,37 @@ class CategoryRepository(
             categoryId = categoryId,
             pattern = trimmed,
             matchType = "contains",
-            priority = 50, // User-defined keywords have higher priority than built-in rules (10)
+            priority = CategoryRule.PRIORITY_USER, // user keywords beat every built-in rule
             isActive = true
         )
         categoryRuleDao.insert(rule.toEntity())
         return true
+    }
+
+    /**
+     * A user rule for [keyword] in [categoryId] (priority above every built-in rule). Returns
+     * the existing rule when the same keyword is already in that category, null when blank.
+     */
+    suspend fun addUserRule(categoryId: String, keyword: String): CategoryRule? {
+        val trimmed = keyword.trim().lowercase()
+        if (trimmed.isBlank()) return null
+        categoryRuleDao.getRulesForCategory(categoryId)
+            .firstOrNull { it.pattern.trim().lowercase() == trimmed }
+            ?.let { existing ->
+                // The user asked for it explicitly, so a built-in keyword becomes a user rule.
+                val promoted = existing.copy(priority = maxOf(existing.priority, CategoryRule.PRIORITY_USER))
+                if (promoted != existing) categoryRuleDao.insert(promoted)
+                return promoted.toDomain()
+            }
+        val rule = CategoryRule(
+            id = "rule_${categoryId}_${System.currentTimeMillis()}",
+            categoryId = categoryId,
+            pattern = trimmed,
+            matchType = "contains",
+            priority = CategoryRule.PRIORITY_USER
+        )
+        categoryRuleDao.insert(rule.toEntity())
+        return rule
     }
 
     suspend fun insertRule(rule: CategoryRule) {
@@ -263,7 +293,8 @@ fun TransactionEntity.toDomain() = Transaction(
     importedAt = importedAt,
     createdAt = createdAt,
     updatedAt = updatedAt,
-    cardLast4 = cardLast4
+    cardLast4 = cardLast4,
+    categorySetByUser = categorySetByUser
 )
 
 fun Transaction.toEntity() = TransactionEntity(
@@ -291,7 +322,8 @@ fun Transaction.toEntity() = TransactionEntity(
     importedAt = importedAt,
     createdAt = createdAt,
     updatedAt = updatedAt,
-    cardLast4 = cardLast4
+    cardLast4 = cardLast4,
+    categorySetByUser = categorySetByUser
 )
 
 fun AccountEntity.toDomain() = Account(

@@ -60,6 +60,9 @@ interface TransactionDao {
     suspend fun reassignAccount(oldAccountId: String, newAccountId: String, updatedAt: java.time.Instant)
 
     @Update
+    suspend fun updateAll(transactions: List<TransactionEntity>)
+
+    @Update
     suspend fun update(transaction: TransactionEntity)
 
     @Delete

@@ -23,6 +23,8 @@ import com.teppe21.finances.data.local.entity.ReceiptEntity
 import com.teppe21.finances.data.local.entity.RecurringRuleEntity
 import com.teppe21.finances.data.local.entity.TransactionEntity
 import com.teppe21.finances.domain.model.AccountType
+import com.teppe21.finances.domain.model.BuiltIns
+import com.teppe21.finances.data.repository.toEntity
 import android.util.Log
 import androidx.room.withTransaction
 import kotlinx.coroutines.CancellationException
@@ -55,7 +57,7 @@ import androidx.room.migration.Migration
         WatchlistEntity::class,
         StockQuoteEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -188,7 +190,44 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        /**
+         * v6: transfer kinds and categorization.
+         * - `transactions.categorySetByUser`, set for manual entries and receipts (the user picked
+         *   their category), so re-applying rules never overwrites them.
+         * - The new built-in categories and keyword rules, inserted only where missing.
+         * - Schema-5 transfer rules re-pointed and re-prioritized by id (rules can be deleted in
+         *   the app but not edited, so a row with that id is still the original).
+         * Existing transactions keep their category and direction until the user re-applies rules.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `categorySetByUser` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `transactions` SET `categorySetByUser` = 1 WHERE `source` IN ('MANUAL', 'RECEIPT')")
+                val now = Instant.now().toEpochMilli()
+                for (c in BuiltIns.categories.filter { it.id in BuiltIns.SCHEMA_6_CATEGORY_IDS }) {
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO `categories` (`id`, `name`, `icon`, `color`, `isIncome`, `isDefault`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+                        arrayOf(c.id, c.name, c.icon, c.color, if (c.isIncome) 1 else 0, now, now)
+                    )
+                }
+                // The own-account category keeps its id but gets a clearer default name, unless renamed.
+                db.execSQL("UPDATE `categories` SET `name` = 'Between own accounts' WHERE `id` = 'transfers' AND `name` = 'Transfers'")
+                for (r in BuiltIns.schema6Rules) {
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO `category_rules` (`id`, `categoryId`, `pattern`, `matchType`, `priority`, `isActive`, `createdAt`) VALUES (?, ?, ?, ?, ?, 1, ?)",
+                        arrayOf(r.id, r.categoryId, r.pattern, r.matchType, r.priority, now)
+                    )
+                }
+                for (r in BuiltIns.schema6Updates) {
+                    db.execSQL(
+                        "UPDATE `category_rules` SET `categoryId` = ?, `priority` = ? WHERE `id` = ?",
+                        arrayOf(r.categoryId, r.priority, r.id)
+                    )
+                }
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -250,45 +289,11 @@ private suspend fun insertMissingDefaults(db: AppDatabase) {
     )
     db.accountDao().insertAllIfAbsent(accounts)
 
-    // 2. Prepopulate default categories
-    val categories = listOf(
-        CategoryEntity("food", "Food & Groceries", "shopping-cart", "#10B981", false, true, now, now),
-        CategoryEntity("dining", "Dining & Restaurants", "utensils", "#F59E0B", false, true, now, now),
-        CategoryEntity("transport", "Transport & Fuel", "car", "#EF4444", false, true, now, now),
-        CategoryEntity("subscriptions", "Subscriptions", "gamepad-2", "#0284C7", false, true, now, now),
-        CategoryEntity("housing", "Housing & Utilities", "home", "#3B82F6", false, true, now, now),
-        CategoryEntity("entertainment", "Entertainment", "film", "#D97706", false, true, now, now),
-        CategoryEntity("savings", "Savings", "piggy-bank", "#06B6D4", false, true, now, now),
-        CategoryEntity("income", "Income", "wallet", "#10B981", true, true, now, now),
-        CategoryEntity("health", "Health & Pharmacy", "heart-pulse", "#14B8A6", false, true, now, now),
-        CategoryEntity("shopping", "Shopping", "shopping-bag", "#F97316", false, true, now, now),
-        CategoryEntity("transfers", "Transfers", "arrow-left-right", "#6366F1", false, true, now, now),
-        CategoryEntity("other", "Other / Uncategorized", "help-circle", "#6B7280", false, true, now, now)
-    )
+    // 2. Default categories and 3. keyword rules, from the shared built-in definitions.
+    val categories = BuiltIns.categories.map {
+        CategoryEntity(it.id, it.name, it.icon, it.color, it.isIncome, true, now, now)
+    }
     db.categoryDao().insertAllIfAbsent(categories)
-
-    // 3. Prepopulate default keyword rules
-    val rules = mutableListOf<CategoryRuleEntity>()
-
-    listOf("lidl", "spar", "interspar", "aldi", "tesco", "auchan", "penny", "coop", "cba", "pékség", "lipóti", "príma").forEachIndexed { i, kw ->
-        rules.add(CategoryRuleEntity("rule_food_$i", "food", kw, "contains", 10, true, now))
-    }
-    listOf("wolt", "foodora", "mcdonalds", "kfc", "burger king", "starbucks", "étterem", "kávézó", "pizza", "bistro").forEachIndexed { i, kw ->
-        rules.add(CategoryRuleEntity("rule_dining_$i", "dining", kw, "contains", 10, true, now))
-    }
-    listOf("mol", "shell", "omv", "orlen", "lukoil", "bkk", "máv", "autópálya", "parkolás", "uber").forEachIndexed { i, kw ->
-        rules.add(CategoryRuleEntity("rule_trans_$i", "transport", kw, "contains", 10, true, now))
-    }
-    listOf("netflix", "spotify", "google", "apple", "youtube", "patreon", "steam", "disney", "hbo", "chatgpt").forEachIndexed { i, kw ->
-        rules.add(CategoryRuleEntity("rule_sub_$i", "subscriptions", kw, "contains", 10, true, now))
-    }
-    listOf("fizetés", "munkabér", "bér", "salary", "payroll", "jóváírás").forEachIndexed { i, kw ->
-        rules.add(CategoryRuleEntity("rule_inc_$i", "income", kw, "contains", 10, true, now))
-    }
-    listOf("átutalás", "utalás", "átutalt", "átvezetés", "transfer", "pénzküldés", "bank transfer").forEachIndexed { i, kw ->
-        rules.add(CategoryRuleEntity("rule_transfer_$i", "transfers", kw, "contains", 10, true, now))
-    }
-
-    db.categoryRuleDao().insertAllIfAbsent(rules)
+    db.categoryRuleDao().insertAllIfAbsent(BuiltIns.allRules.map { it.copy(createdAt = now).toEntity() })
 }
 

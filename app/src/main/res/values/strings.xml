@@ -90,7 +90,6 @@
     <string name="net_balance">Net (income minus expenses)</string>
     <string name="avg_expense">Average expense</string>
     <string name="largest_expense">Largest expense</string>
-    <string name="transfer_volume">Transfers</string>
     <string name="period_3_months">Last 3 months</string>
     <string name="period_6_months">Last 6 months</string>
     <string name="period_this_year">This year</string>
@@ -140,4 +139,64 @@
     <!-- Settings -->
     <string name="settings">Settings</string>
     <string name="currency">Currency</string>
+
+    <!-- Import summary -->
+    <string name="import_done_title">Import finished</string>
+    <string name="import_summary_imported">Imported</string>
+    <string name="import_summary_skipped">Skipped</string>
+    <string name="import_summary_skipped_detail">Already imported: %1$d · unreadable or not completed: %2$d</string>
+    <string name="import_summary_categorized">Categorized</string>
+    <string name="import_summary_uncategorized">Still uncategorized</string>
+    <string name="import_summary_transfers">Transfers detected</string>
+    <string name="import_summary_transfers_detail">Between own accounts: %1$d · with people: %2$d</string>
+    <string name="import_review_uncategorized">Review uncategorized</string>
+    <string name="import_view_transactions">View transactions</string>
+    <string name="import_another">Import another file</string>
+    <string name="import_already_imported">Already imported into this account: %1$d</string>
+    <string name="import_skipped_intro">Rows skipped because they could not be read exactly:</string>
+    <string name="import_encoding">Text encoding: %1$s</string>
+    <string name="import_error_no_rows">No readable transaction rows were found.</string>
+    <string name="import_error_rows_unreadable">Unreadable rows: %1$d.</string>
+    <string name="import_error_file">The file could not be read as CSV.</string>
+    <string name="skip_invalid_date">unknown date format: %1$d</string>
+    <string name="skip_ambiguous_date">day/month date that reads either way: %1$d</string>
+    <string name="skip_invalid_amount">unreadable amount: %1$d</string>
+    <string name="skip_zero_amount">zero amount: %1$d</string>
+    <string name="skip_unsupported_currency">unsupported currency: %1$d</string>
+    <string name="skip_too_few_columns">too few columns: %1$d</string>
+    <string name="skip_not_completed">reverted or declined by the bank: %1$d</string>
+
+    <!-- Uncategorized and rules -->
+    <string name="uncategorized_title">Uncategorized</string>
+    <string name="more_uncategorized_sub">Sort the transactions no rule recognized</string>
+    <string name="uncategorized_intro">Transactions no rule recognized, grouped by merchant. Choose a category once and a rule can sort the rest.</string>
+    <string name="uncategorized_empty_title">Nothing left to sort</string>
+    <string name="uncategorized_empty_desc">Every transaction has a category.</string>
+    <string name="reapply_rules">Re-apply rules</string>
+    <string name="reapply_rules_desc">Runs the rules over existing transactions. Categories you chose yourself are never changed.</string>
+    <string name="categorize_title">Categorize “%1$s”</string>
+    <string name="categorize_create_rule">Remember for the future</string>
+    <string name="categorize_create_rule_desc">Creates a rule for this keyword and applies it to every matching transaction.</string>
+    <string name="categorize_keyword">Keyword</string>
+    <string name="change_category">Change</string>
+    <string name="category_set_by_you">Chosen by you</string>
+    <plurals name="transaction_count">
+        <item quantity="one">%1$d transaction</item>
+        <item quantity="other">%1$d transactions</item>
+    </plurals>
+    <plurals name="recategorize_updated">
+        <item quantity="one">%1$d transaction updated</item>
+        <item quantity="other">%1$d transactions updated</item>
+    </plurals>
+    <plurals name="recategorize_rule_saved">
+        <item quantity="one">Rule saved, %1$d transaction updated</item>
+        <item quantity="other">Rule saved, %1$d transactions updated</item>
+    </plurals>
+
+    <!-- Analytics: transfers -->
+    <string name="analytics_transfers_title">Transfers</string>
+    <string name="analytics_transfers_desc">Not counted as income or spending.</string>
+    <string name="analytics_own_transfers">Between own accounts and cash</string>
+    <string name="analytics_people_sent">Sent to people</string>
+    <string name="analytics_people_received">Received from people</string>
 </resources>

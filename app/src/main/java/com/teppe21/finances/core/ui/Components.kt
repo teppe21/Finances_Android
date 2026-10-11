@@ -122,7 +122,7 @@ fun TransactionRow(
 ) {
     val isIncome = transaction.direction == TransactionDirection.INCOME ||
         (transaction.direction == TransactionDirection.REFUND && transaction.amountMinor > 0)
-    val isTransfer = transaction.direction == TransactionDirection.TRANSFER
+    val isTransfer = transaction.direction.isTransfer
     val sameCurrency = displayCurrency.equals(transaction.currency, ignoreCase = true)
     val title = transaction.merchant?.ifBlank { null } ?: transaction.description
 
@@ -145,6 +145,7 @@ fun TransactionRow(
         else -> MaterialTheme.finances.expense
     }
     val directionLabel = when {
+        transaction.direction == TransactionDirection.PERSONAL_TRANSFER -> "Personal transfer"
         isTransfer -> "Transfer"
         isIncome -> "Income"
         else -> "Expense"

@@ -15,6 +15,7 @@ import com.teppe21.finances.domain.usecase.CategorizeTransactionUseCase
 import com.teppe21.finances.domain.usecase.DetectRecurringTransactionsUseCase
 import com.teppe21.finances.domain.usecase.DuplicateDetector
 import com.teppe21.finances.domain.usecase.IngestTransactionUseCase
+import com.teppe21.finances.domain.usecase.Recategorizer
 import com.teppe21.finances.domain.usecase.ProcessNotificationUseCase
 import com.teppe21.finances.domain.usecase.WalletBankPairPolicy
 import com.teppe21.finances.native.notification.parsing.NotificationRecognizer
@@ -59,6 +60,8 @@ class FinancesApp : Application() {
         private set
     lateinit var detectRecurringUseCase: DetectRecurringTransactionsUseCase
         private set
+    lateinit var recategorizer: Recategorizer
+        private set
 
     val appLock = AppLockController()
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -86,6 +89,12 @@ class FinancesApp : Application() {
             rules = categoryRepository,
             detector = DuplicateDetector(WalletBankPairPolicy),
             categorizeUseCase = CategorizeTransactionUseCase()
+        )
+        recategorizer = Recategorizer(
+            transactions = { transactionRepository.getAllTransactions() },
+            updateAll = { transactionRepository.updateAll(it) },
+            rules = categoryRepository,
+            addUserRule = { categoryId, keyword -> categoryRepository.addUserRule(categoryId, keyword) }
         )
         processNotificationUseCase = ProcessNotificationUseCase(
             recognizer = NotificationRecognizer(),

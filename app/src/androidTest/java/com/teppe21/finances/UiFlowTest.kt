@@ -357,3 +357,56 @@ class NavigationUiTest {
         rule.onNodeWithText(label(R.string.nav_home)).assertIsDisplayed()
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class UncategorizedFlowUiTest {
+
+    @get:Rule
+    val rule = createComposeRule()
+
+    private val categories = listOf(Category("food", "Food & Groceries"), Category("electronics", "Electronics"), Category("other", "Other / Uncategorized"))
+
+    private fun row(id: String, merchant: String, amount: Long) = Transaction(
+        id = id, accountId = "acc", date = LocalDate.of(2026, 9, 1), amountMinor = amount, currency = "HUF",
+        direction = TransactionDirection.EXPENSE, description = merchant, merchant = merchant, categoryId = "other",
+        source = TransactionSource.CSV, fingerprint = "fp_$id", createdAt = Instant.EPOCH, updatedAt = Instant.EPOCH
+    )
+
+    @Test
+    fun aGroupIsSortedWithOneChoiceAndCanBecomeARule() {
+        val transactions = MutableStateFlow(listOf(row("a", "Sample Gadget Shop", -9_990_00), row("b", "SAMPLE GADGET SHOP", -4_990_00), row("c", "Corner Store", -1_00)))
+        var ruleRequest: Pair<String, String>? = null
+        var setRequest: Pair<Set<String>, String>? = null
+        val vm = com.teppe21.finances.feature.categories.UncategorizedViewModel(
+            transactionsFlow = transactions,
+            categoriesFlow = MutableStateFlow(categories),
+            reapplyAll = { 0 },
+            createRuleAndApply = { c, k -> ruleRequest = c to k; setOf("a", "b") },
+            setCategory = { txs, c -> setRequest = txs.map { it.id }.toSet() to c }
+        )
+        rule.setContent { FinancesTheme(darkTheme = false) { com.teppe21.finances.feature.categories.UncategorizedScreen(vm) } }
+
+        rule.onNodeWithText("Sample Gadget Shop").assertIsDisplayed()
+        rule.onNodeWithText("2 transactions").assertIsDisplayed()
+        rule.onNodeWithText("Sample Gadget Shop").performClick()
+        rule.onNodeWithText("Apply").assertIsNotEnabled()
+        rule.onNodeWithText("Electronics").performClick()
+        rule.onNodeWithText("Apply").assertIsEnabled().performClick()
+        rule.waitForIdle()
+
+        assertEquals("electronics" to "sample gadget shop", ruleRequest)
+        assertEquals(setOf("a", "b") to "electronics", setRequest)
+        rule.onNodeWithText("Rule saved, 2 transactions updated").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyQueueSaysSo() {
+        val vm = com.teppe21.finances.feature.categories.UncategorizedViewModel(
+            MutableStateFlow(emptyList()), MutableStateFlow(categories), { 3 }, { _, _ -> null }, { _, _ -> }
+        )
+        rule.setContent { FinancesTheme(darkTheme = false) { com.teppe21.finances.feature.categories.UncategorizedScreen(vm) } }
+        rule.onNodeWithText("Nothing left to sort").assertIsDisplayed()
+        rule.onNodeWithText("Re-apply rules").performClick()
+        rule.onNodeWithText("3 transactions updated").assertIsDisplayed()
+    }
+}

@@ -33,7 +33,13 @@ data class IngestionInput(
     /** Caller-supplied deterministic fingerprint; a unique one is generated when null. */
     val fingerprint: String? = null,
     /** Card issuer reported by a wallet notification, used by the source pair policy. */
-    val issuerHint: String? = null
+    val issuerHint: String? = null,
+    /** The bank's own transaction type from a CSV file, used by the rules. */
+    val bankType: String? = null,
+    /** A built-in category id named by the file's own category column. */
+    val bankCategoryId: String? = null,
+    /** [categoryId] was chosen by the user; rules will never change it. */
+    val categorySetByUser: Boolean = false
 )
 
 data class IngestionOutput(
@@ -97,11 +103,28 @@ class IngestTransactionUseCase(
             return IngestionOutput(DeduplicationStatus.EXACT_DUPLICATE, null, check.matchedTransactionId, check.reason)
         }
 
-        val categoryId = input.categoryId ?: when (input.direction) {
-            TransactionDirection.TRANSFER -> "transfers"
-            TransactionDirection.INCOME -> categorizeUseCase.execute(input.description, cleanMerchant, rules.activeRules(), fallback = "income")
-            else -> categorizeUseCase.execute(input.description, cleanMerchant, rules.activeRules())
+        // A category given by the caller is the user's choice and keeps the caller's direction.
+        // Otherwise the rules pick the category, and the category decides whether this is a transfer.
+        val categoryId: String
+        val direction: TransactionDirection
+        if (input.categoryId != null) {
+            categoryId = input.categoryId
+            direction = input.direction
+        } else {
+            val c = categorizeUseCase.classify(
+                ClassificationInput(input.description, cleanMerchant, input.bankType, input.bankCategoryId, amount),
+                rules.activeRules()
+            )
+            categoryId = c.categoryId
+            direction = when {
+                c.direction.isTransfer -> c.direction
+                input.direction == TransactionDirection.REFUND -> TransactionDirection.REFUND
+                else -> c.direction
+            }
         }
+        // A person's name or "Exchanged to EUR" is not a merchant.
+        val merchant = if (direction.isTransfer && input.categoryId == null) null else cleanMerchant
+        val transferId = if (direction == TransactionDirection.TRANSFER) findTransferLeg(input, amount, currency) else null
 
         val possibleDuplicate = check.status == DeduplicationStatus.POSSIBLE_DUPLICATE
         val now = clock()
@@ -112,10 +135,12 @@ class IngestTransactionUseCase(
             valueDate = input.occurredAt ?: now,
             amountMinor = amount,
             currency = currency,
-            direction = input.direction,
+            direction = direction,
             description = input.description.trim().ifBlank { cleanMerchant ?: "Transaction" },
-            merchant = cleanMerchant,
+            merchant = merchant,
             categoryId = categoryId,
+            categorySetByUser = input.categorySetByUser && input.categoryId != null,
+            transferId = transferId?.second,
             source = input.source,
             sourceAppPackage = input.sourceAppPackage,
             externalId = input.externalId?.takeIf { it.isNotBlank() },
@@ -136,7 +161,25 @@ class IngestTransactionUseCase(
             val winner = store.findByFingerprint(fingerprint)
             return IngestionOutput(DeduplicationStatus.EXACT_DUPLICATE, null, winner?.id, DuplicateReason.FINGERPRINT)
         }
+        transferId?.let { (leg, id) -> store.update(leg.copy(transferId = id, updatedAt = now)) }
         return IngestionOutput(check.status, transaction, check.matchedTransactionId, check.reason)
+    }
+
+    /**
+     * The other leg of a move between two of the user's accounts: an unlinked own-account
+     * transfer in another account with the opposite amount in the same currency, at most
+     * [TRANSFER_LEG_DAYS] days apart (the closest wins). Returns it with a new shared id.
+     * Exchanges have two currencies and are not linked; they are excluded from totals anyway.
+     */
+    private suspend fun findTransferLeg(input: IngestionInput, amount: Long, currency: String): Pair<Transaction, String>? {
+        if (input.accountId.isBlank() || amount == 0L) return null
+        val from = input.date.minusDays(TRANSFER_LEG_DAYS)
+        val to = input.date.plusDays(TRANSFER_LEG_DAYS)
+        val leg = store.findSameAmount(-amount, currency, from, to)
+            .filter { it.direction == TransactionDirection.TRANSFER && it.transferId == null && it.accountId.isNotBlank() && it.accountId != input.accountId }
+            .minByOrNull { abs(it.date.toEpochDay() - input.date.toEpochDay()) }
+            ?: return null
+        return leg to UUID.randomUUID().toString()
     }
 
     /** The first notification may lack a merchant or card number that the second one has. */
@@ -156,6 +199,8 @@ class IngestTransactionUseCase(
     }
 
     companion object {
+        const val TRANSFER_LEG_DAYS = 3L
+
         /** Signed amount convention: money leaving the account is negative. */
         fun normalizedAmount(direction: TransactionDirection, amountMinor: Long): Long = when (direction) {
             TransactionDirection.EXPENSE -> -abs(amountMinor)

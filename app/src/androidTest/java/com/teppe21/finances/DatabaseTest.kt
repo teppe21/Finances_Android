@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.teppe21.finances.domain.model.BuiltIns
 import com.teppe21.finances.data.local.database.AppDatabase
 import com.teppe21.finances.data.local.database.deleteAllFinancialData
 import com.teppe21.finances.data.local.database.prepopulateDefaults
@@ -89,7 +90,7 @@ class DatabaseTest {
         val categories = db.categoryDao().getAll().size
         val rules = db.categoryRuleDao().getAll().size
         assertEquals(4, accounts)
-        assertEquals(12, categories)
+        assertEquals(BuiltIns.categories.size, categories)
         assertTrue(rules > 40)
 
         prepopulateDefaults(db)
@@ -133,7 +134,7 @@ class DatabaseTest {
                 while (seeded.accountDao().getAll().size < 4) delay(50)
             }
             assertEquals(4, seeded.accountDao().getAll().size)
-            assertEquals(12, seeded.categoryDao().getAll().size)
+            assertEquals(BuiltIns.categories.size, seeded.categoryDao().getAll().size)
         } finally {
             seeded.close()
         }
@@ -155,7 +156,7 @@ class DatabaseTest {
 
         val first = open()
         try {
-            withTimeout(10_000) { while (first.categoryDao().getAll().size < 12) delay(50) }
+            withTimeout(10_000) { while (first.categoryDao().getAll().size < BuiltIns.categories.size) delay(50) }
             first.categoryDao().deleteById("entertainment")
             assertNull(first.categoryDao().getById("entertainment"))
         } finally {
@@ -166,7 +167,7 @@ class DatabaseTest {
         try {
             delay(500) // onCreate must not run again, so there is nothing to wait for
             assertNull("removed default is not resurrected", second.categoryDao().getById("entertainment"))
-            assertEquals(11, second.categoryDao().getAll().size)
+            assertEquals(BuiltIns.categories.size - 1, second.categoryDao().getAll().size)
         } finally {
             second.close()
             context.deleteDatabase(name)
@@ -183,7 +184,7 @@ class DatabaseTest {
 
         assertTrue(db.transactionDao().getAll().isEmpty())
         assertEquals(4, db.accountDao().getAll().size)
-        assertEquals(12, db.categoryDao().getAll().size)
+        assertEquals(BuiltIns.categories.size, db.categoryDao().getAll().size)
         assertTrue(db.categoryRuleDao().getAll().none { it.id == "user_rule" })
     }
 

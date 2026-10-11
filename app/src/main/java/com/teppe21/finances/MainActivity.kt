@@ -108,6 +108,7 @@ import com.teppe21.finances.feature.analytics.AnalyticsScreen
 import com.teppe21.finances.feature.categories.CategoriesScreen
 import com.teppe21.finances.feature.dashboard.DashboardScreen
 import com.teppe21.finances.feature.importcsv.CsvImportScreen
+import com.teppe21.finances.feature.categories.UncategorizedScreen
 import com.teppe21.finances.feature.more.MoreScreen
 import com.teppe21.finances.feature.notifications.NotificationAutomationScreen
 import com.teppe21.finances.feature.notifications.ReviewScreen
@@ -507,7 +508,8 @@ fun MainAppNavigation() {
                         onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                         onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) },
                         onNavigateToRecurring = { navController.navigate(Screen.Recurring.route) },
-                        onNavigateToCategories = { navController.navigate(Screen.Categories.route) }
+                        onNavigateToCategories = { navController.navigate(Screen.Categories.route) },
+                        onNavigateToUncategorized = { navController.navigate(Screen.Uncategorized.route) }
                     )
                 }
                 composable(Screen.ScanReceipt.route) { ScanReceiptScreen(onNavigateBack = { navController.popBackStack() }) }
@@ -516,11 +518,15 @@ fun MainAppNavigation() {
                 }
                 composable(Screen.Review.route) { ReviewScreen() }
                 composable(Screen.CsvImport.route) {
-                    CsvImportScreen(onImportFinished = { navigateTab(Screen.Transactions.route) })
+                    CsvImportScreen(
+                        onViewTransactions = { navigateTab(Screen.Transactions.route) },
+                        onReviewUncategorized = { navController.navigate(Screen.Uncategorized.route) }
+                    )
                 }
                 composable(Screen.Budgets.route) { BudgetsScreen() }
                 composable(Screen.Recurring.route) { RecurringScreen() }
                 composable(Screen.Categories.route) { CategoriesScreen() }
+                composable(Screen.Uncategorized.route) { UncategorizedScreen() }
                 composable(Screen.Settings.route) {
                     SettingsScreen(
                         onOpenNotifications = { navController.navigate(Screen.NotificationAutomation.route) },
@@ -558,6 +564,7 @@ private fun screenTitle(route: String?): String = when (route) {
     Screen.CsvImport.route -> stringResource(R.string.import_title)
     Screen.Budgets.route -> stringResource(R.string.budgets)
     Screen.Recurring.route -> stringResource(R.string.recurring)
+    Screen.Uncategorized.route -> stringResource(R.string.uncategorized_title)
     Screen.Categories.route -> stringResource(R.string.categories)
     Screen.Settings.route -> stringResource(R.string.settings)
     Screen.Stocks.route -> "Stocks"

@@ -4,6 +4,7 @@ import com.teppe21.finances.core.money.AmountParser
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.money.SeparatorStyle
 import com.teppe21.finances.core.utils.TextNormalizer
+import com.teppe21.finances.domain.model.BuiltIns
 import com.teppe21.finances.domain.model.SupportedCurrencies
 import com.teppe21.finances.domain.model.TransactionDirection
 import java.io.InputStream
@@ -16,25 +17,42 @@ import java.time.LocalDate
 
 data class CsvColumnMapping(
     val dateCol: Int = 0,
+    /** The single description column versions before schema 6 read; still used for fingerprints. */
     val descCol: Int = 1,
     val amountCol: Int? = null,
     val debitCol: Int? = null,
     val creditCol: Int? = null,
     val currencyCol: Int? = null,
-    val categoryCol: Int? = null
+    val categoryCol: Int? = null,
+    /** Every description-like column (description, partner, remark), in file order. */
+    val descCols: List<Int> = listOf(descCol),
+    /** The bank's transaction type (Revolut `Type`, OTP `Tranzakció típusa`, Wise ID prefix). */
+    val typeCol: Int? = null,
+    /** Completion state (Revolut `State`); reverted or declined rows are skipped. */
+    val stateCol: Int? = null
 )
 
 data class ParsedCsvRow(
     /** 1-based line number of the record in the file, for error messages. */
     val line: Int,
     val date: LocalDate,
+    /** The non-empty description-like cells, joined with " · ". */
     val description: String,
     val merchant: String?,
     /** Signed amount, scale 2. */
     val amountMinor: Long,
     val currency: String,
     val direction: TransactionDirection,
-    val categorySuggestion: String?
+    val categorySuggestion: String?,
+    /** The bank's own type for this row, for example `EXCHANGE` or `Vásárlás kártyával`. */
+    val bankType: String? = null,
+    /** [categorySuggestion] mapped to a built-in category id, when it names one. */
+    val bankCategoryId: String? = null,
+    /**
+     * The text earlier versions used in this row's fingerprint (the first description-like
+     * column only), so re-importing a file imported before schema 6 adds no duplicates.
+     */
+    val fingerprintText: String = description
 )
 
 enum class CsvSkipReason {
@@ -44,7 +62,9 @@ enum class CsvSkipReason {
     INVALID_AMOUNT,
     ZERO_AMOUNT,
     UNSUPPORTED_CURRENCY,
-    TOO_FEW_COLUMNS
+    TOO_FEW_COLUMNS,
+    /** The file marks the row as reverted, declined, failed or cancelled: it never happened. */
+    NOT_COMPLETED
 }
 
 /** Order of the first two numbers in a `dd/MM/yyyy` or `MM/dd/yyyy` style date. */
@@ -71,6 +91,8 @@ data class CsvParseResult(
  * unreadable amount, unsupported currency) are skipped and counted, never guessed.
  */
 object CsvParser {
+
+    private const val IMPORTED_FALLBACK = "Imported transaction"
 
     private const val MAX_BYTES = 10 * 1024 * 1024
 
@@ -134,29 +156,63 @@ object CsvParser {
         return counts.maxByOrNull { it.value }?.takeIf { it.value > 0 }?.key ?: ','
     }
 
+    /**
+     * Assigns a role to each header. Each column gets at most one role, and the date columns are
+     * claimed first: "Értéknap" (value date) contains "ertek" (value) and used to be taken as the
+     * amount column, which made every row of such a file unreadable.
+     */
     fun detectMapping(headers: List<String>): CsvColumnMapping {
-        val norm = headers.map { TextNormalizer.removeDiacritics(it).lowercase().trim().replace("\"", "") }
+        val norm = headers.map { TextNormalizer.normalizeSearch(it.replace("\"", "")) }
+        val claimed = mutableSetOf<Int>()
 
-        fun findIndex(vararg keywords: String): Int =
-            norm.indexOfFirst { col -> keywords.any { kw -> col.contains(kw) } }
+        fun matching(vararg keywords: String): List<Int> = norm.indices.filter { i ->
+            i !in claimed && keywords.any { kw -> norm[i].contains(kw) }
+        }
+        fun claimFirst(vararg keywords: String): Int? = matching(*keywords).firstOrNull()?.also { claimed += it }
 
-        val dateIdx = findIndex("datum", "date", "konyveles", "erteknap")
-        val descIdx = findIndex("leiras", "description", "partner", "megjegyzes", "kozlemeny", "payee", "merchant")
-        val amountIdx = findIndex("osszeg", "amount", "ertek")
-        val debitIdx = findIndex("terheles", "kiadas", "debit")
-        val creditIdx = findIndex("jovairas", "bevetel", "credit")
-        val currIdx = findIndex("penznem", "currency", "deviza")
-        val catIdx = findIndex("kategoria", "category")
+        // Legacy description column: the same choice earlier versions made, for fingerprints only.
+        val legacyDesc = norm.indexOfFirst { col ->
+            listOf("leiras", "description", "partner", "megjegyzes", "kozlemeny", "payee", "merchant").any { col.contains(it) }
+        }
+
+        val dateCols = matching("datum", "date", "konyveles", "erteknap", "teljesites")
+        claimed += dateCols
+        val typeIdx = claimFirst("transferwise id", "tipus", "type")
+        val stateIdx = claimFirst("state", "status", "allapot")
+        val currIdx = claimFirst("penznem", "currency", "deviza")
+        val catIdx = claimFirst("kategoria", "category")
+        val debitIdx = claimFirst("terheles", "kiadas", "debit")
+        val creditIdx = claimFirst("jovairas", "bevetel", "credit")
+        val amountIdx = claimFirst("osszeg", "amount", "ertek")
+        // Account numbers and balances are never descriptions.
+        claimed += norm.indices.filter { i -> listOf("szamlaszam", "account", "iban", "balance", "egyenleg").any { norm[i].contains(it) } }
+        val descCols = matching(
+            "leiras", "description", "megnevezes", "partner", "megjegyzes", "kozlemeny", "payee", "payer",
+            "merchant", "reference", "kedvezmenyezett", "ellenoldal"
+        )
 
         return CsvColumnMapping(
-            dateCol = if (dateIdx != -1) dateIdx else 0,
-            descCol = if (descIdx != -1) descIdx else 1,
-            amountCol = amountIdx.takeIf { it != -1 },
-            debitCol = debitIdx.takeIf { it != -1 },
-            creditCol = creditIdx.takeIf { it != -1 },
-            currencyCol = currIdx.takeIf { it != -1 },
-            categoryCol = catIdx.takeIf { it != -1 }
+            dateCol = dateCols.firstOrNull() ?: 0,
+            descCol = if (legacyDesc != -1) legacyDesc else 1,
+            amountCol = amountIdx,
+            debitCol = debitIdx,
+            creditCol = creditIdx,
+            currencyCol = currIdx,
+            categoryCol = catIdx,
+            descCols = descCols.ifEmpty { listOf(if (legacyDesc != -1) legacyDesc else 1) },
+            typeCol = typeIdx,
+            stateCol = stateIdx
         )
+    }
+
+    private val NOT_COMPLETED_STATES = setOf(
+        "reverted", "declined", "failed", "cancelled", "canceled", "elutasitva", "elutasitott", "sztornozva", "visszavonva"
+    )
+
+    /** `CARD-1234` (a Wise transaction id) becomes `CARD`; other type cells are kept as they are. */
+    private fun bankType(raw: String?): String? {
+        val value = raw?.trim()?.ifBlank { null } ?: return null
+        return Regex("^([A-Za-z_]+)-\\d+$").find(value)?.groupValues?.get(1) ?: value
     }
 
     fun parse(
@@ -195,6 +251,8 @@ object CsvParser {
 
         for ((line, cells) in records.drop(1)) {
             if (cells.size < 2) { skip(CsvSkipReason.TOO_FEW_COLUMNS); continue }
+            val state = mapping.stateCol?.let { TextNormalizer.normalizeSearch(cells.getOrNull(it)) }
+            if (state != null && state in NOT_COMPLETED_STATES) { skip(CsvSkipReason.NOT_COMPLETED); continue }
 
             val date = when (val reading = readDate(cells.getOrNull(mapping.dateCol), dateOrder)) {
                 is DateReading.Valid -> reading.date
@@ -226,16 +284,29 @@ object CsvParser {
             if (amountMinor == null) { skip(CsvSkipReason.INVALID_AMOUNT); continue }
             if (amountMinor == 0L) { skip(CsvSkipReason.ZERO_AMOUNT); continue }
 
-            val rawDesc = cells.getOrNull(mapping.descCol)?.trim().orEmpty().ifBlank { "Imported transaction" }
+            val legacyDesc = cells.getOrNull(mapping.descCol)?.trim().orEmpty().ifBlank { IMPORTED_FALLBACK }
+            // A part already contained in an earlier one (Wise repeats the merchant) is dropped.
+            val descParts = mapping.descCols.mapNotNull { cells.getOrNull(it)?.trim()?.ifBlank { null } }
+                .fold(emptyList<String>()) { kept, part ->
+                    val norm = TextNormalizer.normalizeSearch(part)
+                    if (kept.any { TextNormalizer.normalizeSearch(it).contains(norm) }) kept else kept + part
+                }
+            val type = mapping.typeCol?.let { bankType(cells.getOrNull(it)) }
+            // Without any description, the bank's type ("Számlavezetési díj") is the best name there is.
+            val description = descParts.joinToString(" · ").ifBlank { type ?: IMPORTED_FALLBACK }
+            val suggestion = mapping.categoryCol?.let { cells.getOrNull(it) }?.trim()?.ifBlank { null }
             rows += ParsedCsvRow(
                 line = line,
                 date = date,
-                description = rawDesc,
-                merchant = TextNormalizer.cleanMerchantName(rawDesc).ifBlank { null },
+                description = description,
+                merchant = TextNormalizer.cleanMerchantName(descParts.firstOrNull() ?: description).ifBlank { null },
                 amountMinor = amountMinor,
                 currency = currency,
                 direction = if (amountMinor > 0) TransactionDirection.INCOME else TransactionDirection.EXPENSE,
-                categorySuggestion = mapping.categoryCol?.let { cells.getOrNull(it) }?.ifBlank { null }
+                categorySuggestion = suggestion,
+                bankType = type,
+                bankCategoryId = BuiltIns.categoryForBankLabel(suggestion),
+                fingerprintText = legacyDesc
             )
         }
         return CsvParseResult(rows, skipped, charset)
