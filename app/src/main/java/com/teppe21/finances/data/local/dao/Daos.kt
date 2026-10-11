@@ -92,8 +92,9 @@ interface AccountDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(account: AccountEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(accounts: List<AccountEntity>)
+    /** Seeding only: an existing id is left untouched so user edits to a default account survive. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIfAbsent(accounts: List<AccountEntity>)
 
     @Update
     suspend fun update(account: AccountEntity)
@@ -113,8 +114,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): CategoryEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(categories: List<CategoryEntity>)
+    /** Seeding only: an existing id is left untouched so user edits to a default category survive. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIfAbsent(categories: List<CategoryEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(category: CategoryEntity)
@@ -146,8 +148,9 @@ interface CategoryRuleDao {
     @Query("SELECT * FROM category_rules WHERE categoryId = :categoryId AND isActive = 1 ORDER BY priority DESC")
     suspend fun getRulesForCategory(categoryId: String): List<CategoryRuleEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(rules: List<CategoryRuleEntity>)
+    /** Seeding only: an existing id is left untouched so edited or disabled default rules survive. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIfAbsent(rules: List<CategoryRuleEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(rule: CategoryRuleEntity)

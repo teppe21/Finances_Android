@@ -23,7 +23,12 @@ import com.teppe21.finances.data.local.entity.ReceiptEntity
 import com.teppe21.finances.data.local.entity.RecurringRuleEntity
 import com.teppe21.finances.data.local.entity.TransactionEntity
 import com.teppe21.finances.domain.model.AccountType
+import android.util.Log
+import androidx.room.withTransaction
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -187,33 +192,53 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                val ready = CompletableDeferred<AppDatabase>()
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "finances.db"
                 )
                     .addMigrations(*ALL_MIGRATIONS)
-                    .addCallback(DatabasePrepopulateCallback())
+                    .addCallback(prepopulationCallback(ready))
                     .build()
+                ready.complete(instance)
                 INSTANCE = instance
                 instance
             }
         }
-    }
 
-    private class DatabasePrepopulateCallback : Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            CoroutineScope(Dispatchers.IO).launch {
-                INSTANCE?.let { database ->
-                    prepopulateDefaults(database)
+        /**
+         * Seeds the default accounts, categories and rules when the database file is first
+         * created. The seeding coroutine waits on [database] for the instance this callback
+         * belongs to, so it never depends on the global [INSTANCE] having been assigned yet.
+         */
+        internal fun prepopulationCallback(database: Deferred<AppDatabase>): Callback = object : Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        prepopulateDefaults(database.await())
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w("FinancesDb", "Default data could not be created: ${e.javaClass.simpleName}")
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Creates the default accounts, categories and keyword rules. Idempotent and transactional:
+ * a row that already exists (including one the user has edited or disabled) is never replaced,
+ * and the three inserts either all happen or none do.
+ */
 suspend fun prepopulateDefaults(db: AppDatabase) {
+    db.withTransaction { insertMissingDefaults(db) }
+}
+
+private suspend fun insertMissingDefaults(db: AppDatabase) {
     val now = Instant.now()
 
     // 1. Prepopulate default accounts (Bank, Revolut, Cash Wallet) with ZERO balance on clean install
@@ -223,7 +248,7 @@ suspend fun prepopulateDefaults(db: AppDatabase) {
         AccountEntity("acc_revolut", "Revolut", "Revolut", AccountType.BANK, "HUF", 0L, 0L, true, now, now),
         AccountEntity("acc_savings", "Savings", "Treasury", AccountType.SAVINGS, "HUF", 0L, 0L, true, now, now)
     )
-    db.accountDao().insertAll(accounts)
+    db.accountDao().insertAllIfAbsent(accounts)
 
     // 2. Prepopulate default categories
     val categories = listOf(
@@ -240,7 +265,7 @@ suspend fun prepopulateDefaults(db: AppDatabase) {
         CategoryEntity("transfers", "Transfers", "arrow-left-right", "#6366F1", false, true, now, now),
         CategoryEntity("other", "Other / Uncategorized", "help-circle", "#6B7280", false, true, now, now)
     )
-    db.categoryDao().insertAll(categories)
+    db.categoryDao().insertAllIfAbsent(categories)
 
     // 3. Prepopulate default keyword rules
     val rules = mutableListOf<CategoryRuleEntity>()
@@ -264,6 +289,6 @@ suspend fun prepopulateDefaults(db: AppDatabase) {
         rules.add(CategoryRuleEntity("rule_transfer_$i", "transfers", kw, "contains", 10, true, now))
     }
 
-    db.categoryRuleDao().insertAll(rules)
+    db.categoryRuleDao().insertAllIfAbsent(rules)
 }
 
