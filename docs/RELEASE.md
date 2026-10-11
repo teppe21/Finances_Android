@@ -56,7 +56,7 @@ Expect `package: name='com.teppe21.finances'`, `versionCode='2'`, `sdkVersion:'2
 
 ## Publishing a release (step by step)
 
-The release workflow `.github/workflows/release.yml` runs when you push a tag that starts with `v`. It builds a signed release APK and AAB, verifies the APK signature, runs the 16 KB check, and attaches `Finances-vX.Y.Z.apk` and its `.sha256` file to a GitHub Release. It never signs with a debug key: without the four secrets below it stops with an error.
+The release workflow `.github/workflows/release.yml` runs when you push a tag that starts with `v` and contains no hyphen (a tag such as `v2.1.0-beta.1` is treated as a hand-published beta pre-release and does not start it). It builds a signed release APK and AAB, verifies the APK signature, runs the 16 KB check, and attaches `Finances-vX.Y.Z.apk` and its `.sha256` file to a GitHub Release. It never signs with a debug key: without the four secrets below it stops with an error.
 
 ### 1. Create the upload keystore (once, on your own computer)
 

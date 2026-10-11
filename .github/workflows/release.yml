@@ -1,10 +1,12 @@
 name: Android release build
 
 # Push a tag like v2.1.0 to build a signed release APK and publish it as a GitHub Release.
+# Tags with a hyphen (v2.1.0-beta.1) are pre-release tags for hand-published debug beta APKs: they do not
+# run this workflow, which needs the signing secrets and a tag equal to v<versionName>.
 # "Run workflow" (workflow_dispatch) builds and uploads artifacts only; it does not publish a Release.
 on:
   push:
-    tags: [ "v*" ]
+    tags: [ "v*", "!v*-*" ]
   workflow_dispatch:
 
 permissions:
