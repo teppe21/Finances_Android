@@ -2,8 +2,8 @@ package com.teppe21.finances.feature.receipt
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import kotlin.math.abs
+import java.util.concurrent.Executors
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -59,6 +59,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -101,11 +105,16 @@ fun ScanReceiptScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            viewModel.processUri(context, uri)
+            viewModel.processUri(uri)
         }
     }
 
+    val view = LocalView.current
     val imageCapture = remember { ImageCapture.Builder().build() }
+    val captureExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose { captureExecutor.shutdown() }
+    }
 
 
     Box(
@@ -173,7 +182,8 @@ fun ScanReceiptScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 40.dp, start = 16.dp, end = 16.dp),
+                .statusBarsPadding()
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -231,7 +241,8 @@ fun ScanReceiptScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 40.dp, start = 24.dp, end = 24.dp),
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp, start = 24.dp, end = 24.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -252,17 +263,29 @@ fun ScanReceiptScreen(
             Surface(
                 modifier = Modifier
                     .size(76.dp)
-                    .clickable {
+                    .clickable(enabled = !state.isProcessing) {
+                        // Keep the capture rotation in step with the display (rotation / multi-window).
+                        view.display?.rotation?.let { imageCapture.targetRotation = it }
                         imageCapture.takePicture(
-                            ContextCompat.getMainExecutor(context),
+                            captureExecutor,
                             object : ImageCapture.OnImageCapturedCallback() {
                                 override fun onCaptureSuccess(imageProxy: ImageProxy) {
-                                    val buffer = imageProxy.planes[0].buffer
-                                    val bytes = ByteArray(buffer.remaining())
-                                    buffer.get(bytes)
-                                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                    imageProxy.close()
-                                    viewModel.processBitmap(context, bitmap)
+                                    // Runs on the capture executor, not the main thread. The JPEG is not
+                                    // pre-rotated; rotationDegrees is applied once, by ML Kit.
+                                    val bytes: ByteArray
+                                    val rotation: Int
+                                    try {
+                                        val buffer = imageProxy.planes[0].buffer
+                                        bytes = ByteArray(buffer.remaining())
+                                        buffer.get(bytes)
+                                        rotation = imageProxy.imageInfo.rotationDegrees
+                                    } catch (_: Exception) {
+                                        viewModel.reportCaptureFailed()
+                                        return
+                                    } finally {
+                                        imageProxy.close()
+                                    }
+                                    viewModel.processCapture(bytes, rotation)
                                 }
 
                                 override fun onError(exception: ImageCaptureException) {
@@ -299,7 +322,8 @@ fun ScanReceiptScreen(
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 100.dp, start = 24.dp, end = 24.dp),
+                    .statusBarsPadding()
+                    .padding(top = 64.dp, start = 24.dp, end = 24.dp),
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.errorContainer
             ) {

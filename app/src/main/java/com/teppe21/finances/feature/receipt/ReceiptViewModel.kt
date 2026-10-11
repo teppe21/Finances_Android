@@ -1,7 +1,5 @@
 package com.teppe21.finances.feature.receipt
 
-import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,12 +11,15 @@ import com.teppe21.finances.domain.model.PaymentMethod
 import com.teppe21.finances.domain.model.ReceiptScan
 import com.teppe21.finances.domain.model.TransactionDirection
 import com.teppe21.finances.domain.model.TransactionSource
+import com.teppe21.finances.domain.usecase.Fingerprints
 import com.teppe21.finances.domain.usecase.IngestionInput
 import com.teppe21.finances.native.receipt.ReceiptOcrEngine
 import com.teppe21.finances.native.receipt.ReceiptParser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -31,108 +32,124 @@ data class ReceiptUiState(
     val selectedCategoryId: String? = null,
     val errorMessage: String? = null,
     /** True when the scan came from the built-in sample, not the camera or gallery. */
-    val isSample: Boolean = false
+    val isSample: Boolean = false,
+    /** True while the confirmed receipt is being written, so the sheet cannot be submitted twice. */
+    val isSaving: Boolean = false
 )
 
-class ReceiptViewModel : ViewModel() {
+/** The part of OCR the view model depends on; [ReceiptOcrEngine] is the on-device implementation. */
+interface ReceiptTextRecognition {
+    suspend fun recognizeCapture(jpeg: ByteArray, rotationDegrees: Int): ReceiptScan
+    suspend fun recognizeFromUri(uri: Uri): ReceiptScan
+}
 
-    private val app = FinancesApp.instance
-    private val receiptRepo = app.receiptRepository
-    private val accountRepo = app.accountRepository
-    private val catRepo = app.categoryRepository
-    private val ingestUseCase = app.ingestTransactionUseCase
+class ReceiptViewModel(
+    private val ocr: ReceiptTextRecognition,
+    private val loadAccounts: suspend () -> List<Account>,
+    private val loadCategories: suspend () -> List<Category>,
+    private val saveReceipt: suspend (ReceiptScan) -> Unit,
+    private val ingest: suspend (IngestionInput) -> Unit
+) : ViewModel() {
+
+    /** Used by the default `viewModel()` factory: wires the app-level singletons. */
+    constructor() : this(FinancesApp.instance)
+
+    private constructor(app: FinancesApp) : this(
+        ocr = object : ReceiptTextRecognition {
+            private val engine = ReceiptOcrEngine(app)
+            override suspend fun recognizeCapture(jpeg: ByteArray, rotationDegrees: Int) =
+                engine.recognizeCapture(jpeg, rotationDegrees)
+
+            override suspend fun recognizeFromUri(uri: Uri) = engine.recognizeFromUri(uri)
+        },
+        loadAccounts = { app.accountRepository.getAllAccounts() },
+        loadCategories = { app.categoryRepository.getAllCategories() },
+        saveReceipt = { app.receiptRepository.insertReceipt(it) },
+        ingest = { app.ingestTransactionUseCase.execute(it) }
+    )
 
     private val _uiState = MutableStateFlow(ReceiptUiState())
     val uiState: StateFlow<ReceiptUiState> = _uiState.asStateFlow()
 
     init {
-        loadData()
-    }
-
-    private fun loadData() {
         viewModelScope.launch {
-            val accounts = accountRepo.getAllAccounts()
-            val categories = catRepo.getAllCategories()
-            _uiState.value = _uiState.value.copy(
-                accounts = accounts,
-                categories = categories
-            )
+            val accounts = loadAccounts()
+            val categories = loadCategories()
+            _uiState.update { it.copy(accounts = accounts, categories = categories) }
         }
     }
 
-    fun processBitmap(context: Context, bitmap: Bitmap) {
-        _uiState.value = _uiState.value.copy(isProcessing = true, errorMessage = null)
+    /** [jpeg] and [rotationDegrees] come straight from CameraX's in-memory capture. */
+    fun processCapture(jpeg: ByteArray, rotationDegrees: Int) = recognize(
+        failureMessage = "Text recognition failed. Try again with better lighting."
+    ) { ocr.recognizeCapture(jpeg, rotationDegrees) }
+
+    fun processUri(uri: Uri) = recognize(
+        failureMessage = "The image could not be read. Try another image."
+    ) { ocr.recognizeFromUri(uri) }
+
+    private fun recognize(failureMessage: String, block: suspend () -> ReceiptScan) {
+        // A second tap on the shutter while a scan is running would start a parallel OCR run.
+        if (_uiState.value.isProcessing) return
+        _uiState.update { it.copy(isProcessing = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                val engine = ReceiptOcrEngine(context)
-                val scan = engine.recognizeFromBitmap(bitmap)
-                handleScanResult(scan)
+                handleScanResult(block())
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    errorMessage = "Text recognition failed. Try again with better lighting."
-                )
+                _uiState.update { it.copy(isProcessing = false, errorMessage = failureMessage) }
             }
         }
     }
 
     fun reportCaptureFailed() {
-        _uiState.value = _uiState.value.copy(isProcessing = false, errorMessage = "The photo could not be taken. Try again or pick an image.")
-    }
-
-    fun processUri(context: Context, uri: Uri) {
-        _uiState.value = _uiState.value.copy(isProcessing = true, errorMessage = null)
-        viewModelScope.launch {
-            try {
-                val engine = ReceiptOcrEngine(context)
-                val scan = engine.recognizeFromUri(uri)
-                handleScanResult(scan)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    errorMessage = "The image could not be read. Try another image."
-                )
-            }
+        _uiState.update {
+            it.copy(isProcessing = false, errorMessage = "The photo could not be taken. Try again or pick an image.")
         }
     }
 
+    fun dismissError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     fun processDemoText(sampleText: String) {
-        _uiState.value = _uiState.value.copy(isProcessing = true, errorMessage = null)
+        if (_uiState.value.isProcessing) return
+        _uiState.update { it.copy(isProcessing = true, errorMessage = null) }
         viewModelScope.launch {
-            val scan = ReceiptParser.parse(sampleText)
-            handleScanResult(scan, isSample = true)
+            handleScanResult(ReceiptParser.parse(sampleText), isSample = true)
         }
     }
 
     private fun handleScanResult(scan: ReceiptScan, isSample: Boolean = false) {
-        val accounts = _uiState.value.accounts
-        // If cash detected, suggest Cash Wallet account!
-        val suggestedAccount = if (scan.paymentMethod == PaymentMethod.CASH) {
-            accounts.firstOrNull { it.type == AccountType.CASH } ?: accounts.firstOrNull()
-        } else {
-            accounts.firstOrNull { it.type == AccountType.BANK } ?: accounts.firstOrNull()
+        _uiState.update { state ->
+            val accounts = state.accounts
+            val suggestedAccount = if (scan.paymentMethod == PaymentMethod.CASH) {
+                accounts.firstOrNull { it.type == AccountType.CASH } ?: accounts.firstOrNull()
+            } else {
+                accounts.firstOrNull { it.type == AccountType.BANK } ?: accounts.firstOrNull()
+            }
+            state.copy(
+                isProcessing = false,
+                scannedReceipt = scan,
+                selectedAccountId = suggestedAccount?.id,
+                selectedCategoryId = "food",
+                errorMessage = null,
+                isSample = isSample
+            )
         }
-
-        _uiState.value = _uiState.value.copy(
-            isProcessing = false,
-            scannedReceipt = scan,
-            selectedAccountId = suggestedAccount?.id,
-            selectedCategoryId = "food",
-            errorMessage = null,
-            isSample = isSample
-        )
     }
 
     fun setSelectedAccount(accountId: String) {
-        _uiState.value = _uiState.value.copy(selectedAccountId = accountId)
+        _uiState.update { it.copy(selectedAccountId = accountId) }
     }
 
     fun setSelectedCategory(categoryId: String) {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId)
+        _uiState.update { it.copy(selectedCategoryId = categoryId) }
     }
 
     fun clearScan() {
-        _uiState.value = _uiState.value.copy(scannedReceipt = null, errorMessage = null)
+        _uiState.update { it.copy(scannedReceipt = null, errorMessage = null, isSaving = false) }
     }
 
     fun confirmSave(
@@ -144,29 +161,37 @@ class ReceiptViewModel : ViewModel() {
         currency: String = "HUF",
         onSuccess: () -> Unit
     ) {
+        if (_uiState.value.isSaving) return
+        _uiState.update { it.copy(isSaving = true, errorMessage = null) }
         viewModelScope.launch {
-            val scan = _uiState.value.scannedReceipt
-            if (scan != null) {
-                receiptRepo.insertReceipt(scan.copy(merchant = merchant, totalMinor = amountMinor, date = date, currency = currency))
-            }
-
-            ingestUseCase.execute(
-                IngestionInput(
-                    fingerprint = scan?.id?.let { com.teppe21.finances.domain.usecase.Fingerprints.receipt(it) },
-                    notes = if (_uiState.value.isSample) "Demo data" else null,
-                    accountId = accountId,
-                    date = date,
-                    amountMinor = -kotlin.math.abs(amountMinor),
-                    currency = currency,
-                    direction = TransactionDirection.EXPENSE,
-                    description = merchant,
-                    merchant = merchant,
-                    categoryId = categoryId,
-                    source = TransactionSource.RECEIPT,
-                    receiptId = scan?.id
+            try {
+                val state = _uiState.value
+                val scan = state.scannedReceipt
+                if (scan != null) {
+                    saveReceipt(scan.copy(merchant = merchant, totalMinor = amountMinor, date = date, currency = currency))
+                }
+                ingest(
+                    IngestionInput(
+                        fingerprint = scan?.id?.let { Fingerprints.receipt(it) },
+                        notes = if (state.isSample) "Demo data" else null,
+                        accountId = accountId,
+                        date = date,
+                        amountMinor = -kotlin.math.abs(amountMinor),
+                        currency = currency,
+                        direction = TransactionDirection.EXPENSE,
+                        description = merchant,
+                        merchant = merchant,
+                        categoryId = categoryId,
+                        source = TransactionSource.RECEIPT,
+                        receiptId = scan?.id
+                    )
                 )
-            )
-
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false, errorMessage = "The receipt could not be saved. Try again.") }
+                return@launch
+            }
             clearScan()
             onSuccess()
         }
