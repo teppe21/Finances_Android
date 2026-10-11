@@ -31,7 +31,7 @@ The app uses `NotificationListenerService`. Before sending the user to the syste
 
 ## Privacy policy
 
-`docs/privacy-policy.html` is ready for hosting (static HTML, no JavaScript). It still contains placeholders for the developer name and contact, which must be filled in. The public URL must be entered in Play Console and can be added to the app with `-Pfinances.privacyPolicyUrl=`. The same text is available offline inside the app. See [PLAY_CONSOLE_FINAL_CHECKLIST.md](PLAY_CONSOLE_FINAL_CHECKLIST.md) for hosting steps.
+`docs/privacy-policy.html` is ready for hosting (static HTML, no JavaScript). The developer name and contact are filled in; only the effective date is still a placeholder. The public URL must be entered in Play Console and can be added to the app with `-Pfinances.privacyPolicyUrl=`. The same text is available offline inside the app. See [PLAY_CONSOLE_FINAL_CHECKLIST.md](PLAY_CONSOLE_FINAL_CHECKLIST.md) for hosting steps.
 
 ## Financial features
 

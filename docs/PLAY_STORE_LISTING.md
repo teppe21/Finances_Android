@@ -23,6 +23,6 @@ Finances is not a bank and does not connect to your bank accounts.
 
 **Category:** Finance
 
-**Contact email:** [TO BE COMPLETED]
+**Contact email:** lamfalusilevi@gmail.com
 
 **Privacy policy URL:** [TO BE COMPLETED after hosting]
