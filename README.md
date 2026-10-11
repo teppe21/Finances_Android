@@ -67,7 +67,9 @@ The camera is requested only when you open the scanner, after a short explanatio
 
 ### Automatic categorization
 
-Built-in keyword rules (for example `spar`, `wolt`, `netflix`) and your own rules map merchants to categories. Keywords match at word starts, so a rule for `ber` does not catch `Uber`. Your rules take precedence over the built-in ones.
+Built-in keyword rules in Hungarian and English (groceries, dining and delivery, transport and fuel, utilities, subscriptions, health, shopping, electronics, government and taxes, fees, interest, salary) and your own rules map merchants to categories. Matching ignores case, accents, apostrophes and card-terminal noise; keywords match at word starts, and keywords of three letters or fewer only as whole words, so `ber` does not catch `Uber` and `mol` does not catch `Molnár`. Your rules take precedence over the built-in ones.
+
+Transfers are their own kind and never count as income or spending: moves between your own accounts, currency exchanges, top-ups, balance migrations and cash withdrawals are "between own accounts", money sent to or received from people is "transfers with people". Analytics shows both on a separate card. After a CSV import a summary lists what was imported, skipped, categorized, left uncategorized and recognized as a transfer. The Uncategorized screen groups what is left by merchant: one choice sorts the group and can be kept as a rule that also sorts every matching existing transaction; the same "remember" option is on every transaction's category. "Re-apply rules" runs the rules over existing transactions and never changes a category you chose yourself. Details: [docs/IMPORT_FORMATS.md](docs/IMPORT_FORMATS.md#categorization).
 
 ### Multi-currency support
 
@@ -75,11 +77,11 @@ Amounts are stored as 64-bit integers with two implied decimals in their origina
 
 ### Analytics
 
-Month-by-month view with previous, next and current-month navigation, plus 3-month, 6-month, yearly and custom ranges. Income, expenses, net, average and largest expense, category breakdown, top merchants and a six-month trend, all in the display currency.
+Month-by-month view with previous, next and current-month navigation, plus 3-month, 6-month, yearly and custom ranges. Income, expenses, net, average and largest expense, category breakdown, top merchants and a six-month trend, all in the display currency and all without transfers; transfers between own accounts and with people are shown separately.
 
 ### CSV import
 
-Semicolon, comma or tab separated files, quoted fields (including line breaks), UTF-8 or Windows-1250 encoding, Hungarian (`2026.03.28.`, `1 249,50`) and international (`2026-03-28`, `1,234.56`) formats, a single amount column or separate debit and credit columns. Rows with an unreadable date or amount, or an unsupported currency, are skipped and counted rather than guessed. Re-importing the same file into the same account does not create duplicates; two identical rows inside one file are both kept.
+Semicolon, comma or tab separated files, quoted fields (including line breaks), UTF-8 or Windows-1250 encoding, Hungarian (`2026.03.28.`, `1 249,50`) and international (`2026-03-28`, `1,234.56`) formats, a single amount column or separate debit and credit columns, and the type, state and category columns some banks add (Revolut, Wise, Hungarian bank exports). Rows with an unreadable date or amount, an unsupported currency, or that the bank marks as reverted or declined, are skipped and counted rather than guessed. Re-importing the same file into the same account does not create duplicates; two identical rows inside one file are both kept.
 
 ### Budgets and recurring payments
 
@@ -111,7 +113,7 @@ Whether Keystore keys are hardware-backed depends on the phone; the app does not
 | --- | --- |
 | Language | Kotlin 2.0.21 |
 | UI | Jetpack Compose (BOM 2024.02.01), Material 3 |
-| Storage | Room 2.6.1 (schema version 5), DataStore Preferences |
+| Storage | Room 2.6.1 (schema version 6), DataStore Preferences |
 | Camera and OCR | CameraX 1.4.2, ML Kit Text Recognition 16.0.1 |
 | Build | Android Gradle Plugin 8.13.2, Gradle 8.14.3, KSP 2.0.21-1.0.28, JDK 17 |
 | SDK levels | minSdk 26, compileSdk 36, targetSdk 36 |
@@ -122,7 +124,7 @@ Single-module app with a light layering: Compose screens and ViewModels in `feat
 
 ## Testing
 
-JVM unit tests in `app/src/test` (169) cover notification recognition and rejection, the notification pipeline including deduplication and account matching, the bounded notification queue and rebind policy, exact money parsing, currency conversion and statistics, CSV and receipt parsing, OCR orientation and resource lifecycle helpers, the ViewModels, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Instrumented tests in `app/src/androidTest` (33) cover the Room DAOs, default-data seeding, the migration to the current schema and the main Compose flows. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has been run.
+JVM unit tests in `app/src/test` (196) cover categorization and transfer detection (with a harness over synthetic bank statements), notification recognition and rejection, the notification pipeline including deduplication and account matching, the bounded notification queue and rebind policy, exact money parsing, currency conversion and statistics, CSV and receipt parsing, OCR orientation and resource lifecycle helpers, the ViewModels, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Instrumented tests in `app/src/androidTest` (36) cover the Room DAOs, default-data seeding, the migrations to the current schema and the main Compose flows. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has been run.
 
 ## Build
 
@@ -142,7 +144,7 @@ The repository contains the pieces that can be prepared in code: target SDK 36, 
 
 ## Current status
 
-Unreleased (pre-1.0 quality bar). The Android CI workflow runs the JVM unit tests, Android lint, the debug build, compiles the instrumented tests and checks the committed Room schemas on every push to `main`; it also builds a release APK with a throwaway key to check R8 and 16 KB alignment. In a local run on 2026-10-11 the unit tests, lint, the debug and minified release builds, and the 33 instrumented tests on an Android 15 emulator passed (details in [docs/TESTING.md](docs/TESTING.md)). Not yet done: the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) on a physical phone, frame-rate measurements and TalkBack checks. No signed release has been published. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and existing transactions cannot be edited yet.
+Unreleased (pre-1.0 quality bar). The Android CI workflow runs the JVM unit tests, Android lint, the debug build, compiles the instrumented tests and checks the committed Room schemas on every push to `main`; it also builds a release APK with a throwaway key to check R8 and 16 KB alignment. In a local run on 2026-10-11 the unit tests, lint, the debug and minified release builds, and the 33 instrumented tests on an Android 15 emulator passed (details in [docs/TESTING.md](docs/TESTING.md)). Not yet done: the device test plan in [docs/REAL_DEVICE_TEST_PLAN.md](docs/REAL_DEVICE_TEST_PLAN.md) on a physical phone, frame-rate measurements and TalkBack checks. No signed release has been published. The supported-app list is short and recognition will miss notification formats it has not seen. There is no data export, and apart from their category, existing transactions cannot be edited yet.
 
 ## Project background
 
