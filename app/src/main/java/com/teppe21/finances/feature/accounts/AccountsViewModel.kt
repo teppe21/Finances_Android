@@ -4,7 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.domain.model.Account
+import com.teppe21.finances.domain.fx.RateTable
 import com.teppe21.finances.domain.model.AccountType
+import com.teppe21.finances.domain.model.Transaction
+import com.teppe21.finances.domain.usecase.CalculateFinancialStatsUseCase
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,16 +25,29 @@ data class AccountRow(
     val pendingCount: Int
 )
 
-class AccountsViewModel : ViewModel() {
+class AccountsViewModel(
+    accountsFlow: Flow<List<Account>>,
+    transactionsFlow: Flow<List<Transaction>>,
+    ratesFlow: Flow<RateTable>,
+    private val stats: CalculateFinancialStatsUseCase,
+    private val insertAccount: suspend (Account) -> Unit
+) : ViewModel() {
 
-    private val app = FinancesApp.instance
-    private val accountRepo = app.accountRepository
-    private val stats = app.calculateStatsUseCase
+    /** Used by the default `viewModel()` factory: wires the app-level repositories. */
+    constructor() : this(FinancesApp.instance)
+
+    private constructor(app: FinancesApp) : this(
+        accountsFlow = app.accountRepository.getAllAccountsFlow(),
+        transactionsFlow = app.transactionRepository.getAllTransactionsFlow(),
+        ratesFlow = app.exchangeRateRepository.tableFlow,
+        stats = app.calculateStatsUseCase,
+        insertAccount = { app.accountRepository.insertAccount(it) }
+    )
 
     val accounts: StateFlow<List<AccountRow>> = combine(
-        accountRepo.getAllAccountsFlow(),
-        app.transactionRepository.getAllTransactionsFlow(),
-        app.exchangeRateRepository.tableFlow
+        accountsFlow,
+        transactionsFlow,
+        ratesFlow
     ) { accounts, transactions, table ->
         val byAccount = transactions.groupBy { it.accountId }
         accounts.map { acc ->
@@ -42,7 +59,7 @@ class AccountsViewModel : ViewModel() {
 
     fun addAccount(name: String, institution: String, type: AccountType, currency: String, openingBalanceMinor: Long) {
         viewModelScope.launch {
-            accountRepo.insertAccount(
+            insertAccount(
                 Account(
                     id = UUID.randomUUID().toString(),
                     name = name.trim(),

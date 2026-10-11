@@ -15,6 +15,7 @@ import com.teppe21.finances.native.notification.parsing.NotificationSource
 import com.teppe21.finances.native.notification.parsing.Recognition
 import com.teppe21.finances.native.notification.parsing.SourceType
 import com.teppe21.finances.native.notification.parsing.SupportedSources
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -133,29 +134,44 @@ class NotificationViewModel : ViewModel() {
     }
 }
 
-class ReviewViewModel : ViewModel() {
-    private val app = FinancesApp.instance
+class ReviewViewModel(
+    pendingFlow: Flow<List<Transaction>>,
+    accountsFlow: Flow<List<Account>>,
+    private val updateTransaction: suspend (Transaction) -> Unit,
+    private val deleteTransaction: suspend (String) -> Unit,
+    private val markProcessed: suspend (String) -> Unit,
+    private val clock: () -> Instant = Instant::now
+) : ViewModel() {
 
-    val pending: StateFlow<List<Transaction>> = app.transactionRepository.getPendingTransactionsFlow()
+    /** Used by the default `viewModel()` factory: wires the app-level repositories. */
+    constructor() : this(FinancesApp.instance)
+
+    private constructor(app: FinancesApp) : this(
+        pendingFlow = app.transactionRepository.getPendingTransactionsFlow(),
+        accountsFlow = app.accountRepository.getAllAccountsFlow(),
+        updateTransaction = { app.transactionRepository.update(it) },
+        deleteTransaction = { app.transactionRepository.deleteById(it) },
+        markProcessed = { app.notificationRepository.markProcessedForTransaction(it) }
+    )
+
+    val pending: StateFlow<List<Transaction>> = pendingFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val accounts: StateFlow<List<Account>> = app.accountRepository.getAllAccountsFlow()
+    val accounts: StateFlow<List<Account>> = accountsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun confirm(tx: Transaction, accountId: String) {
         if (accountId.isBlank()) return
         viewModelScope.launch {
-            app.transactionRepository.update(
-                tx.copy(accountId = accountId, pending = false, notes = null, updatedAt = Instant.now())
-            )
-            app.notificationRepository.markProcessedForTransaction(tx.id)
+            updateTransaction(tx.copy(accountId = accountId, pending = false, notes = null, updatedAt = clock()))
+            markProcessed(tx.id)
         }
     }
 
     fun discard(tx: Transaction) {
         viewModelScope.launch {
-            app.transactionRepository.deleteById(tx.id)
-            app.notificationRepository.markProcessedForTransaction(tx.id)
+            deleteTransaction(tx.id)
+            markProcessed(tx.id)
         }
     }
 }
