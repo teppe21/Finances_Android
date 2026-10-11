@@ -23,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 
 /**
  * The app's motion language, built on springs.
@@ -154,6 +156,18 @@ fun Modifier.pressClickable(enabled: Boolean = true, onClick: () -> Unit): Modif
         interactionSource = source,
         indication = LocalIndication.current,
         enabled = enabled,
+        onClick = onClick
+    )
+}
+
+/** [selectable] with the standard ripple plus [pressScale], for rows that act as a choice. */
+fun Modifier.pressSelectable(selected: Boolean, role: Role? = null, onClick: () -> Unit): Modifier = composed {
+    val source = remember { MutableInteractionSource() }
+    pressScale(source, pressedScale = 0.98f).selectable(
+        selected = selected,
+        interactionSource = source,
+        indication = LocalIndication.current,
+        role = role,
         onClick = onClick
     )
 }

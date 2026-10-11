@@ -53,6 +53,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.core.money.Money
+import com.teppe21.finances.core.ui.CurrencyChips
+import com.teppe21.finances.core.ui.DialogColumn
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.core.utils.CurrencyFormatter
@@ -192,7 +194,7 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
             onDismissRequest = { showAdd = false },
             title = { Text(stringResource(R.string.budget_dialog_title)) },
             text = {
-                androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DialogColumn {
                     Text(stringResource(R.string.category), style = MaterialTheme.typography.labelMedium)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(state.categories, key = { it.id }) { cat ->
@@ -200,11 +202,7 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
                         }
                     }
                     Text(stringResource(R.string.currency), style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SupportedCurrencies.ALL.forEach { c ->
-                            FilterChip(selected = currency == c.code, onClick = { currency = c.code }, label = { Text(c.code) })
-                        }
-                    }
+                    CurrencyChips(selected = currency, onSelect = { currency = it })
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15) },

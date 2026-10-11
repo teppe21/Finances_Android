@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.semantics.semantics
@@ -28,11 +29,12 @@ import com.teppe21.finances.core.theme.Sizes
 import com.teppe21.finances.core.theme.Spacing
 import com.teppe21.finances.core.theme.amount
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * A name on the start side and an amount on the end side. The amount is measured first at its
  * full width and is never truncated; the name gets what is left. When that would leave the name
- * narrower than [minLabelWidth] (very large amounts, large font scales, narrow screens), the
+ * narrower than [minLabelWidth] (scaled with the font scale; very large amounts, narrow screens), the
  * amount moves under the name, still aligned to the end, instead of squeezing it.
  *
  * Before this existed, a long merchant name could take the whole row and leave the amount a
@@ -58,7 +60,9 @@ fun AmountRowLayout(
         val amountPlaceable = measurables.first { it.layoutId == "amount" }.measure(Constraints(maxWidth = width))
         val labelMeasurable = measurables.first { it.layoutId == "label" }
         val room = width - amountPlaceable.width - gapPx
-        if (room >= minLabelWidth.roundToPx()) {
+        // The name is text, so the room it needs grows with the font scale.
+        val neededForLabel = (minLabelWidth.toPx() * fontScale.coerceAtLeast(1f)).roundToInt()
+        if (room >= neededForLabel) {
             val labelPlaceable = labelMeasurable.measure(Constraints(maxWidth = room))
             val height = max(max(labelPlaceable.height, amountPlaceable.height), constraints.minHeight)
             layout(width, height) {
@@ -114,13 +118,14 @@ fun ListRow(
             modifier = Modifier.weight(1f),
             label = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = titleWeight, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    // A third line at large font scales, so a long category or merchant name stays recognisable.
+                    Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = titleWeight, maxLines = if (LocalDensity.current.fontScale >= 1.3f) 3 else 2, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {
                         Text(
                             subtitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -150,9 +155,9 @@ fun ValueRow(
             .semantics(mergeDescendants = true) {},
         label = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 if (detail != null) {
-                    Text(detail, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(detail, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         },

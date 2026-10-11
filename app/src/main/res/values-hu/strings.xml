@@ -516,6 +516,7 @@
     <string name="save">Mentés</string>
     <string name="delete">Törlés</string>
     <string name="back">Vissza</string>
+    <string name="close">Bezárás</string>
     <string name="apply">Alkalmaz</string>
     <string name="total_balance">Teljes egyenleg</string>
     <string name="income">Bevétel</string>
@@ -589,6 +590,8 @@
     <string name="top_merchants">Legtöbbet kapó kereskedők</string>
     <string name="no_analytics_data">Ebben az időszakban nincs kiadás.</string>
     <string name="tap_to_filter">Koppints egy kategóriára a kiemeléshez</string>
+    <string name="clear_search">Keresés törlése</string>
+    <string name="analytics_donut_description">Kördiagram a költésekről kategóriánként. Összesen %1$s. %2$s.</string>
     <string name="more_title">Továbbiak</string>
     <string name="more_notif_sub">Tranzakciók felismerése támogatott bankappok értesítéseiből</string>
     <string name="more_csv_sub">Bankszámlakivonatok importálása</string>

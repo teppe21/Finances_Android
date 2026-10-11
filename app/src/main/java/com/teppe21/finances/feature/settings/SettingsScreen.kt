@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.settings
 
+import com.teppe21.finances.core.theme.Radii
+
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.compose.foundation.clickable
@@ -43,6 +45,9 @@ import com.teppe21.finances.BuildConfig
 import com.teppe21.finances.data.fx.FxSyncState
 import com.teppe21.finances.data.local.preferences.LockType
 import com.teppe21.finances.data.local.preferences.PinCheck
+import com.teppe21.finances.core.ui.DialogColumn
+import com.teppe21.finances.core.ui.ChipFlow
+import com.teppe21.finances.core.ui.CurrencyChips
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.core.ui.pressClickable
 import androidx.compose.ui.draw.clip
@@ -94,7 +99,7 @@ fun SettingsScreen(
 
         item {
             SectionCard(title = stringResource(R.string.settings_appearance)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChipFlow {
                     listOf("system" to R.string.settings_theme_system, "light" to R.string.settings_theme_light, "dark" to R.string.settings_theme_dark).forEach { (key, label) ->
                         FilterChip(selected = prefs.theme == key, onClick = { viewModel.setTheme(key) }, label = { Text(stringResource(label)) })
                     }
@@ -105,11 +110,7 @@ fun SettingsScreen(
         item {
             SectionCard(title = stringResource(R.string.currency)) {
                 Text(stringResource(R.string.settings_display_currency), style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SupportedCurrencies.ALL.forEach { c ->
-                        FilterChip(selected = prefs.currency == c.code, onClick = { viewModel.setCurrency(c.code) }, label = { Text(c.code) })
-                    }
-                }
+                CurrencyChips(selected = prefs.currency, onSelect = { viewModel.setCurrency(it) })
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.settings_exchange_rates), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Text(rateSummary(table, sync, LocalContext.current), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -296,7 +297,7 @@ private fun LinkRow(title: String, subtitle: String, onClick: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(Radii.control)
             .pressClickable(onClick = onClick)
             .padding(vertical = 8.dp)
     ) {
@@ -332,7 +333,7 @@ private fun SetPinDialog(viewModel: SettingsViewModel, requireCurrent: Boolean, 
         onDismissRequest = onClose,
         title = { Text(stringResource(if (requireCurrent) R.string.settings_change_pin else R.string.settings_set_pin)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (requireCurrent) PinField(current, stringResource(R.string.pin_current)) { current = it }
                 PinField(pin, stringResource(R.string.pin_new)) { pin = it }
                 PinField(confirm, stringResource(R.string.pin_repeat)) { confirm = it }
@@ -370,7 +371,7 @@ private fun DisableLockDialog(viewModel: SettingsViewModel, hasPin: Boolean, onC
         onDismissRequest = onClose,
         title = { Text(stringResource(R.string.settings_lock_off_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.settings_lock_off_body))
                 if (hasPin) PinField(pin, stringResource(R.string.pin_current)) { pin = it }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -403,7 +404,7 @@ private fun ManualRatesDialog(table: RateTable, viewModel: SettingsViewModel, on
         onDismissRequest = onClose,
         title = { Text(stringResource(R.string.settings_manual_rates_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     stringResource(R.string.settings_manual_rates_note),
                     style = MaterialTheme.typography.bodySmall

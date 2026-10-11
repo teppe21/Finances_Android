@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.importcsv
 
+import com.teppe21.finances.core.theme.Radii
+
 import com.teppe21.finances.feature.categories.accountLabel
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -102,7 +104,7 @@ fun CsvImportScreen(
         if (state.summary == null) item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = Radii.card,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(
@@ -135,7 +137,7 @@ fun CsvImportScreen(
                             FinancesApp.instance.appLock.expectExternalActivity()
                             filePicker.launch(arrayOf("text/comma-separated-values", "text/csv", "text/plain", "*/*"))
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = Radii.control,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -173,7 +175,7 @@ fun CsvImportScreen(
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = Radii.card,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
                 ) {
                     Text(
@@ -192,7 +194,7 @@ fun CsvImportScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = Radii.card,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
@@ -254,7 +256,7 @@ fun CsvImportScreen(
                         Button(
                             onClick = viewModel::executeImport,
                             enabled = !state.isImporting && state.newCount > 0,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = Radii.control,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.fillMaxWidth()
                         ) {

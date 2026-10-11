@@ -1,6 +1,12 @@
 package com.teppe21.finances.feature.analytics
 
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.teppe21.finances.core.ui.ShrinkToFitText
 import androidx.compose.ui.text.rememberTextMeasurer
 import com.teppe21.finances.domain.model.FinancialStats
 import com.teppe21.finances.core.ui.SectionCard
@@ -18,7 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.selection.selectable
+import com.teppe21.finances.core.ui.pressSelectable
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.Crossfade
@@ -99,6 +105,25 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.atan2
 import kotlin.math.sqrt
+
+
+/** Ring stroke; the selected segment is drawn [DONUT_SELECTED_STROKE] times as thick. */
+internal val DONUT_STROKE = 28.dp
+internal const val DONUT_SELECTED_STROKE = 1.3f
+
+/**
+ * The ring grows with the font scale (up to what fits a 360 dp card), so the text in the hole can
+ * follow the user's font size instead of being capped: the hole is what the centre text has to fit.
+ */
+internal const val DONUT_CENTRE_TAG = "donutCentre"
+
+internal fun donutRingSize(fontScale: Float): Dp = (220f + 60f * (fontScale - 1f)).coerceIn(220f, 280f).dp
+
+/** Diameter of the open hole, measured inside the thickest (selected) segment. */
+internal fun donutHoleDiameter(ringSize: Dp): Dp = ringSize - DONUT_STROKE * (2f * DONUT_SELECTED_STROKE)
+
+/** Width of the text column in the hole: narrower than the hole, so a stack of lines stays inside the circle. */
+internal fun donutCentreWidth(ringSize: Dp): Dp = donutHoleDiameter(ringSize) * 0.82f
 
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -383,16 +408,22 @@ fun SpendingDonutChartCard(
         }
 
         val segments = remember(breakdown) { donutSegments(breakdown.map { it.totalMinor }) }
+        val chartDescription = stringResource(
+            R.string.analytics_donut_description,
+            CurrencyFormatter.format(totalExpenseMinor, currency),
+            breakdown.joinToString("; ") { "${it.categoryName} ${CurrencyFormatter.formatPercent(it.percentage)}" }
+        )
+        val ringTarget = donutRingSize(LocalDensity.current.fontScale)
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = Spacing.s), contentAlignment = Alignment.Center) {
+        val ringSize = minOf(maxWidth, ringTarget)
         Box(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(vertical = Spacing.s)
-                .size(220.dp),
+            modifier = Modifier.size(ringSize),
             contentAlignment = Alignment.Center
         ) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
+                    .semantics { contentDescription = chartDescription }
                     .pointerInput(segments, selectedCategoryId) {
                         detectTapGestures { offset ->
                             val dx = offset.x - size.width / 2f
@@ -409,8 +440,8 @@ fun SpendingDonutChartCard(
                         }
                     }
             ) {
-                val stroke = 28.dp.toPx()
-                val diameter = size.minDimension - stroke * 1.3f
+                val stroke = DONUT_STROKE.toPx()
+                val diameter = size.minDimension - stroke * DONUT_SELECTED_STROKE
                 val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
                 val arcSize = Size(diameter, diameter)
                 val revealed = 360f * reveal.value
@@ -427,42 +458,48 @@ fun SpendingDonutChartCard(
                         topLeft = topLeft,
                         size = arcSize,
                         // Flat ends: round caps bulged over the neighbours and overstated small shares.
-                        style = Stroke(width = if (item.categoryId == selectedCategoryId) stroke * 1.3f else stroke, cap = StrokeCap.Butt)
+                        style = Stroke(width = if (item.categoryId == selectedCategoryId) stroke * DONUT_SELECTED_STROKE else stroke, cap = StrokeCap.Butt)
                     )
                 }
             }
 
             // The centre shows the total, or the selected category; tapping it clears the selection.
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .widthIn(max = 140.dp)
-                    .clip(CircleShape)
-                    .clickable(enabled = selectedCategoryId != null) { selectedCategoryId?.let(select) }
-                    .padding(Spacing.s)
-            ) {
-                Text(
-                    text = selectedItem?.categoryName ?: stringResource(R.string.expenses),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                // The hole is narrow: a long total steps down in size instead of being cut.
-                val centreText = CurrencyFormatter.format(selectedItem?.totalMinor ?: totalExpenseMinor, currency)
-                val measurer = rememberTextMeasurer()
-                val large = MaterialTheme.typography.amountLarge
-                val fits = with(LocalDensity.current) { measurer.measure(centreText, large).size.width.toDp() } <= 124.dp
-                AmountText(centreText, style = if (fits) large else MaterialTheme.typography.labelLarge.tabular())
-                if (selectedItem != null) {
+            // The text follows the user's font scale; the ring grows with it (see donutRingSize) so
+            // the hole keeps room for the label, the total and the share.
+            run {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .testTag(DONUT_CENTRE_TAG)
+                        .width(donutCentreWidth(ringSize))
+                        .clip(Radii.control)
+                        .clickable(enabled = selectedCategoryId != null) { selectedCategoryId?.let(select) }
+                        .padding(horizontal = Spacing.s)
+                ) {
                     Text(
-                        CurrencyFormatter.formatPercent(selectedItem.percentage),
-                        style = MaterialTheme.typography.labelMedium.tabular(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = selectedItem?.categoryName ?: stringResource(R.string.expenses),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
                     )
+                    // A long total steps down in size instead of being cut.
+                    ShrinkToFitText(
+                        CurrencyFormatter.format(selectedItem?.totalMinor ?: totalExpenseMinor, currency),
+                        style = MaterialTheme.typography.amountLarge,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (selectedItem != null) {
+                        Text(
+                            CurrencyFormatter.formatPercent(selectedItem.percentage),
+                            style = MaterialTheme.typography.labelMedium.tabular(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
+        }
         }
 
         Spacer(Modifier.height(Spacing.s))
@@ -477,7 +514,7 @@ fun SpendingDonutChartCard(
                 modifier = Modifier
                     .clip(Radii.control)
                     .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .selectable(selected = isSelected, role = Role.Button) { select(item.categoryId) }
+                    .pressSelectable(selected = isSelected, role = Role.Button) { select(item.categoryId) }
                     .padding(horizontal = Spacing.s),
                 leading = {
                     Box(Modifier.size(12.dp).clip(CircleShape).background(CategoryColorProvider.getColor(item.categoryId, item.color)))

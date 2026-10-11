@@ -2,7 +2,7 @@
 
 ## Unit tests (JVM)
 
-`./gradlew testDebugUnitTest` runs 196 tests in `app/src/test`. They need no device and no Android framework classes (the real `org.json` is a test dependency).
+`./gradlew testDebugUnitTest` runs 224 tests in `app/src/test`. They need no device and no Android framework classes (the real `org.json` is a test dependency).
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
@@ -24,13 +24,17 @@
 | `ResourceLeaseTest` | 5 | The OCR resource lifecycle helper: released once after success or failure, released immediately when starting throws, **not released while the task runs after cancellation, released when it finishes**, duplicate completion cannot release twice |
 | `ViewModelTest` (4 classes) | 26 | Receipt: capture with rotation, account suggestion, empty total, recognition failure, double tap ignored, sample marking, save without image or text, double save blocked, save failure keeps the sheet open. Transactions: empty list, period/category/search filters, sorting with unconvertible amounts, manual entry, delete. Dashboard: loading state, empty database, confirmed-only totals, review count, unconvertible balance is unknown. Accounts: balances and pending counts, add trims input. Review: confirm, confirm without account, discard |
 | `SecurityTest` | 8 | PIN verifier accept/reject, random salt, no plaintext, Keystore-pepper requirement, malformed verifiers, iteration count, legacy hash migration, PIN policy, lockout schedule |
+| `DonutGeometryTest` | 11 | The Analytics ring: nothing to draw, one category is a whole ring, order kept, no overlap and a fixed gap, the sweeps close the ring, proportional sweeps, a tiny share kept at the minimum sweep, zero values skipped, tap to segment mapping, a tap in a gap or outside hits nothing, angle wrap-around |
+| `ThemeContrastTest` | 3 | WCAG contrast (4.5:1) of the ink, secondary ink, income, expense, transfer, warning, primary and market colours on the background and card surface, in light and dark, and of the text on the primary button |
+| `GlassContrastTest` | 4 | The glass tab bar composited over black, white and the page colour with the highlight at full strength: unselected and selected labels at 4.5:1 and the selected icon at 3:1, light and dark; the terracotta-on-pill label that would have failed; the fill stays mostly opaque and the highlight subtle |
+| `QuickReturnAndDonutLayoutTest` | 8 | The quick-return header state (hide after about 24 px down, return after the same up, direction change restarts the count, always shown at the top, never hidden while pinned) and the donut sizing rules (ring 220 dp at normal scale, grows with the font up to 280 dp, hole and centre column sizes) |
 | `StocksTest` | 19 | Finnhub parsing (quote, search, profile, candles, market status) incl. empty/null/zero/malformed data; HTTP 401/403/429/5xx, timeout, offline; key only in header; freshness labels; refresh policy; add/remove/reorder/duplicates/cap; persistence; missing key; live vs last close; rate-limit stop; stale cache; isolation from finance data |
 
 The ViewModels take their flows and actions as constructor parameters (the no-argument constructors wire the real app), so the tests use plain flows and small fakes instead of a database.
 
 ## Instrumented tests
 
-`./gradlew connectedDebugAndroidTest` needs an emulator or device and runs 36 tests. They use in-memory or throwaway databases with synthetic rows; they never read or change the app's own `finances.db`. Note that Gradle uninstalls the debug app from the device after the run.
+`./gradlew connectedDebugAndroidTest` needs an emulator or device and runs 59 tests. They use in-memory or throwaway databases with synthetic rows; they never read or change the app's own `finances.db`. Note that Gradle uninstalls the debug app from the device after the run.
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
@@ -40,6 +44,7 @@ The ViewModels take their flows and actions as constructor parameters (the no-ar
 | `ReviewFlowUiTest` | 10 | Confirm and discard collapse the card, then act and show a snackbar; an unassigned transaction cannot be confirmed until an account is chosen; empty queue; a quick swipe right confirms and left discards; a short slow drag settles back without committing; swiping to confirm without an account does nothing; Undo restores a discarded or confirmed transaction |
 | `NavigationUiTest` | 2 | Bottom tabs switch between top-level screens; drilling into a screen from More shows Back and Back returns to the list |
 | `UncategorizedFlowUiTest` | 2 | One category choice sorts a merchant group and saves the rule (with the snackbar count); the empty state and "Re-apply rules" |
+| `LayoutUiTest` | 23 | Layout guards at font scale 1.5 on a 300-360 dp wide column, English, Hungarian and dark: a huge amount stays whole on one line inside its row; a very long merchant is ellipsized and never takes the amount; a one-character merchant; the date line under a name is not cut; a transfer row is announced as a transfer (English and Hungarian); tab labels (English and Hungarian) are not clipped (**fails on the old tab bar**); currency chips wrap instead of stacking letters; the donut total fits its hole, also for a 987,654,321 Ft total; the donut has a spoken description (expected text taken from the string resource, so it holds in any locale); the donut text follows the font scale up to 2.0 and its centre fits inside the hole (1.0, 1.5, 2.0, selected category, huge total); the dashboard shortcuts keep the user's font size in English and Hungarian without cut or mid-word-broken labels; the Transactions quick-return header leaves on scroll down, returns on the first scroll up, and a pinned one stays (this test failed once on a graphics-layer implementation because the accessibility bounds did not move with the header, which led to a placement offset). Text cut-off is read from the text layout (an ellipsis, or a single line wanting more width than its box) |
 
 ## What has been run
 
@@ -54,6 +59,12 @@ On 2026-10-11, on Windows 11 with JDK 17.0.12, Android SDK platforms 34-36 and b
 | `./gradlew testReleaseUnitTest lintRelease assembleRelease` with a throwaway key | passed (R8 and resource shrinking); `apksigner verify` and `zipalign -c -P 16` succeeded; the minified APK launched on the emulator and the four tabs opened without a crash |
 
 On 2026-10-11, after the categorization work (schema 6), on the same machine: `testDebugUnitTest` passed (196), `lint` passed (0 errors), `assembleDebug` passed, and `connectedDebugAndroidTest` on the API 35 emulator passed (36). A synthetic Revolut-style CSV was also imported through the real file picker on the emulator: 29 rows imported, the reverted row skipped, 28 categorized, 1 uncategorized, 10 transfers detected, and Analytics showed the transfers on their own card, outside spending.
+
+On 2026-10-11, Phase 2 (typography, layout, accessibility): `testDebugUnitTest` 212 passed (198 before, plus 11 `DonutGeometryTest` and 3 `ThemeContrastTest`), `lint` 0 errors and 28 warnings, `assembleDebug` passed, and `connectedDebugAndroidTest` on the API 35 emulator 49 passed (36 before, plus 13 `LayoutUiTest`). Screens were also checked by eye on the emulator at 360 dp: see [HANDOFF.md](../HANDOFF.md) for exactly which screens, font scales, languages and themes.
+
+On 2026-10-11, Phase 3 (motion and glass chrome), on the same machine: `cleanTestDebugUnitTest testDebugUnitTest lint assembleDebug connectedDebugAndroidTest --offline` in one run, BUILD SUCCESSFUL. Unit tests 216 passed, 0 failed (212 before, plus 4 `GlassContrastTest`). Lint was re-run from a deleted report: 0 errors, 28 warnings, 1 hint. Instrumented tests on the API 35 emulator: 49 passed, 0 failed (no new instrumented test). Checked by eye on the emulator at 360 dp: light, dark and dark at font scale 1.5 (tab bar and content fade), and a tab switch with animations on vs. the animator scale at 0. See [HANDOFF.md](../HANDOFF.md) for what was not checked.
+
+On 2026-10-11, follow-up pass (Stage 3.1: font-scale caps removed, quick-return Transactions header, locale-safe donut test, release builds): `testDebugUnitTest lintDebug assembleDebug connectedDebugAndroidTest --rerun-tasks --offline` (88 tasks executed, BUILD SUCCESSFUL): unit tests 224 passed, 0 failed (216 before, plus 8 `QuickReturnAndDonutLayoutTest`); lint 0 errors, 28 warnings, 1 hint; instrumented tests on the API 35 emulator 59 passed, 0 failed (49 before, plus 10 in `LayoutUiTest`). `lintRelease assembleRelease --rerun-tasks --offline` (57 tasks executed, BUILD SUCCESSFUL) with a throwaway keystore passed through the `FINANCES_KEYSTORE_*` / `FINANCES_KEY_*` environment variables (generated outside the repository; the release lint report is 0 errors, 28 warnings, 1 hint). That release APK is minified and signed with the throwaway key only: it is not a distributable release, and it was not installed or run.
 
 Not run: `scripts/check-16kb-alignment.sh` (needs `readelf`, which this machine does not have; CI runs it), anything on a physical device, camera capture on a real receipt, notification access with real banking apps, TalkBack, and frame-rate measurements. Work through [REAL_DEVICE_TEST_PLAN.md](REAL_DEVICE_TEST_PLAN.md) for those.
 

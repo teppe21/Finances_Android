@@ -1,6 +1,9 @@
 package com.teppe21.finances.feature.dashboard
 
+import com.teppe21.finances.core.theme.Radii
+
 import com.teppe21.finances.core.theme.Spacing
+import com.teppe21.finances.core.theme.Sizes
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -62,6 +65,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
 import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.theme.tabular
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import com.teppe21.finances.core.ui.AmountRowLayout
+import com.teppe21.finances.core.ui.AmountText
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.InfoBanner
@@ -167,11 +176,14 @@ private fun DashboardContent(
         }
 
         item(key = "quick-actions") {
-            Row(place().fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                QuickAction(Modifier.weight(1f), stringResource(R.string.add_transaction), Icons.Default.Add, onAddTransaction)
-                QuickAction(Modifier.weight(1f), stringResource(R.string.scan_receipt), Icons.Default.CameraAlt, onNavigateToScanReceipt)
-                QuickAction(Modifier.weight(1f), stringResource(R.string.import_statement), Icons.Default.FileOpen, onNavigateToImportCsv)
-            }
+            QuickActions(
+                listOf(
+                    QuickActionItem(stringResource(R.string.add_transaction), Icons.Default.Add, onAddTransaction),
+                    QuickActionItem(stringResource(R.string.scan_receipt), Icons.Default.CameraAlt, onNavigateToScanReceipt),
+                    QuickActionItem(stringResource(R.string.import_statement), Icons.Default.FileOpen, onNavigateToImportCsv)
+                ),
+                place()
+            )
         }
 
         if (!state.hasAnyTransactions) {
@@ -323,24 +335,68 @@ private fun SummaryTile(
     }
 }
 
+class QuickActionItem(val title: String, val icon: ImageVector, val onClick: () -> Unit)
+
+private val QuickTilePadding = 4.dp
+private val QuickTileGap = 8.dp
+
+/**
+ * The dashboard shortcuts. They sit side by side while the longest word of every label fits its
+ * tile (so a label wraps at spaces, never in the middle of a word); at a large font scale or with
+ * a long Hungarian word they stack as full-width rows instead, so the text keeps the user's size.
+ */
 @Composable
-private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, onClick: () -> Unit) {
+fun QuickActions(items: List<QuickActionItem>, modifier: Modifier = Modifier) {
+    val style = MaterialTheme.typography.labelMedium
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val tileWidth = (maxWidth - QuickTileGap * (items.size - 1)) / items.size
+        val textWidthPx = with(LocalDensity.current) { (tileWidth - QuickTilePadding * 2).roundToPx() }
+        val sideBySide = items.all { item ->
+            item.title.split(' ').all { word -> measurer.measure(word, style).size.width <= textWidthPx }
+        }
+        if (sideBySide) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(QuickTileGap)) {
+                items.forEach { QuickActionTile(Modifier.weight(1f), it, stacked = false) }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(QuickTileGap)) {
+                items.forEach { QuickActionTile(Modifier.fillMaxWidth(), it, stacked = true) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionTile(modifier: Modifier, item: QuickActionItem, stacked: Boolean) {
     Surface(
         modifier = modifier
-            .height(84.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+            .heightIn(min = if (stacked) Sizes.row else 84.dp)
+            .then(if (stacked) Modifier else Modifier.fillMaxHeight())
+            .clip(Radii.card)
+            .pressClickable(onClick = item.onClick),
+        shape = Radii.card,
         color = MaterialTheme.colorScheme.surface
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(6.dp))
-            Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 1, textAlign = TextAlign.Center)
+        if (stacked) {
+            Row(
+                modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.s),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(item.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(Spacing.m))
+                Text(item.title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(horizontal = QuickTilePadding, vertical = Spacing.s),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(item.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.height(6.dp))
+                Text(item.title, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            }
         }
     }
 }
@@ -422,17 +478,24 @@ private fun CategoryBreakdownCard(
         breakdown.take(5).forEach { cat ->
             val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
             val shown = animatedFraction((cat.percentage / 100f).coerceIn(0f, 1f), "categoryShare")
-            Column(Modifier.padding(vertical = 5.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-                    Spacer(Modifier.width(8.dp))
-                    Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
-                    Text(
-                        "${CurrencyFormatter.format(cat.totalMinor, currency)} · ${cat.percentage.toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+            Column(Modifier.padding(vertical = 5.dp).semantics(mergeDescendants = true) {}) {
+                // The figure is measured first and never truncated; the name takes what is left (two
+                // lines) or the figure moves under it at a large font scale.
+                AmountRowLayout(
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+                            Spacer(Modifier.width(8.dp))
+                            Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    },
+                    amount = {
+                        AmountText(
+                            "${CurrencyFormatter.format(cat.totalMinor, currency)} · ${CurrencyFormatter.formatPercent(cat.percentage)}",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular()
+                        )
+                    }
+                )
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { shown },
@@ -448,8 +511,8 @@ private fun CategoryBreakdownCard(
 @Composable
 private fun StocksEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier.fillMaxWidth().clip(Radii.card).pressClickable(onClick = onClick),
+        shape = Radii.card,
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

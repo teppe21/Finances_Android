@@ -1,5 +1,8 @@
 package com.teppe21.finances.feature.categories
 
+import com.teppe21.finances.core.theme.Radii
+
+import com.teppe21.finances.core.ui.DialogColumn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -125,7 +128,7 @@ fun CategoriesScreen(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = Radii.card,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -246,7 +249,7 @@ fun CategoriesScreen(
             onDismissRequest = { viewModel.closeAddCategory() },
             title = { Text(stringResource(R.string.add_category)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DialogColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
@@ -332,7 +335,7 @@ fun CategoriesScreen(
             onDismissRequest = { viewModel.closeEditCategory() },
             title = { Text(stringResource(R.string.edit_category)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DialogColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
@@ -412,7 +415,7 @@ fun CategoriesScreen(
             onDismissRequest = { viewModel.cancelDeleteCategory() },
             title = { Text(stringResource(R.string.delete_category)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DialogColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (txCount > 0) {
                         Text(
                             text = stringResource(R.string.delete_category_in_use, txCount),

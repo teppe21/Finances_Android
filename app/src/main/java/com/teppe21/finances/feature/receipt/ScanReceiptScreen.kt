@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.receipt
 
+import com.teppe21.finances.core.theme.Radii
+
 import com.teppe21.finances.feature.categories.accountLabel
 import android.Manifest
 import android.content.pm.PackageManager
@@ -196,7 +198,7 @@ fun ScanReceiptScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = Radii.control,
                 color = Color.Black.copy(alpha = 0.6f),
                 modifier = Modifier.clickable { onNavigateBack() }
             ) {
@@ -211,7 +213,7 @@ fun ScanReceiptScreen(
             }
 
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = Radii.card,
                 color = Color.Black.copy(alpha = 0.6f)
             ) {
                 Text(
@@ -239,7 +241,7 @@ fun ScanReceiptScreen(
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier
                     .padding(bottom = 12.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.6f), Radii.small)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
@@ -340,10 +342,10 @@ fun ScanReceiptScreen(
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(top = 64.dp, start = 24.dp, end = 24.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(Radii.control)
                     .clickable { viewModel.dismissError() }
                     .semantics { liveRegion = LiveRegionMode.Assertive },
-                shape = RoundedCornerShape(12.dp),
+                shape = Radii.control,
                 color = MaterialTheme.colorScheme.errorContainer
             ) {
                 Text(stringResource(lastError), modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)

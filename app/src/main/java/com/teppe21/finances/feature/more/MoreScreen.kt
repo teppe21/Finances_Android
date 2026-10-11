@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.more
 
+import com.teppe21.finances.core.theme.Radii
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -158,9 +160,9 @@ fun MoreNavigationItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(Radii.card)
             .pressClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = Radii.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
@@ -175,7 +177,7 @@ fun MoreNavigationItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = Radii.control,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.size(42.dp)
                 ) {

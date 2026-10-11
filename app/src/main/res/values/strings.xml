@@ -14,6 +14,7 @@
     <string name="save">Save</string>
     <string name="delete">Delete</string>
     <string name="back">Back</string>
+    <string name="close">Close</string>
     <string name="apply">Apply</string>
 
     <!-- Dashboard -->
@@ -103,6 +104,8 @@
     <string name="top_merchants">Top merchants</string>
     <string name="no_analytics_data">No expenses in this period.</string>
     <string name="tap_to_filter">Tap a category to highlight it</string>
+    <string name="clear_search">Clear search</string>
+    <string name="analytics_donut_description">Donut chart of spending by category. Total %1$s. %2$s.</string>
 
     <!-- More -->
     <string name="more_title">More</string>

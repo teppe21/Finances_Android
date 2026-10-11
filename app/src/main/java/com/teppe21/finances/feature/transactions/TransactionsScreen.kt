@@ -1,12 +1,12 @@
 package com.teppe21.finances.feature.transactions
 
 import androidx.compose.ui.text.style.TextOverflow
-import com.teppe21.finances.core.ui.topScrollEdge
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.focus.onFocusChanged
+import com.teppe21.finances.core.ui.QuickReturnScaffold
 import com.teppe21.finances.feature.categories.accountLabel
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -80,9 +80,19 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.R
+import com.teppe21.finances.core.theme.Radii
+import com.teppe21.finances.core.theme.Spacing
 import com.teppe21.finances.core.theme.finances
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
 import com.teppe21.finances.core.money.Money
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.ShrinkToFitText
+import com.teppe21.finances.core.ui.CurrencyChips
+import com.teppe21.finances.core.ui.DialogColumn
+import com.teppe21.finances.core.theme.tabular
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.teppe21.finances.core.ui.Motion
 import com.teppe21.finances.core.ui.pressClickable
 import com.teppe21.finances.core.ui.TransactionRow
@@ -106,148 +116,146 @@ fun TransactionsScreen(
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
     var categorizing by remember { mutableStateOf<Transaction?>(null) }
 
+    val listState = rememberLazyListState()
+    // The search field stays put while it has focus, so typing never scrolls it out from under the keyboard.
+    var searchFocused by remember { mutableStateOf(false) }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+        // Search and period filters sit over the top of the list: they leave when the list is scrolled down
+        // (pinned, they took about a third of the screen at a large font scale) and return on the first scroll back up.
+        QuickReturnScaffold(
+            listState = listState,
+            pinned = searchFocused,
+            header = {
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = Spacing.l, end = Spacing.l, top = Spacing.s)
+                        .onFocusChanged { searchFocused = it.isFocused },
+                    placeholder = { Text(stringResource(R.string.search_placeholder), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (state.searchQuery.isNotBlank()) {
+                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear_search))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = Radii.card
+                )
+                Spacer(Modifier.height(Spacing.s + Spacing.xxs))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = Spacing.l),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    item {
+                        FilterChip(
+                            selected = state.selectedPeriod == "this_month",
+                            onClick = { viewModel.setPeriod("this_month") },
+                            label = { Text(stringResource(R.string.filter_this_month)) }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = state.selectedPeriod == "last_month",
+                            onClick = { viewModel.setPeriod("last_month") },
+                            label = { Text(stringResource(R.string.filter_last_month)) }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = state.selectedPeriod == "3_months",
+                            onClick = { viewModel.setPeriod("3_months") },
+                            label = { Text(stringResource(R.string.filter_3_months)) }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = state.selectedPeriod == "all",
+                            onClick = { viewModel.setPeriod("all") },
+                            label = { Text(stringResource(R.string.filter_all)) }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = state.onlyRecurring,
+                            onClick = { viewModel.toggleRecurring() },
+                            leadingIcon = { Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = { Text(stringResource(R.string.filter_recurring)) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(Spacing.s))
+            }
+        ) { headerPadding ->
+        LazyColumn(
+            state = listState,
+            contentPadding = headerPadding,
+            verticalArrangement = Arrangement.spacedBy(Spacing.m - Spacing.xxs),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Spacing.l)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Search Bar
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.search_placeholder), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (state.searchQuery.isNotBlank()) {
-                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(Icons.Default.Close, contentDescription = null)
+            item(key = "sort") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterChip(
+                        selected = true,
+                        onClick = { showSortModal = true },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Sort,
+                                contentDescription = stringResource(R.string.sort_by),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        label = {
+                            val sortLabel = when (state.sortOrder) {
+                                TransactionSortOrder.NEWEST -> stringResource(R.string.sort_newest)
+                                TransactionSortOrder.OLDEST -> stringResource(R.string.sort_oldest)
+                                TransactionSortOrder.AMOUNT_DESC -> stringResource(R.string.sort_amount_desc)
+                                TransactionSortOrder.AMOUNT_ASC -> stringResource(R.string.sort_amount_asc)
+                                TransactionSortOrder.MERCHANT_ASC -> stringResource(R.string.sort_merchant_asc)
+                                TransactionSortOrder.MERCHANT_DESC -> stringResource(R.string.sort_merchant_desc)
+                            }
+                            Text(sortLabel, style = MaterialTheme.typography.labelSmall)
                         }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(20.dp)
-            )
+                    )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                    val count = state.filteredTransactions.size
 
-            // Filter Chips
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                item {
-                    FilterChip(
-                        selected = state.selectedPeriod == "this_month",
-                        onClick = { viewModel.setPeriod("this_month") },
-                        label = { Text(stringResource(R.string.filter_this_month)) }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = state.selectedPeriod == "last_month",
-                        onClick = { viewModel.setPeriod("last_month") },
-                        label = { Text(stringResource(R.string.filter_last_month)) }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = state.selectedPeriod == "3_months",
-                        onClick = { viewModel.setPeriod("3_months") },
-                        label = { Text(stringResource(R.string.filter_3_months)) }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = state.selectedPeriod == "all",
-                        onClick = { viewModel.setPeriod("all") },
-                        label = { Text(stringResource(R.string.filter_all)) }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = state.onlyRecurring,
-                        onClick = { viewModel.toggleRecurring() },
-                        leadingIcon = { Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                        label = { Text(stringResource(R.string.filter_recurring)) }
+                    Text(
+                        text = pluralStringResource(R.plurals.transaction_count, count, count),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Sort & Count Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilterChip(
-                    selected = true,
-                    onClick = { showSortModal = true },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = stringResource(R.string.sort_by),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    label = {
-                        val sortLabel = when (state.sortOrder) {
-                            TransactionSortOrder.NEWEST -> stringResource(R.string.sort_newest)
-                            TransactionSortOrder.OLDEST -> stringResource(R.string.sort_oldest)
-                            TransactionSortOrder.AMOUNT_DESC -> stringResource(R.string.sort_amount_desc)
-                            TransactionSortOrder.AMOUNT_ASC -> stringResource(R.string.sort_amount_asc)
-                            TransactionSortOrder.MERCHANT_ASC -> stringResource(R.string.sort_merchant_asc)
-                            TransactionSortOrder.MERCHANT_DESC -> stringResource(R.string.sort_merchant_desc)
-                        }
-                        Text(sortLabel, style = MaterialTheme.typography.labelSmall)
-                    }
-                )
-
-                val count = state.filteredTransactions.size
-
-                Text(
-                    text = pluralStringResource(R.plurals.transaction_count, count, count),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Transactions List: only the empty <-> non-empty switch is animated (a fade). Filter and
-            // sort changes keep the same list and just move rows, so scroll position is preserved.
-            AnimatedContent(
-                targetState = state.filteredTransactions.isEmpty(),
-                modifier = Modifier.weight(1f),
-                transitionSpec = { Motion.fadeInShort() togetherWith Motion.fadeOutShort() },
-                label = "transactionsEmpty"
-            ) { isEmpty ->
-                if (isEmpty) {
+            if (state.filteredTransactions.isEmpty()) {
+                item(key = "empty") {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xxl),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = stringResource(R.string.no_transactions),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
                     }
-                } else {
-                    val listState = rememberLazyListState()
-                    val edgeColor = MaterialTheme.colorScheme.background
-                    LazyColumn(
-                        state = listState,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize().topScrollEdge(listState, edgeColor)
-                    ) {
+                }
+            } else {
                         if (state.unconvertedCount > 0) {
                             item(key = "unconverted-banner") {
                                 InfoBanner(
@@ -266,10 +274,9 @@ fun TransactionsScreen(
                                 modifier = Modifier.animateItemPlacement(Motion.medium())
                             )
                         }
-                        item { Spacer(modifier = Modifier.height(88.dp)) }
-                    }
-                }
             }
+            item { Spacer(modifier = Modifier.height(88.dp)) }
+        }
         }
 
         // Floating Action Button for New Transaction
@@ -312,7 +319,7 @@ fun TransactionsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(Radii.control)
                                 .clickable {
                                     viewModel.setSortOrder(order)
                                     showSortModal = false
@@ -431,34 +438,58 @@ fun TransactionDetailContent(
     onChangeCategory: (() -> Unit)? = null,
     onClose: () -> Unit
 ) {
+    val isTransfer = transaction.direction.isTransfer
+    val amountColor = when {
+        isTransfer -> MaterialTheme.finances.transfer
+        transaction.amountMinor > 0 -> MaterialTheme.finances.income
+        else -> MaterialTheme.finances.expense
+    }
+    // The sheet can be taller than the screen at a large font scale, so it scrolls.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.l)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = transaction.merchant ?: transaction.description,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = null)
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
             }
         }
 
-        // The stored amount in its own currency is always the primary figure.
-        Text(
+        // The stored amount in its own currency is always the primary figure. It stays on one line
+        // and steps down in size for a very long figure.
+        ShrinkToFitText(
             text = CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (transaction.amountMinor > 0) MaterialTheme.finances.income else MaterialTheme.finances.expense
+            style = MaterialTheme.typography.headlineMedium.tabular().copy(fontWeight = FontWeight.Bold),
+            color = amountColor,
+            floorSp = 16f,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.fillMaxWidth()
         )
+        if (isTransfer) {
+            // Transfers are shown apart from income and spending, here and in the analytics.
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                Text(
+                    if (transaction.direction == TransactionDirection.PERSONAL_TRANSFER) stringResource(R.string.kind_personal_transfer) else stringResource(R.string.kind_transfer),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = amountColor
+                )
+                Text(stringResource(R.string.analytics_transfers_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
 
         if (!displayCurrency.equals(transaction.currency, ignoreCase = true)) {
             DetailRow(
@@ -501,7 +532,7 @@ fun TransactionDetailContent(
             onClick = onDelete,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.finances.expense),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = Radii.control
         ) {
             Icon(Icons.Default.Delete, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
@@ -512,12 +543,20 @@ fun TransactionDetailContent(
 
 @Composable
 fun DetailRow(label: String, value: String) {
+    // Neither side may push the other out: a long note or account name wraps (right-aligned) and the
+    // label keeps its share, so the two never collide at a large font scale.
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f, fill = false))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1.4f, fill = false).padding(start = Spacing.m)
+        )
     }
 }
 
@@ -552,7 +591,7 @@ fun AddTransactionDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.add_transaction)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DialogColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val expenseColor by animateColorAsState(
                         if (isExpense) MaterialTheme.finances.expense else MaterialTheme.colorScheme.surfaceVariant,
@@ -583,18 +622,12 @@ fun AddTransactionDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    com.teppe21.finances.domain.model.SupportedCurrencies.ALL.forEach { curr ->
-                        FilterChip(
-                            selected = selectedCurrency.equals(curr.code, ignoreCase = true),
-                            onClick = { selectedCurrency = curr.code },
-                            label = { Text("${curr.code} (${curr.symbol})", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
+                CurrencyChips(
+                    selected = selectedCurrency,
+                    onSelect = { selectedCurrency = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { "${it.code} (${it.symbol})" }
+                )
 
                 OutlinedTextField(
                     value = amountText,

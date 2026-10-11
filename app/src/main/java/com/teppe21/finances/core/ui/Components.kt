@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -92,8 +95,8 @@ fun EmptyState(title: String, body: String, modifier: Modifier = Modifier, actio
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             if (action != null) {
                 Spacer(Modifier.height(4.dp))
                 action()
@@ -102,14 +105,28 @@ fun EmptyState(title: String, body: String, modifier: Modifier = Modifier, actio
     }
 }
 
+/**
+ * The body of an `AlertDialog` that holds several fields. It scrolls when the dialog is taller than
+ * the screen (a large font scale, a small phone, the keyboard open) instead of pushing the buttons
+ * off screen.
+ */
+@Composable
+fun DialogColumn(
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(Spacing.s),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = verticalArrangement, content = content)
+}
+
 /** Neutral information strip (exchange-rate gaps, review queue, stale data). */
 @Composable
 fun InfoBanner(text: String, modifier: Modifier = Modifier, icon: ImageVector = Icons.Default.Info, onClick: (() -> Unit)? = null) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(16.dp)).pressClickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(16.dp),
+            .then(if (onClick != null) Modifier.clip(Radii.row).pressClickable(onClick = onClick) else Modifier),
+        shape = Radii.row,
         color = MaterialTheme.colorScheme.secondaryContainer
     ) {
         Row(
@@ -210,7 +227,8 @@ fun TransactionRow(
                             title,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
+                            // At large font scales the name gets a second line so it stays recognisable.
+                            maxLines = if (LocalDensity.current.fontScale >= 1.3f) 2 else 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     },
@@ -224,11 +242,12 @@ fun TransactionRow(
                             .background(CategoryColorProvider.getColor(transaction.categoryId))
                     )
                     Spacer(Modifier.width(Spacing.xs + Spacing.xxs))
+                    // Category, date and status can run long; two lines keep the date from being cut.
                     Text(
                         details,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

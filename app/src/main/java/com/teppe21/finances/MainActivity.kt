@@ -1,6 +1,7 @@
 package com.teppe21.finances
 
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
@@ -413,6 +414,7 @@ fun MainAppNavigation() {
     val barState = remember(currentRoute) { TopAppBarState(-Float.MAX_VALUE, 0f, 0f) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(barState)
     val scrolledBarColor = MaterialTheme.colorScheme.surface
+    val pageColor = MaterialTheme.colorScheme.background
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -473,6 +475,15 @@ fun MainAppNavigation() {
                         drawRect(
                             Brush.verticalGradient(listOf(scrolledBarColor.copy(alpha = fraction), Color.Transparent), endY = 12.dp.toPx()),
                             size = Size(size.width, 12.dp.toPx())
+                        )
+                    }
+                    // Above the floating tab bar the content dissolves into the page instead of ending in a hard cut.
+                    if (!hideBars && isTopLevel) {
+                        val h = 16.dp.toPx()
+                        drawRect(
+                            Brush.verticalGradient(listOf(Color.Transparent, pageColor), startY = size.height - h, endY = size.height),
+                            topLeft = Offset(0f, size.height - h),
+                            size = Size(size.width, h)
                         )
                     }
                 },
