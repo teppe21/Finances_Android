@@ -55,7 +55,7 @@ fun SectionCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -92,8 +92,8 @@ fun InfoBanner(text: String, modifier: Modifier = Modifier, icon: ImageVector = 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(12.dp)).pressClickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(12.dp),
+            .then(if (onClick != null) Modifier.clip(RoundedCornerShape(16.dp)).pressClickable(onClick = onClick) else Modifier),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.secondaryContainer
     ) {
         Row(
@@ -153,10 +153,10 @@ fun TransactionRow(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
             .pressClickable(onClick = onClick)
             .semantics { contentDescription = "$directionLabel, $title, $primaryAmount, $details" },
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(

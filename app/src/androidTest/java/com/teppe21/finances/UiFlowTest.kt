@@ -8,6 +8,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -208,6 +212,105 @@ class ReviewFlowUiTest {
         rule.onNodeWithText("Nothing to review").assertIsDisplayed()
     }
 
+    private fun viewModel(
+        items: MutableStateFlow<List<Transaction>>,
+        updated: MutableList<Transaction> = mutableListOf(),
+        deleted: MutableList<String> = mutableListOf(),
+        restored: MutableList<Transaction> = mutableListOf()
+    ) = ReviewViewModel(
+        pendingFlow = items,
+        accountsFlow = MutableStateFlow(listOf(bank)),
+        updateTransaction = { updated += it; items.value = items.value.filter { t -> t.id != it.id } + if (it.pending) listOf(it) else emptyList() },
+        deleteTransaction = { id -> deleted += id; items.value = items.value.filter { it.id != id } },
+        markProcessed = { },
+        restoreTransaction = { restored += it; items.value = items.value + it }
+    )
+
+    @Test
+    fun aQuickSwipeRightConfirmsTheTransaction() {
+        val items = MutableStateFlow(listOf(pending("s1")))
+        val updated = mutableListOf<Transaction>()
+        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated)) } }
+
+        rule.onNodeWithTag("review-card-s1").performTouchInput { swipeRight(durationMillis = 120) }
+
+        rule.waitUntil(5_000) { updated.isNotEmpty() }
+        assertEquals("acc_bank", updated.single().accountId)
+        assertFalse(updated.single().pending)
+    }
+
+    @Test
+    fun aQuickSwipeLeftDiscardsTheTransaction() {
+        val items = MutableStateFlow(listOf(pending("s2")))
+        val deleted = mutableListOf<String>()
+        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, deleted = deleted)) } }
+
+        rule.onNodeWithTag("review-card-s2").performTouchInput { swipeLeft(durationMillis = 120) }
+
+        rule.waitUntil(5_000) { deleted.isNotEmpty() }
+        assertEquals(listOf("s2"), deleted)
+    }
+
+    @Test
+    fun aShortSlowDragSettlesBackWithoutCommitting() {
+        val items = MutableStateFlow(listOf(pending("s3")))
+        val updated = mutableListOf<Transaction>()
+        val deleted = mutableListOf<String>()
+        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated, deleted)) } }
+
+        rule.onNodeWithTag("review-card-s3").performTouchInput {
+            swipeRight(startX = left + 10f, endX = left + width * 0.15f, durationMillis = 900)
+        }
+        rule.waitForIdle()
+
+        assertTrue(updated.isEmpty() && deleted.isEmpty())
+        rule.onNodeWithText("Coffee s3").assertIsDisplayed()
+        rule.onNodeWithText("Confirm").assertIsEnabled()
+    }
+
+    @Test
+    fun withoutAnAccountASwipeToConfirmResistsAndNothingHappens() {
+        val items = MutableStateFlow(listOf(pending("s4", accountId = "")))
+        val updated = mutableListOf<Transaction>()
+        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated)) } }
+
+        rule.onNodeWithTag("review-card-s4").performTouchInput { swipeRight(durationMillis = 120) }
+        rule.waitForIdle()
+
+        assertTrue(updated.isEmpty())
+        rule.onNodeWithText("Choose the account this belongs to.").assertIsDisplayed()
+    }
+
+    @Test
+    fun undoBringsADiscardedTransactionBack() {
+        val items = MutableStateFlow(listOf(pending("s5")))
+        val restored = mutableListOf<Transaction>()
+        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, restored = restored)) } }
+
+        rule.onNodeWithText("Discard").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithTextCount("Discarded. Nothing was added.") > 0 }
+        rule.onNodeWithText("Undo").performClick()
+
+        rule.waitUntil(5_000) { restored.isNotEmpty() }
+        assertEquals("s5", restored.single().id)
+        rule.waitUntil(5_000) { rule.onAllNodesWithTextCount("Coffee s5") > 0 }
+    }
+
+    @Test
+    fun undoPutsAConfirmedTransactionBackInTheQueue() {
+        val items = MutableStateFlow(listOf(pending("s6")))
+        val updated = mutableListOf<Transaction>()
+        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated)) } }
+
+        rule.onNodeWithText("Confirm").performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithTextCount("Confirmed. It now counts toward your totals.") > 0 }
+        rule.onNodeWithText("Undo").performClick()
+
+        rule.waitUntil(5_000) { updated.size >= 2 }
+        assertTrue("the original, still pending, was written back", updated.last().pending)
+        rule.waitUntil(5_000) { rule.onAllNodesWithTextCount("Coffee s6") > 0 }
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextCount(text: String): Int =
         onAllNodesWithText(text).fetchSemanticsNodes().size
 }
@@ -238,14 +341,19 @@ class NavigationUiTest {
     }
 
     @Test
-    fun drillingIntoAScreenShowsBackAndBackReturnsHome() {
-        rule.waitUntil(10_000) { rule.onAllNodesWithText("Stocks").fetchSemanticsNodes().isNotEmpty() }
+    fun drillingIntoAScreenShowsBackAndBackReturnsToTheList() {
+        // Via the More tab so the test does not depend on what data the device happens to hold.
+        rule.waitUntil(10_000) { rule.onAllNodesWithText(label(R.string.nav_more)).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText(label(R.string.nav_more)).performClick()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Stocks").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Stocks").performClick()
 
         rule.waitUntil(5_000) { rule.onAllNodesWithContentDescription(label(R.string.back)).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithContentDescription(label(R.string.back)).performClick()
 
-        rule.waitUntil(5_000) { rule.onAllNodesWithText(label(R.string.nav_home)).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText(label(R.string.scan_receipt)).assertIsDisplayed()
+        rule.waitUntil(5_000) { rule.onAllNodesWithText("Accounts").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Accounts").assertIsDisplayed()
+        // The tab bar is back once a top-level screen is showing again.
+        rule.onNodeWithText(label(R.string.nav_home)).assertIsDisplayed()
     }
 }

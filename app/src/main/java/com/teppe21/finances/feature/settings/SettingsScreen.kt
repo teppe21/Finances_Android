@@ -44,6 +44,9 @@ import com.teppe21.finances.data.fx.FxSyncState
 import com.teppe21.finances.data.local.preferences.LockType
 import com.teppe21.finances.data.local.preferences.PinCheck
 import com.teppe21.finances.core.ui.SectionCard
+import com.teppe21.finances.core.ui.pressClickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.teppe21.finances.domain.fx.RateOrigin
 import com.teppe21.finances.domain.fx.RateTable
 import com.teppe21.finances.domain.model.SupportedCurrencies
@@ -306,7 +309,8 @@ private fun LinkRow(title: String, subtitle: String, onClick: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(12.dp))
+            .pressClickable(onClick = onClick)
             .padding(vertical = 8.dp)
     ) {
         Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)

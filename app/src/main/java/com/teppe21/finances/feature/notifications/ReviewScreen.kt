@@ -12,6 +12,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.teppe21.finances.core.theme.finances
+import com.teppe21.finances.core.ui.SwipeAction
+import com.teppe21.finances.core.ui.SwipeActionBox
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -62,6 +73,7 @@ fun ReviewScreen(viewModel: ReviewViewModel = viewModel()) {
     val accounts by viewModel.accounts.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -84,12 +96,28 @@ fun ReviewScreen(viewModel: ReviewViewModel = viewModel()) {
                     accounts = accounts,
                     modifier = Modifier.animateItemPlacement(Motion.medium()),
                     onConfirm = { accountId ->
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         viewModel.confirm(tx, accountId)
-                        scope.launch { snackbarHostState.showSnackbar("Confirmed. It now counts toward your totals.") }
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                "Confirmed. It now counts toward your totals.",
+                                actionLabel = "Undo",
+                                duration = SnackbarDuration.Short
+                            )
+                            if (result == SnackbarResult.ActionPerformed) viewModel.undoConfirm(tx)
+                        }
                     },
                     onDiscard = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         viewModel.discard(tx)
-                        scope.launch { snackbarHostState.showSnackbar("Discarded. Nothing was added.") }
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                "Discarded. Nothing was added.",
+                                actionLabel = "Undo",
+                                duration = SnackbarDuration.Short
+                            )
+                            if (result == SnackbarResult.ActionPerformed) viewModel.undoDiscard(tx)
+                        }
                     }
                 )
             }
@@ -122,7 +150,27 @@ private fun ReviewCard(
         else -> "Check the amount and merchant before confirming."
     }
 
-    AnimatedVisibility(visibleState = visibility, modifier = modifier, enter = Motion.appear(), exit = Motion.disappear()) {
+    val confirm = { pendingAction = { onConfirm(accountId) }; visibility.targetState = false }
+    val discard = { pendingAction = onDiscard; visibility.targetState = false }
+    val busy = pendingAction != null
+    val confirmAction = if (accountId.isNotBlank() && !busy) {
+        SwipeAction("Confirm", Icons.Default.Check, MaterialTheme.finances.income, MaterialTheme.colorScheme.background, confirm)
+    } else {
+        null // choose an account first: the row resists instead of committing
+    }
+    val discardAction = if (!busy) {
+        SwipeAction("Discard", Icons.Default.Close, MaterialTheme.finances.expense, MaterialTheme.colorScheme.background, discard)
+    } else {
+        null
+    }
+
+    AnimatedVisibility(
+        visibleState = visibility,
+        modifier = modifier.testTag("review-card-${tx.id}"),
+        enter = Motion.appear(),
+        exit = Motion.disappear()
+    ) {
+        SwipeActionBox(swipeRight = confirmAction, swipeLeft = discardAction) {
         SectionCard {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -154,23 +202,17 @@ private fun ReviewCard(
                     }
                 }
             }
-            val busy = pendingAction != null
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        pendingAction = { onConfirm(accountId) }
-                        visibility.targetState = false
-                    },
-                    enabled = accountId.isNotBlank() && !busy
-                ) { Text("Confirm") }
-                OutlinedButton(
-                    onClick = {
-                        pendingAction = onDiscard
-                        visibility.targetState = false
-                    },
-                    enabled = !busy
-                ) { Text("Discard") }
+                Button(onClick = confirm, enabled = accountId.isNotBlank() && !busy) { Text("Confirm") }
+                OutlinedButton(onClick = discard, enabled = !busy) { Text("Discard") }
             }
+            Text(
+                "Swipe right to confirm or left to discard.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
         }
     }
 }

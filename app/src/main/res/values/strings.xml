@@ -4,7 +4,7 @@
     <string name="notification_service_label">Finances transaction recognition</string>
 
     <!-- Navigation -->
-    <string name="nav_home">Home</string>
+    <string name="nav_home">Overview</string>
     <string name="nav_transactions">Transactions</string>
     <string name="nav_analytics">Analytics</string>
     <string name="nav_more">More</string>

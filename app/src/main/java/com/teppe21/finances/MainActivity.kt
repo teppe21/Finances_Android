@@ -30,7 +30,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableLongStateOf
+import com.teppe21.finances.core.ui.FloatingTabBar
 import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.TabBarItem
 import com.teppe21.finances.core.ui.rememberReduceMotion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -374,7 +376,9 @@ fun MainAppNavigation() {
         Tab(Screen.Analytics.route, stringResource(R.string.nav_analytics), Icons.Default.PieChart),
         Tab(Screen.More.route, stringResource(R.string.nav_more), Icons.Default.Menu)
     )
-    val isTopLevel = tabs.any { it.route == currentRoute }
+    val tabBarItems = tabs.map { TabBarItem(it.label, it.icon) }
+    // Before the first destination resolves the route is null; treat that as a tab so no back arrow flashes.
+    val isTopLevel = currentRoute == null || tabs.any { it.route == currentRoute }
     val hideBars = currentRoute == Screen.ScanReceipt.route
 
     fun navigateTab(route: String) {
@@ -429,20 +433,20 @@ fun MainAppNavigation() {
                 enter = slideInVertically(Motion.medium()) { it } + fadeIn(Motion.short()),
                 exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())
             ) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                    tabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = currentRoute == tab.route,
-                            onClick = { navigateTab(tab.route) },
-                            icon = { Icon(tab.icon, contentDescription = null) },
-                            label = { Text(tab.label, maxLines = 1, softWrap = false) }
-                        )
-                    }
-                }
+                FloatingTabBar(
+                    items = tabBarItems,
+                    selectedIndex = tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0),
+                    onSelect = { navigateTab(tabs[it].route) }
+                )
             }
         }
     ) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(if (hideBars) PaddingValues() else innerPadding)) {
+        Box(
+            Modifier.fillMaxSize().padding(if (hideBars) PaddingValues() else innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            // On tablets, unfolded foldables and landscape the content keeps a readable width; the camera is full width.
+            Box((if (hideBars) Modifier else Modifier.widthIn(max = 640.dp)).fillMaxSize()) {
             NavHost(
                 navController = navController,
                 startDestination = Screen.Dashboard.route,
@@ -536,6 +540,7 @@ fun MainAppNavigation() {
                     StockDetailScreen(symbol = symbol, onRemoved = { navController.popBackStack() })
                 }
                 composable(Screen.StocksSetup.route) { StocksSetupScreen(onDone = { navController.popBackStack() }) }
+            }
             }
         }
     }
