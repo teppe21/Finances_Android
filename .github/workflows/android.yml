@@ -59,6 +59,23 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew --no-daemon assembleDebug --stacktrace
 
+      # The instrumented tests (Room DAOs, migrations, Compose UI) need an emulator or device, which this
+      # job does not have. They are at least compiled here so they cannot rot; run them locally with
+      # ./gradlew connectedDebugAndroidTest.
+      - name: Compile instrumented tests
+        run: ./gradlew --no-daemon assembleDebugAndroidTest --stacktrace
+
+      # Room exports the schema on every build. If the committed schema files do not match the entities,
+      # the build above just rewrote or added one: fail so the change is committed with the migration.
+      - name: Check exported Room schemas are committed
+        run: |
+          if [ -n "$(git status --porcelain -- app/schemas)" ]; then
+            git status --porcelain -- app/schemas
+            git diff -- app/schemas | head -80
+            echo "Room schema files are out of date. Commit the files under app/schemas." >&2
+            exit 1
+          fi
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:

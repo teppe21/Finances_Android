@@ -15,7 +15,7 @@ app/                         the single Android module (:app)
     security/                PIN hashing, app lock, Keystore secrets
     core/                    theme, shared UI components, navigation, money, utils
   src/test/                  JVM unit tests
-  src/androidTest/           instrumented tests (Room migration)
+  src/androidTest/           instrumented tests (Room DAOs, migrations, Compose UI)
   schemas/                   exported Room schemas (committed)
 docs/                        topic documentation and the static privacy policy
 scripts/                     check-16kb-alignment.sh
@@ -53,6 +53,13 @@ All commands run from the repository root and match CI:
 
 Reports: `app/build/reports/tests/` and `app/build/reports/lint-results-*.html`.
 
+### Windows notes
+
+- Point `JAVA_HOME` at a JDK 17 and `ANDROID_HOME` at the SDK (or put `sdk.dir` in `local.properties`, which is git-ignored; in that file the path must be escaped, `C\:/path/to/Sdk`, or lint reports an error). Use `gradlew.bat`.
+- If Gradle fails at startup with `Unable to establish loopback connection`, the JDK cannot create its internal pipe because the temp directory is an 8.3 short path (`C:\Users\NAME~1\...`). Set a short, normal path for the JVM, for example `JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=C:\tmp -Djdk.net.unixdomain.tmpdir=C:\tmp`.
+- Emulator: install `emulator` and a `system-images;android-35;google_apis;x86_64` image with `sdkmanager`, create an AVD with `avdmanager`, and make sure the Windows Hypervisor Platform is available (`emulator -accel-check`). `connectedDebugAndroidTest` uninstalls the debug app when it finishes; run `installDebug` again afterwards.
+- Release builds need the four `FINANCES_*` signing values; for a local R8 check use a throwaway key outside the repository and never reuse it for a published build.
+
 Dependency resolution needs `dl.google.com` and Maven Central. In a sandbox that blocks Google Maven, Gradle fails on the first plugin (`Plugin [id: 'com.android.application' ...] was not found`); there is then no Android build result at all, and plain-Kotlin compilation of selected files is not a substitute.
 
 ## Room schema and migrations
@@ -62,7 +69,7 @@ Dependency resolution needs `dl.google.com` and Maven Central. In a sandbox that
 1. Bump `version` in `AppDatabase`.
 2. Add a `Migration` and register it; never use destructive fallback for user data.
 3. Build once so the new `N.json` is exported, and commit it.
-4. Extend `app/src/androidTest/.../MigrationTest.kt` and run `./gradlew connectedDebugAndroidTest` on an emulator.
+4. Extend `app/src/androidTest/.../MigrationTest.kt` (and `DatabaseTest.kt` for new queries) and run `./gradlew connectedDebugAndroidTest` on an emulator.
 
 The current schema version is the highest file in `app/schemas/com.teppe21.finances.data.local.database.AppDatabase/`.
 
