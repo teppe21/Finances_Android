@@ -70,7 +70,7 @@
     <string name="notif_title">Notification recognition</string>
 
     <!-- CSV import -->
-    <string name="import_title">Import bank statement (CSV)</string>
+    <string name="import_title">Import CSV statement</string>
     <string name="select_csv_file">Choose CSV file</string>
     <string name="select_csv_desc">Choose a statement exported as CSV. Date, description and amount columns are detected from the header row; rows that cannot be read exactly are skipped and listed.</string>
     <string name="selected_file">File: %1$s</string>
@@ -644,4 +644,5 @@
     <string name="policy_contact_title">Contact</string>
     <string name="policy_contact">Questions about this policy: %1$s</string>
     <string name="policy_contact_missing">Contact details have not been configured for this build.</string>
+    <string name="analytics_summary">Summary</string>
 </resources>

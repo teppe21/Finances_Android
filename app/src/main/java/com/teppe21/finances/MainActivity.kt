@@ -1,5 +1,12 @@
 package com.teppe21.finances
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.TopAppBarState
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.view.WindowManager
@@ -401,7 +408,14 @@ fun MainAppNavigation() {
             (from in topLevelRoutes && to in topLevelRoutes) ||
             from == Screen.ScanReceipt.route || to == Screen.ScanReceipt.route
 
+    // The bar takes the card tone only while content is scrolled under it, and the content gets a
+    // short fade at its top edge then, so cards no longer end in a hard cut under the title.
+    val barState = remember(currentRoute) { TopAppBarState(-Float.MAX_VALUE, 0f, 0f) }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(barState)
+    val scrolledBarColor = MaterialTheme.colorScheme.surface
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AnimatedVisibility(
                 visible = !hideBars,
@@ -411,7 +425,7 @@ fun MainAppNavigation() {
                 TopAppBar(
                     title = {
                         Crossfade(targetState = screenTitle(currentRoute), animationSpec = Motion.short(), label = "title") { title ->
-                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     },
                     navigationIcon = {
@@ -425,7 +439,11 @@ fun MainAppNavigation() {
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = scrolledBarColor
+                    )
                 )
             }
         },
@@ -444,7 +462,20 @@ fun MainAppNavigation() {
         }
     ) { innerPadding ->
         Box(
-            Modifier.fillMaxSize().padding(if (hideBars) PaddingValues() else innerPadding),
+            Modifier
+                .fillMaxSize()
+                .padding(if (hideBars) PaddingValues() else innerPadding)
+                .drawWithContent {
+                    drawContent()
+                    // Read in the draw phase only: scrolling never recomposes the screen.
+                    val fraction = barState.overlappedFraction
+                    if (!hideBars && fraction > 0f) {
+                        drawRect(
+                            Brush.verticalGradient(listOf(scrolledBarColor.copy(alpha = fraction), Color.Transparent), endY = 12.dp.toPx()),
+                            size = Size(size.width, 12.dp.toPx())
+                        )
+                    }
+                },
             contentAlignment = Alignment.TopCenter
         ) {
             // On tablets, unfolded foldables and landscape the content keeps a readable width; the camera is full width.

@@ -63,7 +63,7 @@ object CurrencyFormatter {
     }
 
     /** One decimal and a percent sign: `12.3%`, Hungarian `12,3%`. */
-    fun formatPercent(value: Float): String =
+    fun formatPercent(value: Float): String = if (value > 0f && value < 0.05f) "<" + String.format(DisplayLocale.locale, "%.1f%%", 0.1f) else
         String.format(DisplayLocale.locale, "%.1f%%", value)
 
     fun formatSigned(amountMinor: Long, currency: String = "HUF"): String {

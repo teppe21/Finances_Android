@@ -1,5 +1,8 @@
 package com.teppe21.finances.feature.transactions
 
+import androidx.compose.ui.text.style.TextOverflow
+import com.teppe21.finances.core.ui.topScrollEdge
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.teppe21.finances.feature.categories.accountLabel
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -116,7 +119,7 @@ fun TransactionsScreen(
                 value = state.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.search_placeholder)) },
+                placeholder = { Text(stringResource(R.string.search_placeholder), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (state.searchQuery.isNotBlank()) {
@@ -238,9 +241,12 @@ fun TransactionsScreen(
                         )
                     }
                 } else {
+                    val listState = rememberLazyListState()
+                    val edgeColor = MaterialTheme.colorScheme.background
                     LazyColumn(
+                        state = listState,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize().topScrollEdge(listState, edgeColor)
                     ) {
                         if (state.unconvertedCount > 0) {
                             item(key = "unconverted-banner") {
@@ -255,6 +261,7 @@ fun TransactionsScreen(
                                 transaction = tx,
                                 displayCurrency = state.currency,
                                 convertedAmountMinor = state.convertedAmounts[tx.id],
+                                categoryName = state.categories.firstOrNull { it.id == tx.categoryId }?.let { categoryLabel(it) },
                                 onClick = { viewModel.selectTransaction(tx) },
                                 modifier = Modifier.animateItemPlacement(Motion.medium())
                             )

@@ -169,7 +169,7 @@ class CalculateFinancialStatsUseCase {
                 percentage = if (totalExpense > 0L) (sum.toFloat() / totalExpense.toFloat()) * 100f else 0f,
                 transactionCount = counts[catId] ?: 0
             )
-        }.sortedByDescending { it.totalMinor }
+        }.sortedWith(compareByDescending<CategoryBreakdown> { it.totalMinor }.thenBy { it.categoryId }) // stable order for the chart
     }
 
     /**

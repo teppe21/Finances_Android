@@ -560,7 +560,7 @@
     <string name="payment_card">Kártya vagy ismeretlen</string>
     <string name="confirm_save">Tranzakció mentése</string>
     <string name="notif_title">Értesítésfelismerés</string>
-    <string name="import_title">Bankszámlakivonat importálása (CSV)</string>
+    <string name="import_title">CSV-kivonat importálása</string>
     <string name="select_csv_file">CSV-fájl kiválasztása</string>
     <string name="select_csv_desc">Válassz CSV-ként exportált kivonatot. A dátum, a leírás és az összeg oszlopát a fejlécsorból ismeri fel; a pontosan nem olvasható sorokat kihagyja és felsorolja.</string>
     <string name="selected_file">Fájl: %1$s</string>
@@ -617,4 +617,5 @@
     <string name="custom_category">Saját kategória</string>
     <string name="settings">Beállítások</string>
     <string name="currency">Pénznem</string>
+    <string name="analytics_summary">Összegzés</string>
 </resources>

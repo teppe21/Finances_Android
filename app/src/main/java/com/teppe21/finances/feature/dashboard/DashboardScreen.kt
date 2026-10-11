@@ -1,5 +1,9 @@
 package com.teppe21.finances.feature.dashboard
 
+import com.teppe21.finances.core.theme.Spacing
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.foundation.layout.BoxWithConstraints
 import com.teppe21.finances.feature.categories.categoryLabel
 import com.teppe21.finances.core.utils.DateFormatter
 import androidx.compose.ui.res.pluralStringResource
@@ -204,6 +208,7 @@ private fun DashboardContent(
                     transaction = tx,
                     displayCurrency = state.currency,
                     convertedAmountMinor = state.recentConverted[tx.id],
+                    categoryName = state.categories.firstOrNull { it.id == tx.categoryId }?.let { categoryLabel(it) },
                     onClick = onNavigateToTransactions,
                     modifier = place()
                 )
@@ -261,26 +266,33 @@ private fun BalanceHero(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SummaryTile(
-                Modifier.weight(1f),
-                stringResource(R.string.income),
-                "+" + CurrencyFormatter.format(incomeMinor, currency),
-                MaterialTheme.finances.income,
-                Icons.Default.ArrowDownward
-            )
-            SummaryTile(
-                Modifier.weight(1f),
-                stringResource(R.string.expenses),
-                "-" + CurrencyFormatter.format(expenseMinor, currency),
-                MaterialTheme.finances.expense,
-                Icons.Default.ArrowUpward
-            )
+        val incomeText = CurrencyFormatter.formatSigned(incomeMinor, currency)
+        val expenseText = CurrencyFormatter.formatSigned(-expenseMinor, currency)
+        // Side by side when both amounts fit in half the width; stacked otherwise (large amounts,
+        // large font scales, narrow screens), so an amount is never cut.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val measurer = rememberTextMeasurer()
+            val style = MaterialTheme.typography.titleMedium.tabular()
+            val density = LocalDensity.current
+            val needed = with(density) {
+                maxOf(measurer.measure(incomeText, style).size.width, measurer.measure(expenseText, style).size.width).toDp()
+            }
+            val available = (maxWidth - Spacing.m) / 2 - SummaryTileChrome
+            val tiles: @Composable (Modifier) -> Unit = { tileModifier ->
+                SummaryTile(tileModifier, stringResource(R.string.income), incomeText, MaterialTheme.finances.income, Icons.Default.ArrowDownward)
+                SummaryTile(tileModifier, stringResource(R.string.expenses), expenseText, MaterialTheme.finances.expense, Icons.Default.ArrowUpward)
+            }
+            if (needed <= available) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.m)) { tiles(Modifier.weight(1f)) }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) { tiles(Modifier.fillMaxWidth()) }
+            }
         }
     }
 }
 
 /** A month figure: a soft tint of its colour, an icon, a word and a signed value, so colour is never the only cue. */
+/** Horizontal space a summary tile uses besides its amount: padding, icon and gap. */private val SummaryTileChrome = 70.dp
 @Composable
 private fun SummaryTile(
     modifier: Modifier,
