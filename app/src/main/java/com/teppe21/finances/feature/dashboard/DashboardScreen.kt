@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.dashboard
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,6 +54,9 @@ import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.animatedFraction
+import com.teppe21.finances.core.ui.pressClickable
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.core.ui.TransactionRow
 import com.teppe21.finances.core.utils.CurrencyFormatter
@@ -64,6 +70,7 @@ import kotlin.math.max
 private val MONTH_TITLE = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
 private val MONTH_SHORT = DateTimeFormatter.ofPattern("MMM", Locale.US)
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
     onNavigateToScanReceipt: () -> Unit,
@@ -77,6 +84,39 @@ fun DashboardScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    // Until the first emission nothing is shown, so "Unavailable" or zero totals never flash
+    // before the real figures; the content then fades in once.
+    Crossfade(targetState = state.isLoading, animationSpec = Motion.medium(), label = "dashboardLoading") { loading ->
+        if (loading) {
+            Box(Modifier.fillMaxSize())
+        } else {
+            DashboardContent(
+                state = state,
+                onNavigateToScanReceipt = onNavigateToScanReceipt,
+                onNavigateToImportCsv = onNavigateToImportCsv,
+                onNavigateToReview = onNavigateToReview,
+                onNavigateToTransactions = onNavigateToTransactions,
+                onNavigateToStocks = onNavigateToStocks,
+                onNavigateToSettings = onNavigateToSettings,
+                onAddTransaction = onAddTransaction
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DashboardContent(
+    state: DashboardUiState,
+    onNavigateToScanReceipt: () -> Unit,
+    onNavigateToImportCsv: () -> Unit,
+    onNavigateToReview: () -> Unit,
+    onNavigateToTransactions: () -> Unit,
+    onNavigateToStocks: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onAddTransaction: () -> Unit
+) {
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -85,64 +125,68 @@ fun DashboardScreen(
     ) {
         item { Spacer(Modifier.height(4.dp)) }
 
-        item {
+        item(key = "balance") {
             BalanceCard(
                 totalBalanceMinor = state.totalBalanceMinor,
                 currency = state.currency,
                 incomeMinor = state.monthStats.incomeMinor,
                 expenseMinor = state.monthStats.expenseMinor,
-                month = state.month
+                month = state.month,
+                modifier = place()
             )
         }
 
         if (state.reviewCount > 0) {
-            item {
+            item(key = "review-banner") {
                 InfoBanner(
                     text = if (state.reviewCount == 1) "1 transaction needs review before it is counted."
                     else "${state.reviewCount} transactions need review before they are counted.",
                     icon = Icons.Default.PendingActions,
-                    onClick = onNavigateToReview
+                    onClick = onNavigateToReview,
+                    modifier = place()
                 )
             }
         }
 
         val unconverted = state.monthStats.unconvertedCount + state.balanceUnconvertedAccounts
         if (unconverted > 0) {
-            item {
+            item(key = "rate-banner") {
                 InfoBanner(
                     text = "Some amounts are not included because no exchange rate to ${state.currency} is available. " +
                         "Refresh rates or enter a manual rate in Settings.",
-                    onClick = onNavigateToSettings
+                    onClick = onNavigateToSettings,
+                    modifier = place()
                 )
             }
         }
 
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item(key = "quick-actions") {
+            Row(place().fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickAction(Modifier.weight(1f), stringResource(R.string.add_transaction), Icons.Default.Add, onAddTransaction)
                 QuickAction(Modifier.weight(1f), stringResource(R.string.scan_receipt), Icons.Default.CameraAlt, onNavigateToScanReceipt)
                 QuickAction(Modifier.weight(1f), stringResource(R.string.import_statement), Icons.Default.FileOpen, onNavigateToImportCsv)
             }
         }
 
-        if (!state.isLoading && !state.hasAnyTransactions) {
-            item {
+        if (!state.hasAnyTransactions) {
+            item(key = "empty") {
                 EmptyState(
                     title = "No transactions yet",
                     body = "Add one manually, scan a receipt, import a bank CSV, or enable notification recognition under More.",
+                    modifier = place(),
                     action = { TextButton(onClick = onAddTransaction) { Text(stringResource(R.string.add_transaction)) } }
                 )
             }
         }
 
         if (state.hasAnyTransactions) {
-            item { MonthlyTrendsChartCard(state.monthlyTrends, state.currency) }
+            item(key = "trends") { MonthlyTrendsChartCard(state.monthlyTrends, state.currency, place()) }
             if (state.categoryBreakdown.isNotEmpty()) {
-                item { CategoryBreakdownCard(state.categoryBreakdown, state.currency, state.month) }
+                item(key = "breakdown") { CategoryBreakdownCard(state.categoryBreakdown, state.currency, state.month, place()) }
             }
-            item {
+            item(key = "recent-header") {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = place().fillMaxWidth().padding(top = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -155,19 +199,21 @@ fun DashboardScreen(
                     transaction = tx,
                     displayCurrency = state.currency,
                     convertedAmountMinor = state.recentConverted[tx.id],
-                    onClick = onNavigateToTransactions
+                    onClick = onNavigateToTransactions,
+                    modifier = place()
                 )
             }
         }
 
-        item { StocksEntryCard(onNavigateToStocks) }
+        item(key = "stocks") { StocksEntryCard(onNavigateToStocks, place()) }
 
         if (state.ratesAsOf != null && state.hasAnyTransactions) {
-            item {
+            item(key = "rates-note") {
                 Text(
                     text = "Converted amounts use the latest available exchange rates, not the rate on each transaction date.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = place()
                 )
             }
         }
@@ -182,10 +228,11 @@ private fun BalanceCard(
     currency: String,
     incomeMinor: Long,
     expenseMinor: Long,
-    month: YearMonth
+    month: YearMonth,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -231,7 +278,7 @@ private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, on
         modifier = modifier
             .height(72.dp)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
+            .pressClickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
@@ -248,8 +295,8 @@ private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, on
 }
 
 @Composable
-fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String) {
-    SectionCard(title = stringResource(R.string.six_months_trends)) {
+fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifier: Modifier = Modifier) {
+    SectionCard(modifier = modifier, title = stringResource(R.string.six_months_trends)) {
         val maxVal = max(trends.maxOfOrNull { max(it.incomeMinor, it.expenseMinor) } ?: 0L, 1L)
         Row(
             modifier = Modifier
@@ -292,8 +339,9 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String) {
 
 @Composable
 private fun Bar(ratio: Float, color: androidx.compose.ui.graphics.Color) {
-    // Zero stays visibly zero: no artificial minimum height.
-    val height = (80f * ratio.coerceIn(0f, 1f)).dp
+    // Zero stays visibly zero: no artificial minimum height. The bar grows to its value; the
+    // exact figures are in the content description and never animate.
+    val height = (80f * animatedFraction(ratio.coerceIn(0f, 1f), "trendBar")).dp
     Box(
         Modifier
             .width(8.dp)
@@ -313,10 +361,16 @@ private fun Legend(label: String, color: androidx.compose.ui.graphics.Color) {
 }
 
 @Composable
-private fun CategoryBreakdownCard(breakdown: List<CategoryBreakdown>, currency: String, month: YearMonth) {
-    SectionCard(title = "Spending by category, ${month.format(MONTH_TITLE)}") {
+private fun CategoryBreakdownCard(
+    breakdown: List<CategoryBreakdown>,
+    currency: String,
+    month: YearMonth,
+    modifier: Modifier = Modifier
+) {
+    SectionCard(modifier = modifier, title = "Spending by category, ${month.format(MONTH_TITLE)}") {
         breakdown.take(5).forEach { cat ->
             val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
+            val shown = animatedFraction((cat.percentage / 100f).coerceIn(0f, 1f), "categoryShare")
             Column(Modifier.padding(vertical = 5.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(8.dp).clip(CircleShape).background(color))
@@ -330,7 +384,7 @@ private fun CategoryBreakdownCard(breakdown: List<CategoryBreakdown>, currency: 
                 }
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
-                    progress = { (cat.percentage / 100f).coerceIn(0f, 1f) },
+                    progress = { shown },
                     modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
                     color = color,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -341,9 +395,9 @@ private fun CategoryBreakdownCard(breakdown: List<CategoryBreakdown>, currency: 
 }
 
 @Composable
-private fun StocksEntryCard(onClick: () -> Unit) {
+private fun StocksEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressClickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
@@ -362,3 +416,8 @@ private fun StocksEntryCard(onClick: () -> Unit) {
         }
     }
 }
+
+/** Items shift smoothly when a banner or the empty state appears or goes away. */
+@OptIn(ExperimentalFoundationApi::class)
+@Suppress("ModifierFactoryExtensionFunction") // needs the LazyItemScope receiver
+private fun LazyItemScope.place(): Modifier = Modifier.animateItemPlacement(Motion.medium())

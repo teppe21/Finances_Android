@@ -1,6 +1,11 @@
 package com.teppe21.finances.feature.subscreens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.animatedFraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -107,6 +112,7 @@ class BudgetsViewModel : ViewModel() {
     fun delete(id: String) = viewModelScope.launch { dao.deleteById(id) }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
@@ -128,7 +134,14 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
             }
             items(state.rows, key = { it.id }) { row ->
                 val ratio = if (row.limitMinor > 0) (row.spentMinor.toFloat() / row.limitMinor).coerceIn(0f, 1f) else 0f
-                SectionCard {
+                val shownRatio = animatedFraction(ratio, "budgetUsed")
+                val barColor by animateColorAsState(
+                    if (row.spentMinor > row.limitMinor) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    Motion.short(), label = "budgetColor"
+                )
+                // Explanations that appear or go away (over budget, missing rates) open and close the card
+                // smoothly; the figures above them are always exact.
+                SectionCard(modifier = Modifier.animateItemPlacement(Motion.medium()).animateContentSize(Motion.medium())) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(row.categoryName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         IconButton(onClick = { viewModel.delete(row.id) }) { Icon(Icons.Default.Delete, contentDescription = "Delete budget for ${row.categoryName}") }
@@ -139,9 +152,9 @@ fun BudgetsScreen(viewModel: BudgetsViewModel = viewModel()) {
                     )
                     Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator(
-                        progress = { ratio },
+                        progress = { shownRatio },
                         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                        color = if (row.spentMinor > row.limitMinor) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        color = barColor,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     if (row.spentMinor > row.limitMinor) {

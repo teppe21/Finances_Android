@@ -1,6 +1,10 @@
 package com.teppe21.finances.stocks.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.pressClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,6 +61,7 @@ import com.teppe21.finances.stocks.domain.userMessage
 const val STOCKS_DISCLAIMER =
     "Quotes come from Finnhub and may be delayed. This is market information for monitoring only, not investment advice."
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StocksScreen(
     onOpenStock: (String) -> Unit,
@@ -176,7 +181,8 @@ fun StocksScreen(
                     row = row,
                     onClick = { onOpenStock(row.stock.symbol) },
                     onUp = { viewModel.move(row.stock.symbol, up = true) },
-                    onDown = { viewModel.move(row.stock.symbol, up = false) }
+                    onDown = { viewModel.move(row.stock.symbol, up = false) },
+                    modifier = Modifier.animateItemPlacement(Motion.medium())
                 )
             }
         }
@@ -209,7 +215,7 @@ private fun marketLine(state: StocksUiState): String {
 }
 
 @Composable
-private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () -> Unit, onDown: () -> Unit) {
+private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () -> Unit, onDown: () -> Unit, modifier: Modifier = Modifier) {
     val quote = row.quote
     val stock = row.stock
     val description = buildString {
@@ -221,9 +227,10 @@ private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () ->
         append(", ${row.status.label}")
     }
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(14.dp))
+            .pressClickable(onClick = onClick)
             .semantics { contentDescription = description },
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface

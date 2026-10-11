@@ -13,6 +13,7 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,6 +59,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import com.teppe21.finances.core.ui.Motion
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.DisposableEffect
@@ -318,25 +323,41 @@ fun ScanReceiptScreen(
             }
         }
 
-        state.errorMessage?.let { error ->
+        // Errors slide in under the title bar and stay until dismissed, retried or replaced. The last
+        // message is kept while the banner animates out so the text does not vanish first.
+        var lastError by remember { mutableStateOf("") }
+        state.errorMessage?.let { lastError = it }
+        AnimatedVisibility(
+            visible = state.errorMessage != null,
+            modifier = Modifier.align(Alignment.TopCenter),
+            enter = Motion.appear(),
+            exit = Motion.disappear()
+        ) {
             Surface(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 64.dp, start = 24.dp, end = 24.dp),
+                    .padding(top = 64.dp, start = 24.dp, end = 24.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { viewModel.dismissError() }
+                    .semantics { liveRegion = LiveRegionMode.Assertive },
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.errorContainer
             ) {
-                Text(error, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(lastError, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
 
-        // OCR Loading Spinner Overlay
-        if (state.isProcessing) {
+        // OCR progress overlay: fades in over the viewfinder without moving any control.
+        AnimatedVisibility(
+            visible = state.isProcessing,
+            enter = Motion.fadeInShort(),
+            exit = Motion.fadeOutShort()
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.75f)),
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .semantics { liveRegion = LiveRegionMode.Polite },
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -387,6 +408,19 @@ fun ScanReceiptScreen(
                             "Sample receipt for trying the feature; it did not come from your camera.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    // A failed save is reported here, inside the sheet, where the user is looking.
+                    AnimatedVisibility(
+                        visible = state.errorMessage != null,
+                        enter = Motion.appear(),
+                        exit = Motion.disappear()
+                    ) {
+                        Text(
+                            state.errorMessage ?: lastError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }
                         )
                     }
                     Text(
@@ -465,7 +499,7 @@ fun ScanReceiptScreen(
                                 onNavigateBack()
                             }
                         },
-                        enabled = parsedTotal != null && state.selectedAccountId != null && merchant.isNotBlank(),
+                        enabled = parsedTotal != null && state.selectedAccountId != null && merchant.isNotBlank() && !state.isSaving,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {

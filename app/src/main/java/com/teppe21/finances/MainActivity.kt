@@ -1,13 +1,37 @@
 package com.teppe21.finances
 
+import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableLongStateOf
+import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.ui.rememberReduceMotion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,6 +127,9 @@ class MainActivity : FragmentActivity() {
     private val app get() = application as FinancesApp
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Android 15+ enforces edge-to-edge for targetSdk 35+; opting in on every API level keeps the
+        // insets handling identical everywhere. The theme-aware style is applied once preferences load.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             val prefs by app.preferencesRepository.preferencesFlow.collectAsState(initial = null)
@@ -114,6 +141,14 @@ class MainActivity : FragmentActivity() {
                 else -> isSystemInDarkTheme()
             }
             val lockEnabled = prefs?.lockEnabled == true
+
+            DisposableEffect(isDark) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { isDark },
+                    navigationBarStyle = SystemBarStyle.auto(NAV_BAR_LIGHT_SCRIM, NAV_BAR_DARK_SCRIM) { isDark }
+                )
+                onDispose { }
+            }
 
             LaunchedEffect(lockEnabled) {
                 // Keep financial screens out of screenshots and the Recents preview while the lock is on.
@@ -142,6 +177,12 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         if (!isChangingConfigurations) app.appLock.onAppStopped()
     }
+
+    private companion object {
+        // Same scrims as the androidx.activity defaults, used behind three-button navigation.
+        val NAV_BAR_LIGHT_SCRIM = AndroidColor.argb(0xe6, 0xFF, 0xFF, 0xFF)
+        val NAV_BAR_DARK_SCRIM = AndroidColor.argb(0x80, 0x1b, 0x1b, 0x1b)
+    }
 }
 
 @Composable
@@ -150,7 +191,7 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
     val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
-    var lockedSeconds by remember { mutableStateOf(0L) }
+    var lockedSeconds by remember { mutableLongStateOf(0L) }
     var checking by remember { mutableStateOf(false) }
     var showReset by remember { mutableStateOf(false) }
 
@@ -226,8 +267,15 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        // System bars and the keyboard are consumed here once; the content scrolls when the keyboard,
+        // a large font or a small screen leaves too little room.
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -265,9 +313,23 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
                 }
             }
 
-            message?.let {
-                Spacer(Modifier.height(12.dp))
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+            // The message fades in place; it never delays or replaces the PIN field.
+            AnimatedContent(
+                targetState = message,
+                transitionSpec = { Motion.fadeInShort() togetherWith Motion.fadeOutShort() },
+                label = "lockMessage"
+            ) { current ->
+                if (current != null) {
+                    Text(
+                        current,
+                        modifier = Modifier.padding(top = 12.dp),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Spacer(Modifier.height(0.dp))
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -324,13 +386,34 @@ fun MainAppNavigation() {
         }
     }
 
+    val reduceMotion = rememberReduceMotion()
+    val topLevelRoutes = remember(tabs) { tabs.map { it.route }.toSet() }
+    // Tab switches fade (the destinations are peers); drilling in or out slides a short distance.
+    // The camera screen only fades so the viewfinder never moves, and reduced motion always fades.
+    fun fadesOnly(from: String?, to: String?): Boolean =
+        reduceMotion ||
+            (from in topLevelRoutes && to in topLevelRoutes) ||
+            from == Screen.ScanReceipt.route || to == Screen.ScanReceipt.route
+
     Scaffold(
         topBar = {
-            if (!hideBars) {
+            AnimatedVisibility(
+                visible = !hideBars,
+                enter = Motion.appear(),
+                exit = Motion.disappear()
+            ) {
                 TopAppBar(
-                    title = { Text(screenTitle(currentRoute), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
+                    title = {
+                        Crossfade(targetState = screenTitle(currentRoute), animationSpec = Motion.short(), label = "title") { title ->
+                            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    },
                     navigationIcon = {
-                        if (!isTopLevel) {
+                        AnimatedVisibility(
+                            visible = !isTopLevel,
+                            enter = Motion.fadeInShort(),
+                            exit = Motion.fadeOutShort()
+                        ) {
                             IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                             }
@@ -341,7 +424,11 @@ fun MainAppNavigation() {
             }
         },
         bottomBar = {
-            if (!hideBars && isTopLevel) {
+            AnimatedVisibility(
+                visible = !hideBars && isTopLevel,
+                enter = slideInVertically(Motion.medium()) { it } + fadeIn(Motion.short()),
+                exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())
+            ) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     tabs.forEach { tab ->
                         NavigationBarItem(
@@ -356,7 +443,38 @@ fun MainAppNavigation() {
         }
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(if (hideBars) PaddingValues() else innerPadding)) {
-            NavHost(navController = navController, startDestination = Screen.Dashboard.route) {
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Dashboard.route,
+                enterTransition = {
+                    if (fadesOnly(initialState.destination.route, targetState.destination.route)) {
+                        fadeIn(tween(Motion.DURATION_MEDIUM, delayMillis = 60, easing = Motion.Decelerate))
+                    } else {
+                        slideInHorizontally(Motion.long()) { it / 10 } + fadeIn(tween(Motion.DURATION_MEDIUM, easing = Motion.Decelerate))
+                    }
+                },
+                exitTransition = {
+                    if (fadesOnly(initialState.destination.route, targetState.destination.route)) {
+                        fadeOut(Motion.exit())
+                    } else {
+                        slideOutHorizontally(Motion.long()) { -it / 14 } + fadeOut(Motion.exit())
+                    }
+                },
+                popEnterTransition = {
+                    if (fadesOnly(initialState.destination.route, targetState.destination.route)) {
+                        fadeIn(tween(Motion.DURATION_MEDIUM, delayMillis = 60, easing = Motion.Decelerate))
+                    } else {
+                        slideInHorizontally(Motion.long()) { -it / 14 } + fadeIn(tween(Motion.DURATION_MEDIUM, easing = Motion.Decelerate))
+                    }
+                },
+                popExitTransition = {
+                    if (fadesOnly(initialState.destination.route, targetState.destination.route)) {
+                        fadeOut(Motion.exit())
+                    } else {
+                        slideOutHorizontally(Motion.long()) { it / 10 } + fadeOut(Motion.exit())
+                    }
+                }
+            ) {
                 composable(Screen.Dashboard.route) {
                     DashboardScreen(
                         onNavigateToScanReceipt = { navController.navigate(Screen.ScanReceipt.route) },

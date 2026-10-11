@@ -1,3 +1,5 @@
+@file:Suppress("ExifInterface") // framework ExifInterface(InputStream) is available from API 24; minSdk is 26
+
 package com.teppe21.finances.native.receipt
 
 import android.content.Context
@@ -89,6 +91,7 @@ class ReceiptOcrEngine(
     private fun openStream(uri: Uri): InputStream =
         contentResolver.openInputStream(uri) ?: throw IOException("Cannot open image")
 
+    // The framework ExifInterface reads from a stream on API 24+ (minSdk is 26); no extra dependency needed.
     private fun readExifOrientation(stream: InputStream): Int =
         try {
             ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
