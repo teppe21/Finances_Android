@@ -1,5 +1,9 @@
 package com.teppe21.finances.stocks.ui
 
+import com.teppe21.finances.core.utils.DateFormatter
+import com.teppe21.finances.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,13 +46,10 @@ import com.teppe21.finances.stocks.domain.HistoryRange
 import com.teppe21.finances.stocks.domain.MarketDataError
 import com.teppe21.finances.stocks.domain.PriceHistory
 import com.teppe21.finances.stocks.domain.RefreshPolicy
-import com.teppe21.finances.stocks.domain.userMessage
 import java.math.BigDecimal
 import java.math.MathContext
 import java.math.RoundingMode
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun StockDetailScreen(symbol: String, onRemoved: () -> Unit, viewModel: StockDetailViewModel = viewModel()) {
@@ -71,7 +72,7 @@ fun StockDetailScreen(symbol: String, onRemoved: () -> Unit, viewModel: StockDet
         Column {
             Text(row?.stock?.displaySymbol ?: symbol, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                listOfNotNull(row?.stock?.name, row?.stock?.exchange, currency?.let { "Trades in $it" }).joinToString(" · "),
+                listOfNotNull(row?.stock?.name, row?.stock?.exchange, currency?.let { stringResource(R.string.stock_trades_in, it) }).joinToString(" · "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -80,32 +81,32 @@ fun StockDetailScreen(symbol: String, onRemoved: () -> Unit, viewModel: StockDet
         val quote = row?.quote
         SectionCard {
             if (quote == null) {
-                Text("No quote available yet.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.stock_no_quote), style = MaterialTheme.typography.bodyMedium)
             } else {
                 Text(StockFormat.price(quote.price, currency), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "${StockFormat.change(quote.change)}  ${StockFormat.percent(quote.changePercent)} vs previous close",
+                    stringResource(R.string.stock_vs_previous_close, StockFormat.change(quote.change), StockFormat.percent(quote.changePercent)),
                     color = changeColor(quote.changePercent),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 StatusChip(row.status, StockFormat.time(quote.quoteTime, zone))
-                Text(StockFormat.statusDescription(row.status), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(row.status.descriptionRes()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(10.dp))
-                Fact("Open", quote.open?.let { StockFormat.price(it, currency) })
-                Fact("High", quote.high?.let { StockFormat.price(it, currency) })
-                Fact("Low", quote.low?.let { StockFormat.price(it, currency) })
-                Fact("Previous close", quote.previousClose?.let { StockFormat.price(it, currency) })
-                Fact("Volume", null)
+                Fact(stringResource(R.string.stock_open), quote.open?.let { StockFormat.price(it, currency) })
+                Fact(stringResource(R.string.stock_high), quote.high?.let { StockFormat.price(it, currency) })
+                Fact(stringResource(R.string.stock_low), quote.low?.let { StockFormat.price(it, currency) })
+                Fact(stringResource(R.string.stock_previous_close), quote.previousClose?.let { StockFormat.price(it, currency) })
+                Fact(stringResource(R.string.stock_volume), null)
             }
             Spacer(Modifier.height(6.dp))
             Text(sessionText(usListing, state.market?.isOpen, state.market?.session, state.market?.holiday), style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = viewModel::refresh) { Text("Refresh quote") }
+            TextButton(onClick = viewModel::refresh) { Text(stringResource(R.string.stock_refresh_quote)) }
         }
 
-        SectionCard(title = "Price history") {
+        SectionCard(title = stringResource(R.string.stock_price_history)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 HistoryRange.values().forEach { r ->
-                    FilterChip(selected = state.range == r, onClick = { viewModel.selectRange(r) }, label = { Text(r.label) })
+                    FilterChip(selected = state.range == r, onClick = { viewModel.selectRange(r) }, label = { Text(stringResource(r.labelRes())) })
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -119,46 +120,47 @@ fun StockDetailScreen(symbol: String, onRemoved: () -> Unit, viewModel: StockDet
                     val error = state.historyError
                     val text = when (error) {
                         MarketDataError.NotOnPlan ->
-                            "Your Finnhub plan does not include historical prices for this symbol, so no chart can be drawn. " +
-                                "The app does not estimate or fill in missing prices."
-                        MarketDataError.NoData -> "The provider has no prices for this period (for example, a weekend or holiday for 1D)."
-                        null -> "No history loaded."
-                        else -> error.userMessage()
+                            stringResource(R.string.stock_history_not_on_plan)
+                        MarketDataError.NoData -> stringResource(R.string.stock_history_no_data)
+                        null -> stringResource(R.string.stock_history_none)
+                        else -> errorMessage(error)
                     }
                     InfoBanner(text)
                 }
             }
         }
 
-        Text(STOCKS_DISCLAIMER, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedButton(onClick = { confirmRemove = true }) { Text("Remove from watchlist") }
+        Text(stringResource(R.string.stock_disclaimer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = { confirmRemove = true }) { Text(stringResource(R.string.stock_remove_from_watchlist)) }
         Spacer(Modifier.height(24.dp))
     }
 
     if (confirmRemove) {
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
-            title = { Text("Remove $symbol?") },
-            text = { Text("The symbol and its cached quote are removed from this device. Your financial records are not affected.") },
-            confirmButton = { TextButton(onClick = { confirmRemove = false; viewModel.remove(onRemoved) }) { Text("Remove") } },
-            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Cancel") } }
+            title = { Text(stringResource(R.string.stock_remove_title, symbol)) },
+            text = { Text(stringResource(R.string.stock_remove_body)) },
+            confirmButton = { TextButton(onClick = { confirmRemove = false; viewModel.remove(onRemoved) }) { Text(stringResource(R.string.stock_remove)) } },
+            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 }
 
+@Composable
 private fun sessionText(usListing: Boolean, isOpen: Boolean?, session: String?, holiday: String?): String = when {
-    !usListing -> "Trading session status is only available for US listings; the label above is based on the quote time."
-    holiday != null -> "US market closed for $holiday."
-    isOpen == true -> "US market open" + (session?.let { " ($it session)" } ?: "") + ". Quotes are refreshed about once a minute while this app is open."
-    isOpen == false -> "US market closed. The price shown is from the last trade the provider reported."
-    else -> "US market status unknown."
+    !usListing -> stringResource(R.string.stock_session_non_us)
+    holiday != null -> stringResource(R.string.stock_session_holiday, holiday)
+    isOpen == true && session != null -> stringResource(R.string.stock_session_open_named, session)
+    isOpen == true -> stringResource(R.string.stock_session_open)
+    isOpen == false -> stringResource(R.string.stock_session_closed)
+    else -> stringResource(R.string.stock_session_unknown)
 }
 
 @Composable
 private fun Fact(label: String, value: String?) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        Text(value ?: "Not provided", style = MaterialTheme.typography.bodyMedium)
+        Text(value ?: stringResource(R.string.stock_not_provided), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -167,7 +169,7 @@ private fun Fact(label: String, value: String?) {
 private fun HistoryChart(history: PriceHistory, currency: String?, zone: ZoneId) {
     val points = history.points
     if (points.size < 2) {
-        InfoBanner("Only one price point was returned for this period.")
+        InfoBanner(stringResource(R.string.stock_one_point))
         return
     }
     val first = points.first().close
@@ -175,15 +177,16 @@ private fun HistoryChart(history: PriceHistory, currency: String?, zone: ZoneId)
     val min = points.minOf { it.close }
     val max = points.maxOf { it.close }
     val changePct = if (first.signum() != 0) last.subtract(first).divide(first, MathContext.DECIMAL64).multiply(BigDecimal(100)) else null
-    val pattern = if (history.range == HistoryRange.DAY_1 || history.range == HistoryRange.WEEK_1) "d MMM HH:mm" else "d MMM yyyy"
-    val fmt = DateTimeFormatter.ofPattern(pattern, Locale.US)
+    val shortRange = history.range == HistoryRange.DAY_1 || history.range == HistoryRange.WEEK_1
+    fun fmt(t: java.time.Instant) = t.atZone(zone).let { if (shortRange) DateFormatter.dayTime(it) else DateFormatter.format(it.toLocalDate()) }
+    val rangeLabel = stringResource(history.range.labelRes())
     val lineColor = changeColor(changePct)
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val span = max.subtract(min).toDouble().takeIf { it > 0 } ?: 1.0
+    val chartDescription = stringResource(R.string.stock_chart_description, rangeLabel, StockFormat.price(first, currency), StockFormat.price(last, currency), StockFormat.price(min, currency), StockFormat.price(max, currency))
 
     Text(
-        "${StockFormat.percent(changePct?.setScale(2, RoundingMode.HALF_UP))} over ${history.range.label} " +
-            "(${points.first().time.atZone(zone).format(fmt)} to ${points.last().time.atZone(zone).format(fmt)})",
+        stringResource(R.string.stock_change_over, StockFormat.percent(changePct?.setScale(2, RoundingMode.HALF_UP)), rangeLabel, fmt(points.first().time), fmt(points.last().time)),
         style = MaterialTheme.typography.bodyMedium,
         color = lineColor
     )
@@ -193,8 +196,7 @@ private fun HistoryChart(history: PriceHistory, currency: String?, zone: ZoneId)
             .fillMaxWidth()
             .height(180.dp)
             .semantics {
-                contentDescription = "Price chart for ${history.range.label}: from ${StockFormat.price(first, currency)} " +
-                    "to ${StockFormat.price(last, currency)}, low ${StockFormat.price(min, currency)}, high ${StockFormat.price(max, currency)}"
+                contentDescription = chartDescription
             }
     ) {
         val w = size.width
@@ -212,11 +214,11 @@ private fun HistoryChart(history: PriceHistory, currency: String?, zone: ZoneId)
         drawPath(path, lineColor, style = Stroke(width = 3f))
     }
     Row(Modifier.fillMaxWidth()) {
-        Text("Low ${StockFormat.price(min, currency)}", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-        Text("High ${StockFormat.price(max, currency)}", style = MaterialTheme.typography.labelSmall)
+        Text(stringResource(R.string.stock_low_value, StockFormat.price(min, currency)), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.stock_high_value, StockFormat.price(max, currency)), style = MaterialTheme.typography.labelSmall)
     }
     Text(
-        "${points.size} data points from ${history.symbol}. Times shown in ${zone.id}.",
+        pluralStringResource(R.plurals.stock_points, points.size, points.size, history.symbol, zone.id),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

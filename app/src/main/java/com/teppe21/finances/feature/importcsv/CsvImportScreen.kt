@@ -1,5 +1,6 @@
 package com.teppe21.finances.feature.importcsv
 
+import com.teppe21.finances.feature.categories.accountLabel
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -243,7 +244,7 @@ fun CsvImportScreen(
                                 FilterChip(
                                     selected = state.selectedAccountId == acc.id,
                                     onClick = { viewModel.setSelectedAccount(acc.id) },
-                                    label = { Text("${acc.getDisplayName()} (${acc.currency})") }
+                                    label = { Text("${accountLabel(acc)} (${acc.currency})") }
                                 )
                             }
                         }

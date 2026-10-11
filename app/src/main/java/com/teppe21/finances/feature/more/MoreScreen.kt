@@ -65,8 +65,8 @@ fun MoreScreen(
 
         item {
             MoreNavigationItem(
-                title = "Stocks",
-                subtitle = "Watchlist and price history from your market data provider",
+                title = stringResource(R.string.stocks_title),
+                subtitle = stringResource(R.string.more_stocks_sub),
                 icon = Icons.AutoMirrored.Filled.ShowChart,
                 onClick = onNavigateToStocks
             )
@@ -75,7 +75,7 @@ fun MoreScreen(
         item {
             MoreNavigationItem(
                 title = stringResource(R.string.accounts_title),
-                subtitle = "Balances, opening amounts and currencies",
+                subtitle = stringResource(R.string.more_accounts_sub),
                 icon = Icons.Default.AccountBalance,
                 onClick = onNavigateToAccounts
             )

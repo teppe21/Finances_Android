@@ -1,5 +1,9 @@
 package com.teppe21.finances.feature.dashboard
 
+import com.teppe21.finances.feature.categories.categoryLabel
+import com.teppe21.finances.core.utils.DateFormatter
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -66,12 +70,8 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.domain.model.CategoryBreakdown
 import com.teppe21.finances.domain.model.MonthlyTrend
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.max
 
-private val MONTH_TITLE = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
-private val MONTH_SHORT = DateTimeFormatter.ofPattern("MMM", Locale.US)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -119,6 +119,7 @@ private fun DashboardContent(
     onNavigateToSettings: () -> Unit,
     onAddTransaction: () -> Unit
 ) {
+    val resources = LocalContext.current.resources
 
     LazyColumn(
         modifier = Modifier
@@ -142,8 +143,7 @@ private fun DashboardContent(
         if (state.reviewCount > 0) {
             item(key = "review-banner") {
                 InfoBanner(
-                    text = if (state.reviewCount == 1) "1 transaction needs review before it is counted."
-                    else "${state.reviewCount} transactions need review before they are counted.",
+                    text = pluralStringResource(R.plurals.dashboard_review, state.reviewCount, state.reviewCount),
                     icon = Icons.Default.PendingActions,
                     onClick = onNavigateToReview,
                     modifier = place()
@@ -155,8 +155,7 @@ private fun DashboardContent(
         if (unconverted > 0) {
             item(key = "rate-banner") {
                 InfoBanner(
-                    text = "Some amounts are not included because no exchange rate to ${state.currency} is available. " +
-                        "Refresh rates or enter a manual rate in Settings.",
+                    text = stringResource(R.string.dashboard_unconverted, state.currency),
                     onClick = onNavigateToSettings,
                     modifier = place()
                 )
@@ -174,8 +173,8 @@ private fun DashboardContent(
         if (!state.hasAnyTransactions) {
             item(key = "empty") {
                 EmptyState(
-                    title = "No transactions yet",
-                    body = "Add one manually, scan a receipt, import a bank CSV, or enable notification recognition under More.",
+                    title = stringResource(R.string.no_transactions_title),
+                    body = stringResource(R.string.no_transactions_desc),
                     modifier = place(),
                     action = { TextButton(onClick = onAddTransaction) { Text(stringResource(R.string.add_transaction)) } }
                 )
@@ -185,7 +184,10 @@ private fun DashboardContent(
         if (state.hasAnyTransactions) {
             item(key = "trends") { MonthlyTrendsChartCard(state.monthlyTrends, state.currency, place()) }
             if (state.categoryBreakdown.isNotEmpty()) {
-                item(key = "breakdown") { CategoryBreakdownCard(state.categoryBreakdown, state.currency, state.month, place()) }
+                item(key = "breakdown") { CategoryBreakdownCard(
+                    state.categoryBreakdown.map { b -> state.categories.firstOrNull { it.id == b.categoryId }?.let { b.copy(categoryName = categoryLabel(it, resources)) } ?: b },
+                    state.currency, state.month, place()
+                ) }
             }
             item(key = "recent-header") {
                 Row(
@@ -213,7 +215,7 @@ private fun DashboardContent(
         if (state.ratesAsOf != null && state.hasAnyTransactions) {
             item(key = "rates-note") {
                 Text(
-                    text = "Converted amounts use the latest available exchange rates, not the rate on each transaction date.",
+                    text = stringResource(R.string.dashboard_rates_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = place()
@@ -242,19 +244,19 @@ private fun BalanceHero(
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: "Unavailable",
+            text = totalBalanceMinor?.let { CurrencyFormatter.formatSigned(it, currency) } ?: stringResource(R.string.unavailable),
             style = MaterialTheme.typography.displayLarge.tabular(),
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1
         )
         Text(
-            text = "All accounts: opening balances plus recorded transactions",
+            text = stringResource(R.string.dashboard_balance_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(20.dp))
         Text(
-            month.format(MONTH_TITLE),
+            DateFormatter.monthYear(month),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -333,6 +335,7 @@ private fun QuickAction(modifier: Modifier, title: String, icon: ImageVector, on
 
 @Composable
 fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     SectionCard(modifier = modifier, title = stringResource(R.string.six_months_trends)) {
         val maxVal = max(trends.maxOfOrNull { max(it.incomeMinor, it.expenseMinor) } ?: 0L, 1L)
         Row(
@@ -341,8 +344,7 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
                 .height(110.dp)
                 .semantics {
                     contentDescription = trends.joinToString("; ") {
-                        "${YearMonth.parse(it.month).format(MONTH_SHORT)}: income ${CurrencyFormatter.format(it.incomeMinor, currency)}, " +
-                            "expenses ${CurrencyFormatter.format(it.expenseMinor, currency)}"
+                        context.getString(R.string.trend_point, DateFormatter.monthShort(YearMonth.parse(it.month)), CurrencyFormatter.format(it.incomeMinor, currency), CurrencyFormatter.format(it.expenseMinor, currency))
                     }
                 },
             verticalAlignment = Alignment.Bottom
@@ -359,7 +361,7 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        YearMonth.parse(item.month).format(MONTH_SHORT),
+                        DateFormatter.monthShort(YearMonth.parse(item.month)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -368,8 +370,8 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Legend("Income", MaterialTheme.finances.income)
-            Legend("Expenses", MaterialTheme.finances.expense)
+            Legend(stringResource(R.string.income), MaterialTheme.finances.income)
+            Legend(stringResource(R.string.expenses), MaterialTheme.finances.expense)
         }
     }
 }
@@ -404,7 +406,7 @@ private fun CategoryBreakdownCard(
     month: YearMonth,
     modifier: Modifier = Modifier
 ) {
-    SectionCard(modifier = modifier, title = "Spending by category, ${month.format(MONTH_TITLE)}") {
+    SectionCard(modifier = modifier, title = stringResource(R.string.dashboard_spending_month, DateFormatter.monthYear(month))) {
         breakdown.take(5).forEach { cat ->
             val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
             val shown = animatedFraction((cat.percentage / 100f).coerceIn(0f, 1f), "categoryShare")
@@ -442,9 +444,9 @@ private fun StocksEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) 
             Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Stocks", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.stocks_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Watchlist of market quotes. Kept separate from your accounts.",
+                    stringResource(R.string.dashboard_stocks_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

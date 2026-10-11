@@ -121,7 +121,7 @@ fun CategoriesScreen(
                 val category = catWithRules.category
                 val rules = catWithRules.rules
                 val catColor = CategoryColorProvider.getColor(category)
-                val displayName = category.displayName()
+                val displayName = categoryLabel(category)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -211,7 +211,7 @@ fun CategoriesScreen(
                                     trailingIcon = {
                                         Icon(
                                             Icons.Default.Close,
-                                            contentDescription = "Remove ${rule.pattern}",
+                                            contentDescription = stringResource(R.string.keyword_remove, rule.pattern),
                                             modifier = Modifier
                                                 .size(16.dp)
                                                 .clickable { viewModel.deleteKeyword(rule.id) }
@@ -426,7 +426,7 @@ fun CategoriesScreen(
                             onExpandedChange = { dropdownExpanded = it }
                         ) {
                             val selectedCat = otherCategories.find { it.id == selectedReplacement }
-                            val repName = selectedCat?.displayName() ?: selectedReplacement
+                            val repName = selectedCat?.let { categoryLabel(it) } ?: selectedReplacement
 
                             OutlinedTextField(
                                 value = repName,
@@ -445,7 +445,7 @@ fun CategoriesScreen(
                             ) {
                                 otherCategories.forEach { cat ->
                                     DropdownMenuItem(
-                                        text = { Text(cat.displayName()) },
+                                        text = { Text(categoryLabel(cat)) },
                                         onClick = {
                                             selectedReplacement = cat.id
                                             dropdownExpanded = false
@@ -456,7 +456,7 @@ fun CategoriesScreen(
                         }
                     } else {
                         Text(
-                            text = "${stringResource(R.string.delete_category)}: ${categoryToDelete.displayName()}?",
+                            text = "${stringResource(R.string.delete_category)}: ${categoryLabel(categoryToDelete)}?",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -491,7 +491,7 @@ fun CategoriesScreen(
 
         AlertDialog(
             onDismissRequest = { viewModel.closeAddKeyword() },
-            title = { Text("${stringResource(R.string.add_keyword)}: ${category.displayName()}") },
+            title = { Text("${stringResource(R.string.add_keyword)}: ${categoryLabel(category)}") },
             text = {
                 OutlinedTextField(
                     value = keyword,

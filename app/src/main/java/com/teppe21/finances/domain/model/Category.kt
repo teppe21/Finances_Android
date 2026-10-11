@@ -16,7 +16,14 @@ data class Category(
      * English display name. Built-in categories map by id; legacy Hungarian names from
      * databases created by early versions are mapped to their English equivalents.
      */
-    fun displayName(): String = BUILT_IN_NAMES[id] ?: LEGACY_NAMES[name] ?: name
+    fun displayName(): String = if (hasDefaultName) BUILT_IN_NAMES[id] ?: LEGACY_NAMES[name] ?: name else name
+
+    /**
+     * True while the category still has a name the app gave it (current, legacy Hungarian or
+     * the schema-5 "Transfers"), so it may be shown translated. A name the user typed is kept.
+     */
+    val hasDefaultName: Boolean
+        get() = BUILT_IN_NAMES[id] == name || name in LEGACY_NAMES || (id == "transfers" && name == "Transfers")
 
     companion object {
         val BUILT_IN_NAMES: Map<String, String> = BuiltIns.categories.associate { it.id to it.name }

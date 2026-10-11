@@ -16,6 +16,7 @@
     <application
         android:name=".FinancesApp"
         android:allowBackup="false"
+        android:localeConfig="@xml/locales_config"
         android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"

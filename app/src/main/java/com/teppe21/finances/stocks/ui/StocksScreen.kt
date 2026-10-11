@@ -1,5 +1,7 @@
 package com.teppe21.finances.stocks.ui
 
+import com.teppe21.finances.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
@@ -56,10 +58,7 @@ import com.teppe21.finances.stocks.domain.DataStatus
 import com.teppe21.finances.stocks.domain.MarketDataError
 import com.teppe21.finances.stocks.domain.RefreshPolicy
 import com.teppe21.finances.stocks.domain.WatchlistRow
-import com.teppe21.finances.stocks.domain.userMessage
 
-const val STOCKS_DISCLAIMER =
-    "Quotes come from Finnhub and may be delayed. This is market information for monitoring only, not investment advice."
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -90,10 +89,9 @@ fun StocksScreen(
         if (state.loaded && !state.hasKey) {
             item {
                 EmptyState(
-                    title = "Connect a market data provider",
-                    body = "Stock quotes come from Finnhub and need your own free or paid Finnhub API key. " +
-                        "The rest of the app works without it.",
-                    action = { Button(onClick = onOpenSetup) { Text("Set up API key") } }
+                    title = stringResource(R.string.stock_connect_title),
+                    body = stringResource(R.string.stock_connect_body),
+                    action = { Button(onClick = onOpenSetup) { Text(stringResource(R.string.stock_setup_key)) } }
                 )
             }
         }
@@ -104,22 +102,22 @@ fun StocksScreen(
                     value = search.query,
                     onValueChange = viewModel::setQuery,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search symbol or company") },
+                    placeholder = { Text(stringResource(R.string.stock_search)) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         if (search.query.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setQuery("") }) { Icon(Icons.Default.Close, contentDescription = "Clear search") }
+                            IconButton(onClick = { viewModel.setQuery("") }) { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.stock_clear_search)) }
                         }
                     },
                     singleLine = true,
                     shape = RoundedCornerShape(18.dp)
                 )
             }
-            search.message?.let { item { Text(it, style = MaterialTheme.typography.bodySmall) } }
+            search.message?.let { (res, arg) -> item { Text(stringResource(res, arg), style = MaterialTheme.typography.bodySmall) } }
             if (search.searching) item { CircularProgressIndicator(Modifier.size(24.dp)) }
-            search.error?.let { item { InfoBanner(it.userMessage()) } }
+            search.error?.let { item { InfoBanner(errorMessage(it)) } }
             if (search.query.isNotBlank() && !search.searching && search.error == null && search.results.isEmpty()) {
-                item { Text("No matching symbols.", style = MaterialTheme.typography.bodySmall) }
+                item { Text(stringResource(R.string.stock_no_matches), style = MaterialTheme.typography.bodySmall) }
             }
             items(search.results, key = { "s_" + it.symbol }) { result ->
                 Row(
@@ -139,7 +137,7 @@ fun StocksScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Icon(Icons.Default.Add, contentDescription = "Add ${result.displaySymbol} to watchlist")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.stock_add_symbol, result.displaySymbol))
                 }
                 HorizontalDivider()
             }
@@ -147,13 +145,13 @@ fun StocksScreen(
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Watchlist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.stock_watchlist), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(marketLine(state), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (state.refreshing) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
-                        IconButton(onClick = viewModel::manualRefresh) { Icon(Icons.Default.Refresh, contentDescription = "Refresh quotes") }
+                        IconButton(onClick = viewModel::manualRefresh) { Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.stock_refresh_quotes)) }
                     }
                 }
             }
@@ -161,7 +159,7 @@ fun StocksScreen(
             state.error?.let { error ->
                 item {
                     InfoBanner(
-                        text = error.userMessage() + if (error == MarketDataError.InvalidKey) " Tap to update it." else "",
+                        text = errorMessage(error) + if (error == MarketDataError.InvalidKey) " " + stringResource(R.string.stock_tap_to_update) else "",
                         onClick = if (error == MarketDataError.InvalidKey) onOpenSetup else null
                     )
                 }
@@ -170,8 +168,8 @@ fun StocksScreen(
             if (state.rows.isEmpty()) {
                 item {
                     EmptyState(
-                        title = "Your watchlist is empty",
-                        body = "Search for a stock above and tap it to follow its price. Up to ${RefreshPolicy.MAX_WATCHLIST_SIZE} symbols."
+                        title = stringResource(R.string.stock_watchlist_empty_title),
+                        body = stringResource(R.string.stock_watchlist_empty_body, RefreshPolicy.MAX_WATCHLIST_SIZE)
                     )
                 }
             }
@@ -189,28 +187,30 @@ fun StocksScreen(
 
         item {
             Text(
-                STOCKS_DISCLAIMER + " Watched stocks are not added to your accounts or balances.",
+                stringResource(R.string.stock_disclaimer) + " " + stringResource(R.string.stock_not_in_accounts),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         }
         if (state.hasKey) {
-            item { TextButton(onClick = onOpenSetup) { Text("Market data settings") } }
+            item { TextButton(onClick = onOpenSetup) { Text(stringResource(R.string.stock_settings)) } }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
+@Composable
 private fun marketLine(state: StocksUiState): String {
-    val market = state.market ?: return "US market status not loaded yet"
+    val market = state.market ?: return stringResource(R.string.stock_market_not_loaded)
     val session = when {
-        market.isOpen == true -> "US market open" + (market.session?.let { " ($it)" } ?: "")
-        market.holiday != null -> "US market closed (${market.holiday})"
-        market.isOpen == false -> "US market closed" + (market.session?.let { ", $it session" } ?: "")
-        else -> "US market status unknown"
+        market.isOpen == true && market.session != null -> stringResource(R.string.stock_market_open_named, market.session)
+        market.isOpen == true -> stringResource(R.string.stock_session_open)
+        market.holiday != null -> stringResource(R.string.stock_session_holiday, market.holiday)
+        market.isOpen == false -> stringResource(R.string.stock_market_closed)
+        else -> stringResource(R.string.stock_session_unknown)
     }
-    val refreshed = state.lastRefresh?.let { " · updated " + StockFormat.time(it, java.time.ZoneId.systemDefault()) } ?: ""
+    val refreshed = state.lastRefresh?.let { " · " + stringResource(R.string.stock_updated, StockFormat.time(it, java.time.ZoneId.systemDefault())) } ?: ""
     return session + refreshed
 }
 
@@ -218,13 +218,15 @@ private fun marketLine(state: StocksUiState): String {
 private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () -> Unit, onDown: () -> Unit, modifier: Modifier = Modifier) {
     val quote = row.quote
     val stock = row.stock
+    val statusText = stringResource(row.status.labelRes())
+    val todayText = quote?.let { stringResource(R.string.stock_today, StockFormat.price(it.price, stock.currency), StockFormat.percent(it.changePercent)) }
     val description = buildString {
         append(stock.displaySymbol)
         stock.name?.let { append(", $it") }
         if (quote != null) {
-            append(", ${StockFormat.price(quote.price, stock.currency)}, ${StockFormat.percent(quote.changePercent)} today")
+            append(", " + todayText)
         }
-        append(", ${row.status.label}")
+        append(", " + statusText)
     }
     Surface(
         modifier = modifier
@@ -256,12 +258,12 @@ private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () ->
                         color = changeColor(quote.changePercent)
                     )
                 } else {
-                    Text("No price", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.stock_no_price), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Column {
-                IconButton(onClick = onUp, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move ${stock.displaySymbol} up") }
-                IconButton(onClick = onDown, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move ${stock.displaySymbol} down") }
+                IconButton(onClick = onUp, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.stock_move_up, stock.displaySymbol)) }
+                IconButton(onClick = onDown, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.stock_move_down, stock.displaySymbol)) }
             }
         }
     }
@@ -270,7 +272,7 @@ private fun WatchlistRowItem(row: WatchlistRow, onClick: () -> Unit, onUp: () ->
 @Composable
 fun StatusChip(status: DataStatus, time: String?) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
-        Text(status.label, style = MaterialTheme.typography.labelSmall, color = statusColor(status), fontWeight = FontWeight.SemiBold)
+        Text(stringResource(status.labelRes()), style = MaterialTheme.typography.labelSmall, color = statusColor(status), fontWeight = FontWeight.SemiBold)
         if (time != null) {
             Spacer(Modifier.width(6.dp))
             Text(time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

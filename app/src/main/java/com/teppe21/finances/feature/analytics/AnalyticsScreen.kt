@@ -53,6 +53,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import com.teppe21.finances.feature.categories.categoryLabel
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +88,7 @@ fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val resources = LocalContext.current.resources
 
     LazyColumn(
         modifier = Modifier
@@ -121,7 +124,7 @@ fun AnalyticsScreen(
         if (state.stats.unconvertedCount > 0) {
             item(key = "unconverted-banner") {
                 InfoBanner(
-                    "${state.stats.unconvertedCount} transactions are not included: no exchange rate to ${state.currency} is available.",
+                    pluralStringResource(R.plurals.unconverted_banner, state.stats.unconvertedCount, state.stats.unconvertedCount, state.currency),
                     modifier = Modifier.animateItemPlacement(Motion.medium())
                 )
             }
@@ -184,7 +187,9 @@ fun AnalyticsScreen(
         item(key = "donut") {
             SpendingDonutChartCard(
                 modifier = Modifier.animateItemPlacement(Motion.medium()),
-                breakdown = state.categoryBreakdown,
+                breakdown = state.categoryBreakdown.map { b ->
+                    state.categories.firstOrNull { it.id == b.categoryId }?.let { b.copy(categoryName = categoryLabel(it, resources)) } ?: b
+                },
                 totalExpenseMinor = state.stats.expenseMinor,
                 selectedCategoryId = state.selectedCategoryId,
                 currency = state.currency,
@@ -229,7 +234,7 @@ fun AnalyticsScreen(
     }
 }
 
-private val MONTH_TITLE = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.US)
+
 
 @Composable
 fun MonthNavigator(
@@ -245,10 +250,10 @@ fun MonthNavigator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.previous_month))
         }
         Crossfade(
-            targetState = month.format(MONTH_TITLE),
+            targetState = DateFormatter.monthYear(month),
             animationSpec = Motion.short(),
             modifier = Modifier.weight(1f),
             label = "monthTitle"
@@ -262,9 +267,9 @@ fun MonthNavigator(
             )
         }
         IconButton(onClick = onNext, enabled = !isCurrent) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.next_month))
         }
-        TextButton(onClick = onCurrent, enabled = !isCurrent) { Text("This month") }
+        TextButton(onClick = onCurrent, enabled = !isCurrent) { Text(stringResource(R.string.filter_this_month)) }
     }
 }
 
@@ -288,7 +293,7 @@ fun PeriodFilterRow(
             FilterChip(
                 selected = currentPeriod == AnalyticsPeriod.MONTH,
                 onClick = { onSelectPeriod(AnalyticsPeriod.MONTH) },
-                label = { Text("Month") },
+                label = { Text(stringResource(R.string.period_month)) },
                 colors = FilterChipDefaults.filterChipColors()
             )
             FilterChip(
@@ -516,7 +521,7 @@ fun SpendingDonutChartCard(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "${"%.1f".format(selectedItem.percentage)}%",
+                                text = CurrencyFormatter.formatPercent(selectedItem.percentage),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = catColor
@@ -588,9 +593,9 @@ fun SpendingDonutChartCard(
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                     )
-                                    val txSuffix = if (item.transactionCount == 1) "transaction" else "transactions"
+                                    val count = pluralStringResource(R.plurals.transaction_count, item.transactionCount, item.transactionCount)
                                     Text(
-                                        text = "${item.transactionCount} $txSuffix • ${"%.1f".format(item.percentage)}%",
+                                        text = "$count · ${CurrencyFormatter.formatPercent(item.percentage)}",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -649,9 +654,9 @@ fun TopMerchantsCard(
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            val txSuffix = if (item.count == 1) "transaction" else "transactions"
+                            val count = pluralStringResource(R.plurals.transaction_count, item.count, item.count)
                             Text(
-                                text = "${item.count} $txSuffix",
+                                text = count,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

@@ -1,5 +1,6 @@
 package com.teppe21.finances.feature.transactions
 
+import com.teppe21.finances.feature.categories.accountLabel
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.togetherWith
@@ -66,7 +67,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import com.teppe21.finances.feature.categories.categoryLabel
+import com.teppe21.finances.feature.categories.sourceLabel
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -204,9 +208,9 @@ fun TransactionsScreen(
                 )
 
                 val count = state.filteredTransactions.size
-                val txSuffix = if (count == 1) "transaction" else "transactions"
+
                 Text(
-                    text = "$count $txSuffix",
+                    text = pluralStringResource(R.plurals.transaction_count, count, count),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -241,8 +245,7 @@ fun TransactionsScreen(
                         if (state.unconvertedCount > 0) {
                             item(key = "unconverted-banner") {
                                 InfoBanner(
-                                    "${state.unconvertedCount} transactions have no exchange rate to ${state.currency}; " +
-                                        "they are shown in their original currency.",
+                                    pluralStringResource(R.plurals.unconverted_shown_original, state.unconvertedCount, state.unconvertedCount, state.currency),
                                     modifier = Modifier.animateItemPlacement(Motion.medium())
                                 )
                             }
@@ -344,8 +347,8 @@ fun TransactionsScreen(
                     transaction = selected,
                     displayCurrency = state.currency,
                     convertedAmountMinor = state.convertedAmounts[selected.id],
-                    categoryName = state.categories.firstOrNull { it.id == selected.categoryId }?.displayName() ?: "Other / Uncategorized",
-                    accountName = state.accounts.firstOrNull { it.id == selected.accountId }?.getDisplayName() ?: "Not assigned",
+                    categoryName = state.categories.firstOrNull { it.id == selected.categoryId }?.let { categoryLabel(it) } ?: stringResource(R.string.category_name_other),
+                    accountName = state.accounts.firstOrNull { it.id == selected.accountId }?.let { accountLabel(it) } ?: stringResource(R.string.account_not_assigned),
                     onDelete = { transactionToDelete = selected },
                     onChangeCategory = { categorizing = selected },
                     onClose = { viewModel.selectTransaction(null) }
@@ -452,9 +455,9 @@ fun TransactionDetailContent(
 
         if (!displayCurrency.equals(transaction.currency, ignoreCase = true)) {
             DetailRow(
-                label = "In $displayCurrency",
+                label = stringResource(R.string.detail_in_currency, displayCurrency),
                 value = convertedAmountMinor?.let { "≈ " + CurrencyFormatter.formatSigned(it, displayCurrency) }
-                    ?: "No exchange rate available"
+                    ?: stringResource(R.string.no_rate_available)
             )
         }
 
@@ -476,10 +479,10 @@ fun TransactionDetailContent(
         } else {
             DetailRow(label = stringResource(R.string.category), value = categoryName)
         }
-        DetailRow(label = "Account", value = accountName)
-        DetailRow(label = stringResource(R.string.source), value = transaction.source.getDisplayName())
+        DetailRow(label = stringResource(R.string.account), value = accountName)
+        DetailRow(label = stringResource(R.string.source), value = sourceLabel(transaction.source))
         if (transaction.pending) {
-            DetailRow(label = "Status", value = "Needs review, not counted yet")
+            DetailRow(label = stringResource(R.string.detail_status), value = stringResource(R.string.detail_needs_review))
         }
         if (!transaction.notes.isNullOrBlank()) {
             DetailRow(label = stringResource(R.string.note), value = transaction.notes)
@@ -529,6 +532,7 @@ fun AddTransactionDialog(
     ) -> Unit
 ) {
     var amountText by remember { mutableStateOf("") }
+    val manualEntryLabel = stringResource(R.string.manual_entry)
     var selectedCurrency by remember { mutableStateOf(defaultCurrency) }
     var descriptionText by remember { mutableStateOf("") }
     var merchantText by remember { mutableStateOf("") }
@@ -593,7 +597,7 @@ fun AddTransactionDialog(
                     label = { Text(stringResource(R.string.amount) + " (${selectedCurrency})") },
                     isError = amountText.isNotBlank() && parsedAmount == null,
                     supportingText = {
-                        if (amountText.isNotBlank() && parsedAmount == null) Text("Use digits with up to two decimals, e.g. 1250 or 12.50")
+                        if (amountText.isNotBlank() && parsedAmount == null) Text(stringResource(R.string.amount_format_error))
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
@@ -614,7 +618,7 @@ fun AddTransactionDialog(
                         FilterChip(
                             selected = selectedCategoryId == cat.id,
                             onClick = { selectedCategoryId = cat.id },
-                            label = { Text(cat.displayName(), style = MaterialTheme.typography.labelSmall) }
+                            label = { Text(categoryLabel(cat), style = MaterialTheme.typography.labelSmall) }
                         )
                     }
                 }
@@ -641,7 +645,7 @@ fun AddTransactionDialog(
                 onClick = {
                     val minor = parsedAmount ?: return@Button
                     val dir = if (isExpense) TransactionDirection.EXPENSE else TransactionDirection.INCOME
-                    val desc = descriptionText.ifBlank { merchantText.ifBlank { "Manual entry" } }
+                    val desc = descriptionText.ifBlank { merchantText.ifBlank { manualEntryLabel } }
                     onConfirm(selectedAccountId, if (isExpense) -minor else minor, selectedCurrency, dir, desc, merchantText.ifBlank { null }, selectedCategoryId, LocalDate.now())
                 },
                 enabled = parsedAmount != null && accounts.isNotEmpty()

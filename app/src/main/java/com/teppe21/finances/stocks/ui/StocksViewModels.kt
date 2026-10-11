@@ -1,5 +1,7 @@
 package com.teppe21.finances.stocks.ui
 
+import com.teppe21.finances.R
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
@@ -49,7 +51,8 @@ data class SearchState(
     val results: List<StockSymbol> = emptyList(),
     val searching: Boolean = false,
     val error: MarketDataError? = null,
-    val message: String? = null
+    /** A string resource with the symbol as its argument. */
+    val message: Pair<Int, String>? = null
 )
 
 class StocksViewModel : ViewModel() {
@@ -136,9 +139,9 @@ class StocksViewModel : ViewModel() {
     fun add(symbol: StockSymbol) {
         viewModelScope.launch {
             val message = when (repo.add(symbol)) {
-                AddResult.Added -> "${symbol.displaySymbol} added"
-                AddResult.AlreadyOnWatchlist -> "${symbol.displaySymbol} is already on your watchlist"
-                AddResult.LimitReached -> "The watchlist is limited to ${RefreshPolicy.MAX_WATCHLIST_SIZE} symbols to stay within provider limits"
+                AddResult.Added -> R.string.stock_added to symbol.displaySymbol
+                AddResult.AlreadyOnWatchlist -> R.string.stock_already_added to symbol.displaySymbol
+                AddResult.LimitReached -> R.string.stock_limit_reached to RefreshPolicy.MAX_WATCHLIST_SIZE.toString()
             }
             _search.value = SearchState(message = message)
             repo.refreshOne(symbol.symbol)
@@ -237,7 +240,7 @@ sealed interface KeyCheck {
     data object Idle : KeyCheck
     data object Checking : KeyCheck
     data object Saved : KeyCheck
-    data class Failed(val message: String, val canSaveAnyway: Boolean) : KeyCheck
+    data class Failed(@StringRes val message: Int, val canSaveAnyway: Boolean) : KeyCheck
 }
 
 class StocksSetupViewModel : ViewModel() {
@@ -259,11 +262,11 @@ class StocksSetupViewModel : ViewModel() {
                     KeyCheck.Saved
                 }
                 is MarketResult.Err -> when (r.error) {
-                    MarketDataError.InvalidKey -> KeyCheck.Failed("Finnhub rejected this key.", canSaveAnyway = false)
-                    MarketDataError.MissingKey -> KeyCheck.Failed("Enter a key first.", canSaveAnyway = false)
+                    MarketDataError.InvalidKey -> KeyCheck.Failed(R.string.stock_key_rejected, canSaveAnyway = false)
+                    MarketDataError.MissingKey -> KeyCheck.Failed(R.string.stock_key_missing, canSaveAnyway = false)
                     MarketDataError.Offline, MarketDataError.Timeout ->
-                        KeyCheck.Failed("Could not reach Finnhub to check the key.", canSaveAnyway = true)
-                    else -> KeyCheck.Failed("Finnhub could not confirm the key right now.", canSaveAnyway = true)
+                        KeyCheck.Failed(R.string.stock_key_unreachable, canSaveAnyway = true)
+                    else -> KeyCheck.Failed(R.string.stock_key_unconfirmed, canSaveAnyway = true)
                 }
             }
         }

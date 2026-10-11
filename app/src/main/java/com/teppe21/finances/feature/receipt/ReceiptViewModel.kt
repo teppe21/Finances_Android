@@ -1,5 +1,6 @@
 package com.teppe21.finances.feature.receipt
 
+import com.teppe21.finances.R
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -30,7 +31,8 @@ data class ReceiptUiState(
     val categories: List<Category> = emptyList(),
     val selectedAccountId: String? = null,
     val selectedCategoryId: String? = null,
-    val errorMessage: String? = null,
+    /** A string resource describing the last failure. */
+    val errorMessage: Int? = null,
     /** True when the scan came from the built-in sample, not the camera or gallery. */
     val isSample: Boolean = false,
     /** True while the confirmed receipt is being written, so the sheet cannot be submitted twice. */
@@ -81,14 +83,14 @@ class ReceiptViewModel(
 
     /** [jpeg] and [rotationDegrees] come straight from CameraX's in-memory capture. */
     fun processCapture(jpeg: ByteArray, rotationDegrees: Int) = recognize(
-        failureMessage = "Text recognition failed. Try again with better lighting."
+        failureMessage = R.string.receipt_error_ocr
     ) { ocr.recognizeCapture(jpeg, rotationDegrees) }
 
     fun processUri(uri: Uri) = recognize(
-        failureMessage = "The image could not be read. Try another image."
+        failureMessage = R.string.receipt_error_image
     ) { ocr.recognizeFromUri(uri) }
 
-    private fun recognize(failureMessage: String, block: suspend () -> ReceiptScan) {
+    private fun recognize(failureMessage: Int, block: suspend () -> ReceiptScan) {
         // A second tap on the shutter while a scan is running would start a parallel OCR run.
         if (_uiState.value.isProcessing) return
         _uiState.update { it.copy(isProcessing = true, errorMessage = null) }
@@ -105,7 +107,7 @@ class ReceiptViewModel(
 
     fun reportCaptureFailed() {
         _uiState.update {
-            it.copy(isProcessing = false, errorMessage = "The photo could not be taken. Try again or pick an image.")
+            it.copy(isProcessing = false, errorMessage = R.string.receipt_error_photo)
         }
     }
 
@@ -190,7 +192,7 @@ class ReceiptViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(isSaving = false, errorMessage = "The receipt could not be saved. Try again.") }
+                _uiState.update { it.copy(isSaving = false, errorMessage = R.string.receipt_error_save) }
                 return@launch
             }
             clearScan()

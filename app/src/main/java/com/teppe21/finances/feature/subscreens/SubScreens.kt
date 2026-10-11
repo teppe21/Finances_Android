@@ -89,7 +89,7 @@ fun RecurringScreen() {
                             )
                             val nextFormatted = rule.nextDate?.let { DateFormatter.format(it) } ?: ""
                             Text(
-                                text = if (nextFormatted.isNotBlank()) "Monthly • Next: $nextFormatted" else "Monthly",
+                                text = if (nextFormatted.isNotBlank()) stringResource(R.string.recurring_monthly_next, nextFormatted) else stringResource(R.string.recurring_monthly),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

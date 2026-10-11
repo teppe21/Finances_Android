@@ -8,11 +8,23 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 import kotlin.math.abs
 
+/**
+ * Money as text. A non-breaking space (normal width) separates the number from the unit, so
+ * "12,345 Ft" never wraps between the two. English: `12,345 Ft`, `€12.50`, `CHF 12.50`.
+ * Hungarian ([DisplayLocale]): `12 345 Ft`, `12,50 €`, `12,50 CHF`, grouped with the same
+ * non-breaking space and a decimal comma, units after the number.
+ */
 object CurrencyFormatter {
 
-    private val symbols = DecimalFormatSymbols(Locale.US).apply {
+    const val NBSP = ' '
+
+    private val englishSymbols = DecimalFormatSymbols(Locale.US).apply {
         groupingSeparator = ','
         decimalSeparator = '.'
+    }
+    private val hungarianSymbols = DecimalFormatSymbols(Locale.US).apply {
+        groupingSeparator = NBSP
+        decimalSeparator = ','
     }
 
     fun format(amountMinor: Long, currency: String = "HUF"): String {
@@ -26,18 +38,33 @@ object CurrencyFormatter {
             "#,##0." + "0".repeat(curr.decimalPlaces)
         }
 
-        val df = DecimalFormat(pattern, symbols).apply { roundingMode = RoundingMode.HALF_UP }
-        val formattedNumber = df.format(major)
+        val hungarian = DisplayLocale.isHungarian
+        val df = DecimalFormat(pattern, if (hungarian) hungarianSymbols else englishSymbols).apply { roundingMode = RoundingMode.HALF_UP }
+        val number = df.format(major)
 
+        if (hungarian) {
+            val unit = when (curr.code) {
+                "HUF" -> "Ft"
+                "EUR" -> "€"
+                "USD" -> "$"
+                "GBP" -> "£"
+                else -> curr.code
+            }
+            return "$number$NBSP$unit"
+        }
         return when (curr.code) {
-            "HUF" -> "$formattedNumber Ft"
-            "EUR" -> "€$formattedNumber"
-            "USD" -> "$$formattedNumber"
-            "GBP" -> "£$formattedNumber"
-            "CHF" -> "CHF $formattedNumber"
-            else -> "$formattedNumber ${curr.symbol}"
+            "HUF" -> "$number${NBSP}Ft"
+            "EUR" -> "€$number"
+            "USD" -> "$$number"
+            "GBP" -> "£$number"
+            "CHF" -> "CHF$NBSP$number"
+            else -> "$number$NBSP${curr.symbol}"
         }
     }
+
+    /** One decimal and a percent sign: `12.3%`, Hungarian `12,3%`. */
+    fun formatPercent(value: Float): String =
+        String.format(DisplayLocale.locale, "%.1f%%", value)
 
     fun formatSigned(amountMinor: Long, currency: String = "HUF"): String {
         val base = format(amountMinor, currency)

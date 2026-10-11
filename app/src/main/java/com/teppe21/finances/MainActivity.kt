@@ -108,6 +108,7 @@ import com.teppe21.finances.feature.analytics.AnalyticsScreen
 import com.teppe21.finances.feature.categories.CategoriesScreen
 import com.teppe21.finances.feature.dashboard.DashboardScreen
 import com.teppe21.finances.feature.importcsv.CsvImportScreen
+import com.teppe21.finances.core.utils.DisplayLocale
 import com.teppe21.finances.feature.categories.UncategorizedScreen
 import com.teppe21.finances.feature.more.MoreScreen
 import com.teppe21.finances.feature.notifications.NotificationAutomationScreen
@@ -134,6 +135,8 @@ class MainActivity : FragmentActivity() {
         // insets handling identical everywhere. The theme-aware style is applied once preferences load.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Dates and amounts follow the language the resources resolved to (English or Hungarian).
+        DisplayLocale.set(resources.configuration.locales[0])
         setContent {
             val prefs by app.preferencesRepository.preferencesFlow.collectAsState(initial = null)
             val unlocked by app.appLock.unlocked.collectAsState()
@@ -224,10 +227,10 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
             }
         )
         val builder = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Finances")
-            .setSubtitle("Confirm it is you to view your finances")
+            .setTitle(activity.getString(R.string.lock_biometric_title))
+            .setSubtitle(activity.getString(R.string.lock_biometric_subtitle))
         if (prefs.hasPin) {
-            builder.setAllowedAuthenticators(BIOMETRIC_WEAK).setNegativeButtonText("Use PIN")
+            builder.setAllowedAuthenticators(BIOMETRIC_WEAK).setNegativeButtonText(activity.getString(R.string.lock_use_pin))
         } else {
             // Lock created by version 2.0.0 without a PIN: allow the device screen lock as fallback.
             builder.setAllowedAuthenticators(BIOMETRIC_WEAK or DEVICE_CREDENTIAL)
@@ -254,15 +257,15 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
             when (val result = app.preferencesRepository.verifyPin(pin)) {
                 PinCheck.Success -> app.appLock.markUnlocked()
                 is PinCheck.Wrong -> message = if (result.attemptsBeforeLockout > 0) {
-                    "Incorrect PIN. ${result.attemptsBeforeLockout} attempts left before a temporary lockout."
+                    activity.resources.getQuantityString(R.plurals.lock_wrong_pin_left, result.attemptsBeforeLockout, result.attemptsBeforeLockout)
                 } else {
-                    "Incorrect PIN."
+                    activity.getString(R.string.pin_error_wrong)
                 }
                 is PinCheck.LockedOut -> {
                     lockedSeconds = result.remaining.seconds.coerceAtLeast(1)
-                    message = "Too many attempts. Try again in a moment."
+                    message = activity.getString(R.string.lock_too_many)
                 }
-                PinCheck.NoPinSet -> message = "No PIN is set. Use biometric unlock."
+                PinCheck.NoPinSet -> message = activity.getString(R.string.lock_no_pin)
             }
             pin = ""
             checking = false
@@ -284,14 +287,14 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
         ) {
             Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(16.dp))
-            Text("Finances is locked", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.lock_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(24.dp))
 
             if (prefs.hasPin) {
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { input -> if (input.length <= 8 && input.all { it.isDigit() }) pin = input },
-                    label = { Text("PIN") },
+                    label = { Text(stringResource(R.string.settings_lock_pin)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { submit() }),
@@ -304,7 +307,7 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
                     onClick = { submit() },
                     enabled = pin.length >= 4 && lockedSeconds == 0L && !checking,
                     modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth()
-                ) { Text(if (lockedSeconds > 0) "Locked for ${lockedSeconds}s" else "Unlock") }
+                ) { Text(if (lockedSeconds > 0) stringResource(R.string.lock_locked_for, lockedSeconds) else stringResource(R.string.lock_unlock)) }
             }
 
             if (useBiometric) {
@@ -312,7 +315,7 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
                 OutlinedButton(onClick = launchBiometric, modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth()) {
                     Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Use biometrics")
+                    Text(stringResource(R.string.lock_use_biometrics))
                 }
             }
 
@@ -336,28 +339,26 @@ fun LockGateScreen(prefs: UserPreferences, activity: FragmentActivity) {
             }
 
             Spacer(Modifier.height(24.dp))
-            TextButton(onClick = { showReset = true }) { Text("Forgot PIN?") }
+            TextButton(onClick = { showReset = true }) { Text(stringResource(R.string.lock_forgot)) }
         }
     }
 
     if (showReset) {
         AlertDialog(
             onDismissRequest = { showReset = false },
-            title = { Text("Reset Finances?") },
+            title = { Text(stringResource(R.string.lock_reset_title)) },
             text = {
                 Text(
-                    "The PIN cannot be recovered. Resetting erases every transaction, account, category, " +
-                        "receipt record, the stock watchlist, the market data API key and all settings on this device. " +
-                        "This cannot be undone."
+                    stringResource(R.string.lock_reset_body)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showReset = false
                     scope.launch { AppReset.fullReset(app) }
-                }) { Text("Erase everything", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.lock_erase), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showReset = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showReset = false }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 }
@@ -560,16 +561,16 @@ private fun screenTitle(route: String?): String = when (route) {
     Screen.Accounts.route -> stringResource(R.string.accounts_title)
     Screen.More.route -> stringResource(R.string.more_title)
     Screen.NotificationAutomation.route -> stringResource(R.string.notif_title)
-    Screen.Review.route -> "Review queue"
+    Screen.Review.route -> stringResource(R.string.review_title)
     Screen.CsvImport.route -> stringResource(R.string.import_title)
     Screen.Budgets.route -> stringResource(R.string.budgets)
     Screen.Recurring.route -> stringResource(R.string.recurring)
     Screen.Uncategorized.route -> stringResource(R.string.uncategorized_title)
     Screen.Categories.route -> stringResource(R.string.categories)
     Screen.Settings.route -> stringResource(R.string.settings)
-    Screen.Stocks.route -> "Stocks"
-    Screen.StockDetail.route -> "Stock details"
-    Screen.StocksSetup.route -> "Market data"
-    Screen.PrivacyPolicy.route -> "Privacy policy"
+    Screen.Stocks.route -> stringResource(R.string.stocks_title)
+    Screen.StockDetail.route -> stringResource(R.string.stock_details_title)
+    Screen.StocksSetup.route -> stringResource(R.string.settings_market_data)
+    Screen.PrivacyPolicy.route -> stringResource(R.string.privacy_policy)
     else -> stringResource(R.string.app_name)
 }

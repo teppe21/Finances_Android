@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,7 +63,8 @@ fun CategorizeDialog(
     var selected by rememberSaveable { mutableStateOf(initialCategoryId?.takeIf { it != BuiltIns.UNCATEGORIZED }) }
     var createRule by rememberSaveable { mutableStateOf(offerRule) }
     var keyword by rememberSaveable { mutableStateOf(suggestedKeyword) }
-    val choices = remember(categories) { categories.filter { it.id != BuiltIns.UNCATEGORIZED }.sortedBy { it.displayName().lowercase() } }
+    val resources = LocalContext.current.resources
+    val choices = remember(categories) { categories.filter { it.id != BuiltIns.UNCATEGORIZED }.sortedBy { categoryLabel(it, resources).lowercase() } }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -74,7 +76,7 @@ fun CategorizeDialog(
                         FilterChip(
                             selected = selected == cat.id,
                             onClick = { selected = cat.id },
-                            label = { Text(cat.displayName(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            label = { Text(categoryLabel(cat), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = {
                                 Spacer(
                                     Modifier

@@ -1,5 +1,7 @@
 package com.teppe21.finances.stocks.ui
 
+import com.teppe21.finances.R
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -55,39 +57,34 @@ fun StocksSetupScreen(onDone: () -> Unit, viewModel: StocksSetupViewModel = view
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Spacer(Modifier.height(4.dp))
-        SectionCard(title = "Why a key is needed") {
+        SectionCard(title = stringResource(R.string.stock_why_key)) {
             Text(
-                "Stock prices come from Finnhub, a market data service. Finnhub requires every user to have their own API key; " +
-                    "the app does not include a shared key. You can create one on Finnhub's website. Finnhub offers a free plan; " +
-                    "its limits and which exchanges and history it includes are set by Finnhub and can change, so check their " +
-                    "pricing page.",
+                stringResource(R.string.stock_why_key_body),
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "How the app uses it: about one request per symbol per minute while the Stocks screen is open and the US market " +
-                    "is open, no requests in the background, and automatic pauses when Finnhub reports its rate limit. " +
-                    "Each quote is labelled from Finnhub's own timestamp, so delayed or closing prices are never shown as real-time.",
+                stringResource(R.string.stock_how_used),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "What is sent: the key, the symbols on your watchlist and your search text. No financial data from the app.",
+                stringResource(R.string.stock_what_sent),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             TextButton(onClick = {
                 FinancesApp.instance.appLock.expectExternalActivity()
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://finnhub.io/register"))) }
-            }) { Text("Open finnhub.io to get a key") }
+            }) { Text(stringResource(R.string.stock_open_finnhub)) }
         }
 
-        SectionCard(title = if (hasKey) "Replace API key" else "Enter API key") {
+        SectionCard(title = stringResource(if (hasKey) R.string.stock_replace_key else R.string.stock_enter_key)) {
             OutlinedTextField(
                 value = key,
                 onValueChange = { key = it.trim().take(128) },
-                label = { Text("Finnhub API key") },
+                label = { Text(stringResource(R.string.stock_key_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -97,25 +94,25 @@ fun StocksSetupScreen(onDone: () -> Unit, viewModel: StocksSetupViewModel = view
             when (val c = check) {
                 KeyCheck.Checking -> CircularProgressIndicator()
                 is KeyCheck.Failed -> {
-                    Text(c.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    if (c.canSaveAnyway) TextButton(onClick = { viewModel.saveWithoutCheck(key) }) { Text("Save without checking") }
+                    Text(stringResource(c.message), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    if (c.canSaveAnyway) TextButton(onClick = { viewModel.saveWithoutCheck(key) }) { Text(stringResource(R.string.stock_save_unchecked)) }
                 }
                 else -> Unit
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { viewModel.validateAndSave(key) }, enabled = key.isNotBlank() && check != KeyCheck.Checking) {
-                    Text("Check and save")
+                    Text(stringResource(R.string.stock_check_save))
                 }
             }
             Text(
-                "The key is encrypted with an Android Keystore key and stored only on this device. It is excluded from backups and never logged.",
+                stringResource(R.string.stock_key_storage),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         if (hasKey) {
-            OutlinedButton(onClick = { viewModel.removeKey() }, modifier = Modifier.fillMaxWidth()) { Text("Remove saved key") }
+            OutlinedButton(onClick = { viewModel.removeKey() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.stock_remove_key)) }
         }
         Spacer(Modifier.height(24.dp))
     }

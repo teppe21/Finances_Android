@@ -44,6 +44,9 @@ import androidx.compose.ui.text.style.TextAlign
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.Transaction
+import com.teppe21.finances.R
+import com.teppe21.finances.feature.categories.sourceLabel
+import androidx.compose.ui.res.stringResource
 import com.teppe21.finances.domain.model.TransactionDirection
 
 /** Card with a title, used for every dashboard / settings section. */
@@ -133,10 +136,10 @@ fun TransactionRow(
     }
     val details = buildList {
         add(DateFormatter.format(transaction.date))
-        add(transaction.source.getDisplayName())
+        add(sourceLabel(transaction.source))
         if (!sameCurrency && convertedAmountMinor != null) add(CurrencyFormatter.formatSigned(transaction.amountMinor, transaction.currency))
-        if (!sameCurrency && convertedAmountMinor == null) add("no $displayCurrency rate")
-        if (transaction.pending) add("needs review")
+        if (!sameCurrency && convertedAmountMinor == null) add(stringResource(R.string.row_no_rate, displayCurrency))
+        if (transaction.pending) add(stringResource(R.string.row_needs_review))
     }.joinToString(" · ")
 
     val accent = when {
@@ -145,10 +148,10 @@ fun TransactionRow(
         else -> MaterialTheme.finances.expense
     }
     val directionLabel = when {
-        transaction.direction == TransactionDirection.PERSONAL_TRANSFER -> "Personal transfer"
-        isTransfer -> "Transfer"
-        isIncome -> "Income"
-        else -> "Expense"
+        transaction.direction == TransactionDirection.PERSONAL_TRANSFER -> stringResource(R.string.kind_personal_transfer)
+        isTransfer -> stringResource(R.string.kind_transfer)
+        isIncome -> stringResource(R.string.kind_income)
+        else -> stringResource(R.string.kind_expense)
     }
 
     Surface(

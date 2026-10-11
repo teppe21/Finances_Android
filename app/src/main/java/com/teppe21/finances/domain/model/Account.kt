@@ -30,6 +30,8 @@ data class Account(
     val updatedAt: Instant = Instant.now()
 ) {
     fun getDisplayName(): String {
+        // Default accounts are shown by id only while their name is a default one; a rename wins.
+        if (name !in DEFAULT_NAMES) return name
         return when (id) {
             "acc_cash" -> "Cash Wallet"
             "acc_otp" -> "OTP Current Account"
@@ -42,5 +44,10 @@ data class Account(
                 else -> name
             }
         }
+    }
+
+    companion object {
+        /** Names the app gave its default accounts, current and from early Hungarian versions. */
+        val DEFAULT_NAMES = setOf("Cash Wallet", "OTP Current Account", "Savings", "Revolut", "Készpénz", "OTP Folyószámla", "Megtakarítás")
     }
 }

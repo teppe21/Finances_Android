@@ -1,5 +1,10 @@
 package com.teppe21.finances.feature.notifications
 
+import com.teppe21.finances.feature.categories.sourceLabel
+import com.teppe21.finances.feature.categories.accountLabel
+import com.teppe21.finances.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -73,6 +78,7 @@ fun ReviewScreen(viewModel: ReviewViewModel = viewModel()) {
     val accounts by viewModel.accounts.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
     Box(Modifier.fillMaxSize()) {
@@ -84,8 +90,8 @@ fun ReviewScreen(viewModel: ReviewViewModel = viewModel()) {
             if (pending.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
-                        "Nothing to review",
-                        "Recognized transactions that need a decision will appear here.",
+                        stringResource(R.string.review_empty_title),
+                        stringResource(R.string.review_empty_desc),
                         modifier = Modifier.animateItemPlacement(Motion.medium())
                     )
                 }
@@ -100,8 +106,8 @@ fun ReviewScreen(viewModel: ReviewViewModel = viewModel()) {
                         viewModel.confirm(tx, accountId)
                         scope.launch {
                             val result = snackbarHostState.showSnackbar(
-                                "Confirmed. It now counts toward your totals.",
-                                actionLabel = "Undo",
+                                context.getString(R.string.review_confirmed),
+                                actionLabel = context.getString(R.string.undo),
                                 duration = SnackbarDuration.Short
                             )
                             if (result == SnackbarResult.ActionPerformed) viewModel.undoConfirm(tx)
@@ -112,8 +118,8 @@ fun ReviewScreen(viewModel: ReviewViewModel = viewModel()) {
                         viewModel.discard(tx)
                         scope.launch {
                             val result = snackbarHostState.showSnackbar(
-                                "Discarded. Nothing was added.",
-                                actionLabel = "Undo",
+                                context.getString(R.string.review_discarded),
+                                actionLabel = context.getString(R.string.undo),
                                 duration = SnackbarDuration.Short
                             )
                             if (result == SnackbarResult.ActionPerformed) viewModel.undoDiscard(tx)
@@ -145,21 +151,21 @@ private fun ReviewCard(
         pendingAction?.invoke()
     }
     val reason = when {
-        tx.isUnassigned -> "Choose the account this belongs to."
-        tx.notes?.startsWith("Possible duplicate") == true -> "This may be the same payment as another notification. Discard it if so."
-        else -> "Check the amount and merchant before confirming."
+        tx.isUnassigned -> stringResource(R.string.review_hint_account)
+        tx.notes?.startsWith("Possible duplicate") == true -> stringResource(R.string.review_hint_duplicate)
+        else -> stringResource(R.string.review_hint_check)
     }
 
     val confirm = { pendingAction = { onConfirm(accountId) }; visibility.targetState = false }
     val discard = { pendingAction = onDiscard; visibility.targetState = false }
     val busy = pendingAction != null
     val confirmAction = if (accountId.isNotBlank() && !busy) {
-        SwipeAction("Confirm", Icons.Default.Check, MaterialTheme.finances.income, MaterialTheme.colorScheme.background, confirm)
+        SwipeAction(stringResource(R.string.review_confirm), Icons.Default.Check, MaterialTheme.finances.income, MaterialTheme.colorScheme.background, confirm)
     } else {
         null // choose an account first: the row resists instead of committing
     }
     val discardAction = if (!busy) {
-        SwipeAction("Discard", Icons.Default.Close, MaterialTheme.finances.expense, MaterialTheme.colorScheme.background, discard)
+        SwipeAction(stringResource(R.string.review_discard), Icons.Default.Close, MaterialTheme.finances.expense, MaterialTheme.colorScheme.background, discard)
     } else {
         null
     }
@@ -176,7 +182,7 @@ private fun ReviewCard(
                 Column(Modifier.weight(1f)) {
                     Text(tx.merchant ?: tx.description, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "${DateFormatter.format(tx.date)} · ${tx.source.getDisplayName()}",
+                        "${DateFormatter.format(tx.date)} · ${sourceLabel(tx.source)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -187,14 +193,14 @@ private fun ReviewCard(
             Text(reason, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Account:", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.account) + ":", style = MaterialTheme.typography.bodyMedium)
                 Column {
                     TextButton(onClick = { expanded = true }) {
-                        Text(accounts.firstOrNull { it.id == accountId }?.getDisplayName() ?: "Select")
+                        Text(accounts.firstOrNull { it.id == accountId }?.let { accountLabel(it) } ?: stringResource(R.string.review_select_account))
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         accounts.forEach { acc ->
-                            DropdownMenuItem(text = { Text(acc.getDisplayName()) }, onClick = {
+                            DropdownMenuItem(text = { Text(accountLabel(acc)) }, onClick = {
                                 accountId = acc.id
                                 expanded = false
                             })
@@ -203,11 +209,11 @@ private fun ReviewCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = confirm, enabled = accountId.isNotBlank() && !busy) { Text("Confirm") }
-                OutlinedButton(onClick = discard, enabled = !busy) { Text("Discard") }
+                Button(onClick = confirm, enabled = accountId.isNotBlank() && !busy) { Text(stringResource(R.string.review_confirm)) }
+                OutlinedButton(onClick = discard, enabled = !busy) { Text(stringResource(R.string.review_discard)) }
             }
             Text(
-                "Swipe right to confirm or left to discard.",
+                stringResource(R.string.review_swipe_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)

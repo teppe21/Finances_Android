@@ -1,5 +1,7 @@
 package com.teppe21.finances.feature.accounts
 
+import com.teppe21.finances.feature.categories.accountTypeLabel
+import com.teppe21.finances.feature.categories.accountLabel
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,7 +86,7 @@ fun AccountsScreen(
 
             item {
                 Text(
-                    "Balances are the opening balance plus every confirmed transaction recorded for the account.",
+                    stringResource(R.string.accounts_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -162,7 +164,7 @@ fun AccountCard(row: AccountRow, modifier: Modifier = Modifier) {
 
                 Column {
                     Text(
-                        text = account.getDisplayName(),
+                        text = accountLabel(account),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -182,13 +184,13 @@ fun AccountCard(row: AccountRow, modifier: Modifier = Modifier) {
                 )
                 if (row.unconvertedCount > 0) {
                     Text(
-                        "Incomplete: ${row.unconvertedCount} without exchange rate",
+                        stringResource(R.string.accounts_incomplete, row.unconvertedCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error
                     )
                 } else if (row.pendingCount > 0) {
                     Text(
-                        "${row.pendingCount} awaiting review",
+                        stringResource(R.string.accounts_awaiting_review, row.pendingCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -230,13 +232,13 @@ fun AddAccountDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Type", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.account_type), style = MaterialTheme.typography.labelMedium)
                 androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(AccountType.values().toList()) { t ->
-                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(t.getDisplayName()) })
+                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(accountTypeLabel(t)) })
                     }
                 }
-                Text("Currency", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.currency), style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SupportedCurrencies.ALL.forEach { c ->
                         FilterChip(selected = currency == c.code, onClick = { currency = c.code }, label = { Text(c.code) })
@@ -247,14 +249,14 @@ fun AddAccountDialog(
                     onValueChange = { balanceText = it.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(15) },
                     label = { Text(stringResource(R.string.opening_balance) + " ($currency)") },
                     isError = parsed == null,
-                    supportingText = { if (parsed == null) Text("Use digits with up to two decimals") },
+                    supportingText = { if (parsed == null) Text(stringResource(R.string.amount_format_error)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Checkbox(checked = negative, onCheckedChange = { negative = it })
-                    Text("Opening balance is negative (debt)", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.accounts_negative_opening), style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
