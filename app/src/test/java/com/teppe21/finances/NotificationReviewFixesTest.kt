@@ -16,7 +16,7 @@ class NotificationReviewFixesTest {
 
     private val recognizer = NotificationRecognizer(zone = ZoneOffset.UTC)
     private val wallet = "com.google.android.apps.walletnfcrel"
-    private val erste = "hu.erstebank.george"
+    private val erste = "hu.erstebank.george.hungary"
     private val otp = "hu.otpbank.smartbank"
 
     private fun recognize(pkg: String, title: String?, text: String?) =

@@ -18,7 +18,7 @@ The settings intent tries the per-app detail screen (Android 11+), then the gene
 | Google Wallet | `com.google.android.apps.walletnfcrel` | real samples | yes, when the card issuer maps to one account |
 | OTP Bank | `hu.otpbank.smartbank`, `hu.otpbank.mobilbank` | synthetic samples | no, review queue |
 | Wise | `com.transferwise.android` | synthetic samples | no, review queue |
-| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank` | none | no, review queue |
+| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank`, `pegasus.project.ebh.mobile.android.bundle.mobilebank` | none | no, review queue |
 | MBH Bank | `hu.mbhbank.app`, `hu.takarek.mobilbank` | none | no, review queue |
 
 "Real samples" means the parser tests use notification text captured from those apps (for example `Coop` / `You spent HUF804` / `HUF balance: HUF42,285.97`, and `75. SZ. ABC ÁRUHÁZ` / `HUF804.00 with Revolut Mastercard ••1413`). The Hungarian bank and Wise package names and patterns were carried over from the earlier version and still need checking against real notifications.

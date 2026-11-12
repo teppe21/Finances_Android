@@ -54,7 +54,7 @@ With Android notification access (granted only after an in-app disclosure and an
 | Google Wallet | `com.google.android.apps.walletnfcrel` | Patterns tested with real notification text |
 | OTP Bank | `hu.otpbank.smartbank`, `hu.otpbank.mobilbank` | Recognized transactions go to the review queue |
 | Wise | `com.transferwise.android` | Recognized transactions go to the review queue |
-| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank` | Recognized transactions go to the review queue |
+| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank`, `pegasus.project.ebh.mobile.android.bundle.mobilebank` | Recognized transactions go to the review queue |
 | MBH Bank | `hu.mbhbank.app`, `hu.takarek.mobilbank` | Recognized transactions go to the review queue |
 
 Notifications from every other app are dropped before their text is read. For supported apps, security messages (login codes, approval requests) and promotions (referral offers, cashback, rewards) are rejected, and a transaction is only created when the text contains source-specific payment wording plus a readable amount. Balance lines are never used as the amount. Raw notification text is not stored; only the recognized transaction and a sanitized status code (for example `REJECTED_PROMOTIONAL`) are kept, the status records for 30 days.
