@@ -16,6 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -26,7 +29,7 @@ import java.util.UUID
  *
  * - Notifications from packages outside the supported list are dropped here, before any
  *   text is read.
- * - Only title, text and big text are read; other extras are ignored.
+ * - Only title, text, big text, text lines and sub text are read; other extras are ignored.
  * - Nothing from the notification text is logged or written to disk.
  * - Supported notifications go through a bounded, strictly serial queue, so a wallet and a
  *   bank notification arriving together are deduplicated against each other deterministically
@@ -48,6 +51,7 @@ class BankNotificationListenerService : NotificationListenerService() {
     )
 
     override fun onDestroy() {
+        _connected.value = false
         queue.close()
         scope.cancel()
         super.onDestroy()
@@ -56,10 +60,12 @@ class BankNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         rebindPolicy.onConnected()
+        _connected.value = true
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        _connected.value = false
         val delayMillis = rebindPolicy.nextDelayMillis()
         if (delayMillis == null) {
             Log.w(TAG, "Listener disconnected; rebind budget used up, waiting for Android to rebind")
@@ -88,12 +94,21 @@ class BankNotificationListenerService : NotificationListenerService() {
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
         val extras = notification.extras ?: return
+        val body = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+            ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+        // Extra lines and sub text go into the body in memory only, skipping what is already there.
+        val extraLines = (extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES).orEmpty().toList() +
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
+            .mapNotNull { it?.toString()?.trim()?.takeIf(String::isNotEmpty) }
+            .filter { body == null || !body.contains(it) }
+            .distinct()
+        val fullBody = if (extraLines.isEmpty()) body else (listOfNotNull(body) + extraLines).joinToString("\n")
         queue.offer(
             RawNotification(
                 packageName = packageName,
                 title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
                 text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
-                bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+                bigText = fullBody,
                 postedAt = Instant.ofEpochMilli(sbn.postTime),
                 notificationKey = sbn.key
             )
@@ -129,6 +144,11 @@ class BankNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
+        private val _connected = MutableStateFlow(false)
+
+        /** True while Android has this listener bound; process-wide, not persisted. */
+        val connected: StateFlow<Boolean> = _connected.asStateFlow()
+
         private const val TAG = "FinancesNotif"
     }
 }

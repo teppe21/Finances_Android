@@ -3,28 +3,25 @@ package com.teppe21.finances.feature.notifications
 import com.teppe21.finances.feature.categories.accountLabel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -48,6 +45,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.core.ui.InfoBanner
 import com.teppe21.finances.core.theme.finances
 import com.teppe21.finances.core.ui.SectionCard
+import com.teppe21.finances.core.ui.ValueRow
+import androidx.annotation.StringRes
 import com.teppe21.finances.domain.model.Account
 import java.time.ZoneId
 import androidx.compose.ui.res.pluralStringResource
@@ -57,6 +56,7 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NotificationAutomationScreen(
     onOpenReview: () -> Unit,
@@ -86,8 +86,9 @@ fun NotificationAutomationScreen(
 
         item {
             SectionCard(title = stringResource(R.string.notif_status)) {
-                StatusLine(stringResource(R.string.notif_status_access), state.accessGranted)
-                StatusLine(stringResource(R.string.notif_status_disclosure), state.disclosureAccepted)
+                HealthRow(R.string.notif_status_access, state.accessGranted, R.string.notif_health_granted, R.string.notif_health_not_granted)
+                HealthRow(R.string.notif_status_disclosure, state.disclosureAccepted, R.string.notif_health_finished, R.string.notif_health_not_finished)
+                HealthRow(R.string.notif_status_listener, state.listenerConnected, R.string.notif_health_connected, R.string.notif_health_not_connected)
                 Spacer(Modifier.height(8.dp))
                 val active = state.accessGranted && state.disclosureAccepted
                 Text(
@@ -107,6 +108,26 @@ fun NotificationAutomationScreen(
                     TextButton(onClick = { showWithdraw = true }) { Text(stringResource(R.string.notif_stop)) }
                 }
             }
+        }
+
+        when (healthAction(state.accessGranted, state.disclosureAccepted, state.listenerConnected)) {
+            HealthAction.FINISH_SETUP -> item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoBanner(text = stringResource(R.string.notif_health_setup_banner))
+                    Button(onClick = { showDisclosure = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.notif_health_setup_action))
+                    }
+                }
+            }
+            HealthAction.RECONNECT -> item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoBanner(text = stringResource(R.string.notif_health_reconnect_banner))
+                    OutlinedButton(onClick = { viewModel.reconnectListener(context) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.notif_health_reconnect))
+                    }
+                }
+            }
+            HealthAction.NONE -> Unit
         }
 
         if (state.reviewCount > 0) {
@@ -160,7 +181,8 @@ fun NotificationAutomationScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { viewModel.runSample("wallet") }) { Text(stringResource(R.string.notif_sample_wallet)) }
                     OutlinedButton(onClick = { viewModel.runSample("purchase") }) { Text(stringResource(R.string.notif_sample_purchase)) }
                     OutlinedButton(onClick = { viewModel.runSample("promo") }) { Text(stringResource(R.string.notif_sample_promo)) }
                     OutlinedButton(onClick = { viewModel.runSample("otp") }) { Text(stringResource(R.string.notif_sample_login)) }
@@ -282,17 +304,12 @@ fun NotificationDisclosureDialog(onNotNow: () -> Unit, onContinue: () -> Unit) {
 }
 
 @Composable
-private fun StatusLine(label: String, ok: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
-        Icon(
-            if (ok) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
-            contentDescription = null,
-            tint = if (ok) MaterialTheme.finances.success else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.notif_status_line, label, stringResource(if (ok) R.string.yes else R.string.no)), style = MaterialTheme.typography.bodyMedium)
-    }
+private fun HealthRow(@StringRes label: Int, ok: Boolean, @StringRes okText: Int, @StringRes notOkText: Int) {
+    ValueRow(
+        label = stringResource(label),
+        value = stringResource(if (ok) okText else notOkText),
+        valueColor = if (ok) MaterialTheme.finances.success else MaterialTheme.colorScheme.error
+    )
 }
 
 @Composable
