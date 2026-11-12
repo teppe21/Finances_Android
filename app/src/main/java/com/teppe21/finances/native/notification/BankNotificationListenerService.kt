@@ -94,21 +94,15 @@ class BankNotificationListenerService : NotificationListenerService() {
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
         val extras = notification.extras ?: return
-        val body = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
-            ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
-        // Extra lines and sub text go into the body in memory only, skipping what is already there.
-        val extraLines = (extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES).orEmpty().toList() +
-            extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
-            .mapNotNull { it?.toString()?.trim()?.takeIf(String::isNotEmpty) }
-            .filter { body == null || !body.contains(it) }
-            .distinct()
-        val fullBody = if (extraLines.isEmpty()) body else (listOfNotNull(body) + extraLines).joinToString("\n")
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+        val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES).orEmpty().mapNotNull { it?.toString() }
         queue.offer(
             RawNotification(
                 packageName = packageName,
                 title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
-                text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
-                bigText = fullBody,
+                text = text,
+                bigText = mergeNotificationBody(bigText, text, lines),
                 postedAt = Instant.ofEpochMilli(sbn.postTime),
                 notificationKey = sbn.key
             )
@@ -152,3 +146,8 @@ class BankNotificationListenerService : NotificationListenerService() {
         private const val TAG = "FinancesNotif"
     }
 }
+
+/** Body text in memory only: inbox-style lines are a fallback when big text and text are both empty. */
+internal fun mergeNotificationBody(bigText: String?, text: String?, lines: List<String>): String =
+    bigText?.takeIf { it.isNotBlank() } ?: text?.takeIf { it.isNotBlank() }
+        ?: lines.map { it.trim() }.filter { it.isNotEmpty() }.joinToString("\n")

@@ -36,4 +36,4 @@ All migrations are additive or data-preserving. There is no destructive fallback
 
 ## Preferences (DataStore)
 
-Theme, display currency, lock type, PIN verifier (`pbkdf2-sha256$...`), failed attempt count and lockout time, automatic rate fetching, notification consent, encrypted Finnhub key, and bank-to-account mappings (`bank_map_<institution>`).
+Display currency, lock type, PIN verifier (`pbkdf2-sha256$...`), failed attempt count and lockout time, automatic rate fetching, notification consent, encrypted Finnhub key, and bank-to-account mappings (`bank_map_<institution>`).

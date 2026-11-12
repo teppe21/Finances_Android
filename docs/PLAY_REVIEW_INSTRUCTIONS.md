@@ -20,7 +20,7 @@ Date;Description;Amount;Currency
 2026-09-02;Demo Salary;520000;HUF
 ```
 
-**Notification access.** More > Notification recognition > Set up notification access shows the disclosure. "Not now" closes it without changes; "Continue" opens the Android settings screen. Without a supported banking app installed, use "Try it without a real notification" (Purchase, Promotion, Login code) to see what is recognized and rejected; nothing is saved by these samples.
+**Notification access.** More > Notification recognition > Set up notification access shows the disclosure. "Not now" closes it without changes; "Continue" opens the Android settings screen. Without a supported banking app installed, use "Try it without a real notification" (Purchase, Promotion, Login code, Google Wallet) to see what is recognized and rejected; nothing is saved by these samples.
 
 **App lock.** Settings > Security > Set PIN (4 to 8 digits; simple PINs like 1234 are refused). Leave the app and return to see the lock screen. "Forgot PIN?" offers a full reset.
 

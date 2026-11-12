@@ -92,7 +92,7 @@ The floating tab bar is flat: `Modifier.glassChrome` (`core/ui/Glass.kt`) gives 
 
 - Nothing loops. There are no shimmer or idle effects.
 - Per-frame work is limited to drawing (chart reveal) or layer changes (press scale, swipe offset). Animated values are read in `graphicsLayer` and draw blocks, so they do not recompose.
-- No new dependency,, and no backdrop blur. The flat bar is a `background` and a `border`, so it adds no extra layer.
+- No new dependency, and no backdrop blur. The flat bar is a `background` and a `border`, so it adds no extra layer.
 - No frame-rate claims are made. Nothing has been profiled on a low-end device; check by hand using [REAL_DEVICE_TEST_PLAN.md](REAL_DEVICE_TEST_PLAN.md).
 
 ## Adding to the UI

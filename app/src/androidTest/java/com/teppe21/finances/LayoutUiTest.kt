@@ -219,7 +219,6 @@ class LayoutUiTest {
     fun englishTabBarLabelsAreNotClippedAtScale15() = assertTabLabelsFit(listOf("Overview", "Transactions", "Analytics", "More"))
 
     @Test
-    @Ignore("Hungarian UI is disabled for now (English-only build)")
     fun hungarianTabBarLabelsAreNotClippedAtScale15() = assertTabLabelsFit(listOf("Áttekintés", "Tranzakciók", "Elemzések", "Továbbiak"))
 
     // ---- chips ------------------------------------------------------------------------------------

@@ -679,7 +679,7 @@ fun AddTransactionDialog(
                                 Text(accounts.firstOrNull { it.id == selectedAccountId }?.let { accountLabel(it) } ?: stringResource(R.string.account_not_assigned))
                             }
                             DropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
-                                accounts.forEach { acc ->
+                                accounts.filter { it.isActive || it.id == existing.accountId }.forEach { acc ->
                                     DropdownMenuItem(text = { Text(accountLabel(acc)) }, onClick = {
                                         selectedAccountId = acc.id
                                         accountMenu = false

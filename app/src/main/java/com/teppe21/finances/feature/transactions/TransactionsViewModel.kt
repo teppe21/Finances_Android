@@ -264,7 +264,10 @@ class TransactionsViewModel(
     }
 
     fun editTransaction(tx: Transaction, edit: TransactionEdit) {
-        viewModelScope.launch { update(tx, edit) }
+        viewModelScope.launch {
+            // The dialog already prevents both rejected cases; this only keeps a bad edit from crashing.
+            try { update(tx, edit) } catch (_: IllegalArgumentException) { }
+        }
     }
 
     fun deleteTransaction(tx: Transaction) {

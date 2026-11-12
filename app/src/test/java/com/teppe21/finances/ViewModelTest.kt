@@ -382,7 +382,8 @@ class DashboardViewModelTest {
         accounts = flowOf(accounts),
         preferences = flowOf(UserPreferences(currency = currency)),
         rates = flowOf(rates),
-        stats = CalculateFinancialStatsUseCase()
+        stats = CalculateFinancialStatsUseCase(),
+        computeDispatcher = kotlinx.coroutines.Dispatchers.Unconfined
     )
 
     @Test

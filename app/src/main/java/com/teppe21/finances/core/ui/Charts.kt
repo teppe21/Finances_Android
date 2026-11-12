@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.teppe21.finances.core.theme.Spacing
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -50,33 +51,62 @@ fun bandIndexAt(x: Float, width: Float, count: Int): Int? =
     if (count <= 0 || width <= 0f) null else (x / width * count).toInt().coerceIn(0, count - 1)
 
 /**
- * Press-and-drag selection. Horizontal drags are claimed only once they clearly dominate, so a vertical
- * swipe still scrolls the screen (the selection is dropped when a parent takes the gesture). The callbacks are
+ * Press-and-drag selection inside a scrolling page. The parent scroll container consumes a vertical drag
+ * in the Main pass after this modifier has seen it, so consumption is checked in the Final pass. A gesture
+ * is claimed (and its changes consumed, so the page stops scrolling) once horizontal travel passes touch
+ * slop and exceeds vertical travel, or - with [selectOnHold] - after a press held without moving. [onSelect]
+ * is only called for a claimed gesture; with [selectOnTap] an unclaimed down+up within slop selects at the
+ * touch point. [onRelease] always runs when the gesture ends, also on cancellation. The callbacks are
  * captured once per [key]: restarting on every new lambda would cancel the gesture being tracked.
  */
 private fun Modifier.dragSelect(
     key: Any,
+    selectOnHold: Boolean,
+    selectOnTap: Boolean,
     indexAt: (x: Float, width: Float) -> Int?,
     onSelect: (Int?) -> Unit,
     onRelease: () -> Unit
 ): Modifier = pointerInput(key) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
-        onSelect(indexAt(down.position.x, size.width.toFloat()))
+        val slop = viewConfiguration.touchSlop
+        val width = size.width.toFloat()
         var claimed = false
-        while (true) {
-            val change = awaitPointerEvent(PointerEventPass.Main).changes.firstOrNull { it.id == down.id } ?: break
-            if (!claimed && change.isConsumed) break
-            if (!change.pressed) break
-            if (!claimed) {
-                val dx = abs(change.position.x - down.position.x)
-                val dy = abs(change.position.y - down.position.y)
-                claimed = dx > viewConfiguration.touchSlop && dx > dy
+        try {
+            var exceededSlop = false
+            while (true) {
+                // Without movement, a press held for the long-press timeout claims the gesture.
+                val event = if (selectOnHold && !claimed && !exceededSlop) {
+                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { awaitPointerEvent(PointerEventPass.Final) }
+                } else {
+                    awaitPointerEvent(PointerEventPass.Final)
+                }
+                if (event == null) {
+                    claimed = true
+                    onSelect(indexAt(down.position.x, width))
+                    continue
+                }
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (!claimed && change.isConsumed) break
+                val distance = (change.position - down.position).getDistance()
+                if (!change.pressed) {
+                    if (!claimed && selectOnTap && distance <= slop) onSelect(indexAt(change.position.x, width))
+                    break
+                }
+                if (distance > slop) exceededSlop = true
+                if (!claimed) {
+                    val dx = abs(change.position.x - down.position.x)
+                    val dy = abs(change.position.y - down.position.y)
+                    claimed = dx > slop && dx > dy
+                }
+                if (claimed) {
+                    change.consume()
+                    onSelect(indexAt(change.position.x, width))
+                }
             }
-            if (claimed) change.consume()
-            onSelect(indexAt(change.position.x, size.width.toFloat()))
+        } finally {
+            onRelease()
         }
-        onRelease()
     }
 }
 
@@ -112,6 +142,8 @@ fun LineChart(
             .semantics { this.contentDescription = contentDescription }
             .dragSelect(
                 key = values.size,
+                selectOnHold = true,
+                selectOnTap = false,
                 indexAt = { x, w -> lineIndexAt(x, w, values.size) },
                 onSelect = { selected = it; onInspect(it) },
                 onRelease = { selected = null; onInspect(null) }
@@ -159,7 +191,7 @@ fun LineChart(
 }
 
 /**
- * Paired bars per period with [labels] beneath. Touching or dragging selects a period ([selectedIndex],
+ * Paired bars per period with [labels] beneath. Tapping or horizontally dragging selects a period ([selectedIndex],
  * reported through [onSelect] and kept after release); the other periods dim.
  */
 @Composable
@@ -183,6 +215,8 @@ fun GroupedBarChart(
                 .height(120.dp)
                 .dragSelect(
                     key = labels.size,
+                    selectOnHold = false,
+                    selectOnTap = true,
                     indexAt = { x, w -> bandIndexAt(x, w, labels.size) },
                     onSelect = { if (it != null) onSelect(it) },
                     onRelease = {}

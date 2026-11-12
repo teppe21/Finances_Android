@@ -67,6 +67,11 @@ class BalanceSeriesTest {
         assertTrue(series(listOf(acc("e", 10, "EUR")), emptyList()).isEmpty())
     }
 
+    @Test fun transactionWithoutRateGivesEmptySeries() {
+        val s = series(listOf(acc("a", 100)), listOf(tx("a", 2, 50, currency = "CHF")))
+        assertTrue(s.isEmpty())
+    }
+
     @Test fun futureDatedCountsToday() {
         val s = series(listOf(acc("a", 0)), listOf(tx("a", -5, 70)))
         assertEquals(70L, s.last().balanceMinor)

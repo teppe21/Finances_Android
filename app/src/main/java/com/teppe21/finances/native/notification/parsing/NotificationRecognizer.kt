@@ -83,7 +83,7 @@ class NotificationRecognizer(
         if (fields.amountMinor == 0L) return false
         // 100 million in major units is far outside personal card / transfer notifications
         // and almost certainly a misread reference number.
-        if (kotlin.math.abs(fields.amountMinor) > 100_000_000_00L) return false
+        if (kotlin.math.abs(fields.amountMinor) > com.teppe21.finances.core.money.Money.MAX_INPUT_MINOR) return false
         val outflow = fields.direction == TransactionDirection.EXPENSE || fields.direction == TransactionDirection.TRANSFER
         return if (outflow) fields.amountMinor < 0 else fields.amountMinor > 0
     }

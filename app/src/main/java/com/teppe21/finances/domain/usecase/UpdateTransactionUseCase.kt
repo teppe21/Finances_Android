@@ -34,7 +34,10 @@ class UpdateTransactionUseCase(
     private val clock: () -> Instant = Instant::now,
     private val zone: ZoneId = ZoneId.systemDefault()
 ) {
+    /** @throws IllegalArgumentException for a zero amount or a date after today. */
     suspend fun execute(existing: Transaction, edit: TransactionEdit): Transaction {
+        require(edit.amountMinor != 0L) { "amount must not be zero" }
+        require(!edit.date.isAfter(clock().atZone(zone).toLocalDate())) { "date must not be in the future" }
         val merchant = TextNormalizer.cleanMerchantName(edit.merchant).ifBlank { null }
         val categoryChanged = edit.categoryId != existing.categoryId
         val updated = existing.copy(

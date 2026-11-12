@@ -49,18 +49,18 @@ object MoneyMentions {
     }
 
     /**
-     * Finds every currency amount in [text], in order of appearance. Lines that describe an
-     * account balance or available limit are skipped so that a balance can never be
+     * Finds every currency amount in [text], in order of appearance. Text after a balance or
+     * available-limit cue on a line is skipped so that a balance can never be
      * mistaken for the transaction amount.
      */
     fun find(text: String): List<MoneyMention> {
         val results = mutableListOf<MoneyMention>()
         var offset = 0
         for (line in text.split('\n')) {
-            val stripped = Cues.fold(line)
-            val isBalanceLine = BALANCE_CUES.any { stripped.contains(it) }
-            if (!isBalanceLine) {
-                results += findInLine(line, offset)
+            // Only mentions after the first balance cue are balances: "Vásárlás: 4 500 Ft. Egyenleg: 120 000 Ft".
+            results += findInLine(line, offset).filter { m ->
+                val before = Cues.fold(line.substring(0, m.start - offset))
+                BALANCE_CUES.none { before.contains(it) }
             }
             offset += line.length + 1
         }

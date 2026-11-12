@@ -15,9 +15,9 @@ private const val MAX_HISTORY_DAYS = 3660L
 
 /**
  * Total balance per day, from the first confirmed transaction (at most [MAX_HISTORY_DAYS] back) to [today],
- * in [target]. Same rules as the dashboard total: pending transactions are ignored, a transaction that cannot
- * be converted into its account's currency is skipped, and the series is empty when an account balance cannot
- * be converted (the total is then unavailable too). Later-dated transactions count on [today], so the last
+ * in [target]. Same rules as the dashboard total: pending transactions are ignored, and the series is empty
+ * when a transaction cannot be converted into its account's currency or an account balance cannot be
+ * converted into [target] (the total is then unavailable too). Later-dated transactions count on [today], so the last
  * point equals the current total. Transfers need no special case: their legs cancel.
  */
 fun balanceSeries(
@@ -37,7 +37,7 @@ fun balanceSeries(
         for (t in transactions) {
             if (t.pending || t.accountId != account.id) continue
             val amount = if (t.currency.equals(account.currency, ignoreCase = true)) t.amountMinor
-            else convert(t.amountMinor, t.currency, account.currency) ?: continue
+            else convert(t.amountMinor, t.currency, account.currency) ?: return emptyList()
             if (t.date.isBefore(from)) running += amount
             else delta[ChronoUnit.DAYS.between(from, minOf(t.date, today)).toInt()] += amount
         }

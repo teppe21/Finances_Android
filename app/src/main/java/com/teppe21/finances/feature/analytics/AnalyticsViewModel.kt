@@ -15,10 +15,12 @@ import com.teppe21.finances.domain.usecase.BalancePoint
 import com.teppe21.finances.domain.usecase.CalculateFinancialStatsUseCase
 import com.teppe21.finances.domain.usecase.balanceSeries
 import com.teppe21.finances.domain.usecase.CurrencyAmountConverter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -94,7 +96,9 @@ class AnalyticsViewModel : ViewModel() {
         val accounts: List<Account>,
         val categories: List<Category>,
         val preferences: UserPreferences,
-        val rates: com.teppe21.finances.domain.fx.RateTable
+        val rates: com.teppe21.finances.domain.fx.RateTable,
+        /** Independent of the selected period, so computed once per data change. */
+        val balanceSeries: List<BalancePoint>
     )
 
     private val _sourceDataFlow = combine(
@@ -104,8 +108,11 @@ class AnalyticsViewModel : ViewModel() {
         prefsRepo.preferencesFlow,
         fxRepo.tableFlow
     ) { transactions, accounts, categories, prefs, rates ->
-        AnalyticsSourceData(transactions, accounts, categories, prefs, rates)
-    }
+        AnalyticsSourceData(
+            transactions, accounts, categories, prefs, rates,
+            balanceSeries(accounts, transactions, LocalDate.now(), prefs.currency) { a, from, to -> rates.convert(a, from, to) }
+        )
+    }.flowOn(Dispatchers.Default)
 
     val uiState: StateFlow<AnalyticsUiState> = combine(
         _sourceDataFlow,
@@ -163,9 +170,7 @@ class AnalyticsViewModel : ViewModel() {
             categoryBreakdown = breakdown,
             categories = categories,
             monthlyTrends = trends,
-            balanceSeries = balanceSeries(sourceData.accounts, transactions, LocalDate.now(), targetCurrency) { a, from, to ->
-                sourceData.rates.convert(a, from, to)
-            },
+            balanceSeries = sourceData.balanceSeries,
             topMerchants = topMerchants,
             selectedCategoryId = periodState.selectedCatId,
             currency = targetCurrency,

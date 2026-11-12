@@ -53,6 +53,28 @@ class UpdateTransactionTest {
         assertEquals(700L, income.amountMinor)
     }
 
+    @Test fun zeroAmountIsRejected() = runTest {
+        val tx = seed()
+        try {
+            update.execute(tx, edit(tx, amount = 0))
+            org.junit.Assert.fail("expected rejection")
+        } catch (_: IllegalArgumentException) {
+        }
+        assertEquals(tx, store.rows.single())
+    }
+
+    @Test fun futureDateIsRejected() = runTest {
+        val tx = seed()
+        val now = Instant.parse("2026-03-10T12:00:00Z")
+        val u = UpdateTransactionUseCase(store, { now }, ZoneId.of("UTC"))
+        u.execute(tx, edit(tx).copy(date = LocalDate.of(2026, 3, 10)))
+        try {
+            u.execute(tx, edit(tx).copy(date = LocalDate.of(2026, 3, 11)))
+            org.junit.Assert.fail("expected rejection")
+        } catch (_: IllegalArgumentException) {
+        }
+    }
+
     @Test fun categoryFlagSetOnlyWhenCategoryChanges() = runTest {
         val tx = seed(categoryId = "food").copy(categorySetByUser = false).also { store.update(it) }
         val same = update.execute(tx, edit(tx))

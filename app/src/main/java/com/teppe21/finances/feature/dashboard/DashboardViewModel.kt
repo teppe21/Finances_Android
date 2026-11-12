@@ -16,9 +16,12 @@ import com.teppe21.finances.domain.model.FinancialStats
 import com.teppe21.finances.domain.model.MonthlyTrend
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.usecase.CurrencyAmountConverter
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
 import java.time.LocalDate
@@ -53,7 +56,8 @@ class DashboardViewModel(
     accounts: Flow<List<Account>>,
     preferences: Flow<UserPreferences>,
     rates: Flow<RateTable>,
-    private val stats: CalculateFinancialStatsUseCase = CalculateFinancialStatsUseCase()
+    private val stats: CalculateFinancialStatsUseCase = CalculateFinancialStatsUseCase(),
+    computeDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
     /** Used by the default `viewModel()` factory: wires the app-level repositories. */
@@ -113,6 +117,6 @@ class DashboardViewModel(
             hasAnyTransactions = transactions.isNotEmpty(),
             isLoading = false
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
+    }.flowOn(computeDispatcher).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
 
 }

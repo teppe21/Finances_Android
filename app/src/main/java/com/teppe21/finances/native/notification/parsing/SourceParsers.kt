@@ -162,9 +162,22 @@ object RevolutParser : SourceParser {
  */
 object GoogleWalletParser : SourceParser {
 
-    private val ENGLISH_WITH = rx("\\swith\\s")
+    private val DECLINE_CUES = listOf("declined", "failed", "refund*", "elutasit*", "sikertelen", "visszaterit*")
+    private val WITH_AFTER_AMOUNT = rx("^\\s*with\\s")
+    private val MASKED_TAIL = Regex("(?:[•*·]{1,4}\\s?|ending in\\s)\\d{4}")
+    private val NETWORK_WORDS = listOf("visa", "mastercard", "maestro", "debit", "credit")
+    // lazy: SupportedSources references this parser, so reading it at init would be circular
+    private val CARD_WORDS by lazy { rx("\\b(" + (NETWORK_WORDS + SupportedSources.CARD_ISSUER_KEYWORDS.map { it.first }).joinToString("|") + ")\\b") }
+    private val CONNECTORS = rx("\\bwith\\b|\\ba kovetkezovel\\b|\\bkartyaval\\b|[-–—,:•·|]")
+
+    /** True when nothing but the amount, the card reference and a connector is on the line. */
+    private fun isPaymentLine(line: String, amount: MoneyMention): Boolean {
+        val rest = Cues.fold(line.removeRange(amount.start, amount.end))
+        return rest.replace(MASKED_TAIL, " ").replace(CARD_WORDS, " ").replace(CONNECTORS, " ").isBlank()
+    }
 
     override fun parse(text: NotificationText): ParseOutcome {
+        if (Cues.anyCue(text.folded, DECLINE_CUES)) return ParseOutcome.NotATransaction
         // Language-independent: a line with exactly one amount plus a card reference
         // (masked tail or known issuer), whatever the connecting word ("with", "–", ...).
         val hit = text.body.lines().firstNotNullOfOrNull { line ->
@@ -174,10 +187,17 @@ object GoogleWalletParser : SourceParser {
                 Cues.containsCue(foldedLine, keyword)
             }?.second
             val amount = MoneyMentions.find(line).singleOrNull()
-            if (amount == null || (cardLast4 == null && issuer == null)) null
-            else Triple(amount, cardLast4, issuer)
+            if (amount == null || (cardLast4 == null && issuer == null) || !isPaymentLine(line, amount)) null
+            else {
+                val english = line.substring(0, amount.start).isBlank() &&
+                    WITH_AFTER_AMOUNT.containsMatchIn(line.substring(amount.end))
+                listOf(amount, cardLast4, issuer, english)
+            }
         } ?: return ParseOutcome.NotATransaction
-        val (amount, cardLast4, issuer) = hit
+        val amount = hit[0] as MoneyMention
+        val cardLast4 = hit[1] as String?
+        val issuer = hit[2] as String?
+        val english = hit[3] as Boolean
 
         val merchant = if (ParserSupport.isGenericTitle(text.title)) null else ParserSupport.cleanMerchant(text.title)
 
@@ -190,8 +210,8 @@ object GoogleWalletParser : SourceParser {
                 description = if (merchant != null) "Contactless payment at $merchant" else "Contactless payment",
                 suggestedInstitution = issuer,
                 cardLast4 = cardLast4,
-                // Only the English "with" shape is backed by real samples; anything else stays in review.
-                confidence = if (!ENGLISH_WITH.containsMatchIn(text.body)) 0.8f else if (merchant != null) 0.95f else 0.85f
+                // Only the English "<amount> with <card>" line is backed by real samples; anything else stays in review.
+                confidence = if (!english) 0.8f else if (merchant != null) 0.95f else 0.85f
             )
         )
     }
@@ -205,7 +225,8 @@ object OtpParser : SourceParser by HungarianBankParser("OTP Bank")
 
 class HungarianBankParser(private val institution: String) : SourceParser {
 
-    private val INCOME = rx("(j[oó]v[aá][ií]r[aá]s|be[eé]rkez[oő]|munkab[eé]r|j[oó]v[aá][ií]rtunk|\\b[eé]rkezett\\b)")
+    private val INCOME = rx("(j[oó]v[aá][ií]r[aá]s|be[eé]rkez[oő]|munkab[eé]r|j[oó]v[aá][ií]rtunk)")
+    private val ARRIVED = rx("\\b[eé]rkezett\\b")
     private val TRANSFER = rx("(\\b[aá]tutal[aá]s|\\butal[aá]s\\b|[aá]tvezet[eé]s)")
     private val EXPENSE = rx("(v[aá]s[aá]rl[aá]s|k[aá]rty[aá]s fizet[eé]s|\\bterhel[eé]s|k[eé]szp[eé]nzfelv[eé]tel|\\bfizet[eé]s\\b|\\bk[oö]lt[eé]s\\b)")
     private val AMOUNT_LABEL = rx("([oö]sszeg|amount)\\s*:")
@@ -216,6 +237,7 @@ class HungarianBankParser(private val institution: String) : SourceParser {
         val direction = when {
             INCOME.containsMatchIn(full) -> TransactionDirection.INCOME
             EXPENSE.containsMatchIn(full) -> TransactionDirection.EXPENSE
+            ARRIVED.containsMatchIn(full) -> TransactionDirection.INCOME
             TRANSFER.containsMatchIn(full) -> TransactionDirection.TRANSFER
             else -> return ParseOutcome.NotATransaction
         }

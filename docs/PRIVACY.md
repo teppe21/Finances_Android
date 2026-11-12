@@ -13,7 +13,7 @@ This describes what the app actually does with data, as implemented. The user-fa
 | Watchlist and last quotes | Room `watchlist`, `stock_quotes` | separate from finance tables |
 | Settings, PIN verifier, Finnhub key | DataStore | key encrypted with a Keystore AES key |
 
-Nothing is written to shared storage. The app does not log notification text, amounts, merchants, PINs or API keys; the only log line is the exception type when notification processing fails.
+Nothing is written to shared storage. The app does not log notification text, amounts, merchants, PINs or API keys; the notification service has four log lines, none containing notification text: the number of notifications dropped when the backlog is full, a notice that the rebind budget is used up, the exception type when a rebind request fails, and the status code when processing fails.
 
 ## Backup
 
