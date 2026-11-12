@@ -8,7 +8,9 @@ import com.teppe21.finances.domain.fx.RateTable
 import com.teppe21.finances.domain.model.Account
 import com.teppe21.finances.domain.model.Category
 import com.teppe21.finances.domain.model.CategoryBreakdown
+import com.teppe21.finances.domain.usecase.BalancePoint
 import com.teppe21.finances.domain.usecase.CalculateFinancialStatsUseCase
+import com.teppe21.finances.domain.usecase.balanceSeries
 import kotlinx.coroutines.flow.Flow
 import com.teppe21.finances.domain.model.FinancialStats
 import com.teppe21.finances.domain.model.MonthlyTrend
@@ -32,6 +34,10 @@ data class DashboardUiState(
     val recentConverted: Map<String, Long?> = emptyMap(),
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
     val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
+    /** Last month's spending per category id, for the month-over-month change. */
+    val previousCategoryTotals: Map<String, Long> = emptyMap(),
+    /** Daily total balance; empty when it cannot be computed (missing rate). */
+    val balanceSeries: List<BalancePoint> = emptyList(),
     /** For translated category names; the breakdown carries ids. */
     val categories: List<Category> = emptyList(),
     val reviewCount: Int = 0,
@@ -73,6 +79,7 @@ class DashboardViewModel(
         val converter: CurrencyAmountConverter = { amount, currency, _ -> table.convert(amount, currency, target) }
         val month = YearMonth.now()
         val thisMonth = transactions.filter { YearMonth.from(it.date) == month }
+        val lastMonth = transactions.filter { YearMonth.from(it.date) == month.minusMonths(1) }
 
         var total = 0L
         var unconvertedAccounts = 0
@@ -97,6 +104,8 @@ class DashboardViewModel(
             recentConverted = recent.associate { it.id to table.convert(it.amountMinor, it.currency, target) },
             monthlyTrends = stats.calculateMonthlyTrends(transactions, monthCount = 6, referenceDate = LocalDate.now(), converter = converter),
             categoryBreakdown = stats.calculateCategoryBreakdown(thisMonth, categories, converter),
+            previousCategoryTotals = stats.calculateCategoryBreakdown(lastMonth, categories, converter).associate { it.categoryId to it.totalMinor },
+            balanceSeries = balanceSeries(accounts, transactions, LocalDate.now(), target) { a, from, to -> table.convert(a, from, to) },
             categories = categories,
             reviewCount = transactions.count { it.pending },
             currency = target,

@@ -4,7 +4,6 @@ import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,15 +31,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.LineChart
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.stocks.domain.HistoryRange
 import com.teppe21.finances.stocks.domain.MarketDataError
@@ -181,38 +176,22 @@ private fun HistoryChart(history: PriceHistory, currency: String?, zone: ZoneId)
     fun fmt(t: java.time.Instant) = t.atZone(zone).let { if (shortRange) DateFormatter.dayTime(it) else DateFormatter.format(it.toLocalDate()) }
     val rangeLabel = stringResource(history.range.labelRes())
     val lineColor = changeColor(changePct)
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
-    val span = max.subtract(min).toDouble().takeIf { it > 0 } ?: 1.0
     val chartDescription = stringResource(R.string.stock_chart_description, rangeLabel, StockFormat.price(first, currency), StockFormat.price(last, currency), StockFormat.price(min, currency), StockFormat.price(max, currency))
+    var inspected by remember { mutableStateOf<Int?>(null) }
+    val values = remember(points) { points.map { it.close.toFloat() } }
+    val point = inspected?.let { points.getOrNull(it) }
 
-    Text(
-        stringResource(R.string.stock_change_over, StockFormat.percent(changePct?.setScale(2, RoundingMode.HALF_UP)), rangeLabel, fmt(points.first().time), fmt(points.last().time)),
-        style = MaterialTheme.typography.bodyMedium,
-        color = lineColor
-    )
-    Spacer(Modifier.height(8.dp))
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(180.dp)
-            .semantics {
-                contentDescription = chartDescription
-            }
-    ) {
-        val w = size.width
-        val h = size.height
-        drawLine(gridColor, Offset(0f, 0f), Offset(w, 0f), strokeWidth = 1f)
-        drawLine(gridColor, Offset(0f, h), Offset(w, h), strokeWidth = 1f)
-        val startMs = points.first().time.toEpochMilli().toDouble()
-        val spanMs = (points.last().time.toEpochMilli() - points.first().time.toEpochMilli()).toDouble().takeIf { it > 0 } ?: 1.0
-        val path = Path()
-        points.forEachIndexed { i, p ->
-            val x = ((p.time.toEpochMilli() - startMs) / spanMs * w).toFloat()
-            val y = (h - (p.close.subtract(min).toDouble() / span) * h).toFloat()
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, lineColor, style = Stroke(width = 3f))
+    if (point != null) {
+        Text(StockFormat.price(point.close, currency) + " · " + fmt(point.time), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    } else {
+        Text(
+            stringResource(R.string.stock_change_over, StockFormat.percent(changePct?.setScale(2, RoundingMode.HALF_UP)), rangeLabel, fmt(points.first().time), fmt(points.last().time)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = lineColor
+        )
     }
+    Spacer(Modifier.height(8.dp))
+    LineChart(values, lineColor, chartDescription, Modifier.fillMaxWidth().height(180.dp), onInspect = { inspected = it })
     Row(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.stock_low_value, StockFormat.price(min, currency)), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
         Text(stringResource(R.string.stock_high_value, StockFormat.price(max, currency)), style = MaterialTheme.typography.labelSmall)

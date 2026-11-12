@@ -45,6 +45,8 @@
     <string name="source">Source</string>
     <string name="delete_confirm_title">Delete transaction?</string>
     <string name="delete_confirm_msg">This transaction will be removed permanently.</string>
+    <string name="edit_transaction_action">Edit</string>
+    <string name="edit_transaction">Edit transaction</string>
 
     <!-- Sorting -->
     <string name="sort_by">Sort by</string>
@@ -656,4 +658,10 @@
     <string name="policy_contact">Questions about this policy: %1$s</string>
     <string name="policy_contact_missing">Contact details have not been configured for this build.</string>
     <string name="analytics_summary">Summary</string>
+    <string name="balance_trend_title">Balance</string>
+    <string name="range_all">All</string>
+    <string name="balance_chart_description">Balance chart, %1$s: from %2$s to %3$s, low %4$s, high %5$s. Touch and drag to inspect.</string>
+    <string name="net_short">Net</string>
+    <string name="chart_other">Other</string>
+    <string name="category_vs_last_month">%1$s vs last month</string>
 </resources>

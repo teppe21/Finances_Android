@@ -551,6 +551,8 @@
     <string name="source">Forrás</string>
     <string name="delete_confirm_title">Törlöd a tranzakciót?</string>
     <string name="delete_confirm_msg">A tranzakció véglegesen törlődik.</string>
+    <string name="edit_transaction_action">Szerkesztés</string>
+    <string name="edit_transaction">Tranzakció szerkesztése</string>
     <string name="sort_by">Rendezés</string>
     <string name="sort_newest">Legújabb elöl</string>
     <string name="sort_oldest">Legrégebbi elöl</string>
@@ -629,4 +631,10 @@
     <string name="settings">Beállítások</string>
     <string name="currency">Pénznem</string>
     <string name="analytics_summary">Összegzés</string>
+    <string name="balance_trend_title">Egyenleg</string>
+    <string name="range_all">Mind</string>
+    <string name="balance_chart_description">Egyenlegdiagram, %1$s: %2$s értékről %3$s értékre, minimum %4$s, maximum %5$s. Érintse meg és húzza az ujját a részletekhez.</string>
+    <string name="net_short">Nettó</string>
+    <string name="chart_other">Egyéb</string>
+    <string name="category_vs_last_month">%1$s az előző hónaphoz képest</string>
 </resources>

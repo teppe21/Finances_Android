@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teppe21.finances.FinancesApp
 import com.teppe21.finances.data.local.preferences.UserPreferences
+import com.teppe21.finances.domain.model.Account
 import com.teppe21.finances.domain.model.Category
 import com.teppe21.finances.domain.model.CategoryBreakdown
 import com.teppe21.finances.domain.model.FinancialStats
 import com.teppe21.finances.domain.model.MonthlyTrend
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
+import com.teppe21.finances.domain.usecase.BalancePoint
 import com.teppe21.finances.domain.usecase.CalculateFinancialStatsUseCase
+import com.teppe21.finances.domain.usecase.balanceSeries
 import com.teppe21.finances.domain.usecase.CurrencyAmountConverter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,6 +52,7 @@ data class AnalyticsUiState(
     /** For translated category names; the breakdown carries ids. */
     val categories: List<Category> = emptyList(),
     val monthlyTrends: List<MonthlyTrend> = emptyList(),
+    val balanceSeries: List<BalancePoint> = emptyList(),
     val topMerchants: List<MerchantSpending> = emptyList(),
     val selectedCategoryId: String? = null,
     val currency: String = "HUF",
@@ -87,6 +91,7 @@ class AnalyticsViewModel : ViewModel() {
 
     private data class AnalyticsSourceData(
         val transactions: List<Transaction>,
+        val accounts: List<Account>,
         val categories: List<Category>,
         val preferences: UserPreferences,
         val rates: com.teppe21.finances.domain.fx.RateTable
@@ -94,11 +99,12 @@ class AnalyticsViewModel : ViewModel() {
 
     private val _sourceDataFlow = combine(
         txRepo.getAllTransactionsFlow(),
+        app.accountRepository.getAllAccountsFlow(),
         catRepo.getAllCategoriesFlow(),
         prefsRepo.preferencesFlow,
         fxRepo.tableFlow
-    ) { transactions, categories, prefs, rates ->
-        AnalyticsSourceData(transactions, categories, prefs, rates)
+    ) { transactions, accounts, categories, prefs, rates ->
+        AnalyticsSourceData(transactions, accounts, categories, prefs, rates)
     }
 
     val uiState: StateFlow<AnalyticsUiState> = combine(
@@ -157,6 +163,9 @@ class AnalyticsViewModel : ViewModel() {
             categoryBreakdown = breakdown,
             categories = categories,
             monthlyTrends = trends,
+            balanceSeries = balanceSeries(sourceData.accounts, transactions, LocalDate.now(), targetCurrency) { a, from, to ->
+                sourceData.rates.convert(a, from, to)
+            },
             topMerchants = topMerchants,
             selectedCategoryId = periodState.selectedCatId,
             currency = targetCurrency,
