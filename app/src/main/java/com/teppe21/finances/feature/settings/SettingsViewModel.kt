@@ -42,7 +42,6 @@ class SettingsViewModel : ViewModel() {
         _message.value = null
     }
 
-    fun setTheme(theme: String) = viewModelScope.launch { prefsRepo.setTheme(theme) }
 
     fun setCurrency(currency: String) = viewModelScope.launch { prefsRepo.setCurrency(currency) }
 

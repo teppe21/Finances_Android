@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 class TabBarItem(val label: String, val icon: ImageVector)
 
 /**
- * Floating tab bar: a rounded surface set in from the screen edges, with a selection pill that slides
+ * Floating tab bar: a flat surface set in from the screen edges, with a selection pill that slides
  * between tabs on a spring (so a quick second tap redirects it mid-flight instead of waiting).
  *
  * Touch targets are 56 dp tall, the pressed state shows on touch-down, and each tab is exposed to
@@ -60,8 +60,7 @@ fun FloatingTabBar(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Floating glass chrome (tinted, lightly translucent, no blur): see Glass.kt.
-        Box(Modifier.glassChrome(RoundedCornerShape(30.dp))) {
+        Box(Modifier.glassChrome(RoundedCornerShape(16.dp))) {
             BoxWithConstraints(Modifier.padding(6.dp).widthIn(max = 440.dp).fillMaxWidth()) {
                 val itemWidth = maxWidth / items.size
                 val indicatorX by animateDpAsState(itemWidth * selectedIndex, Motion.sheet(), label = "tabIndicator")
@@ -71,7 +70,7 @@ fun FloatingTabBar(
                         .offset { IntOffset(indicatorX.roundToPx(), 0) }
                         .width(itemWidth)
                         .height(TAB_HEIGHT)
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                 )
                 Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
@@ -98,17 +97,12 @@ private fun TabBarButton(item: TabBarItem, selected: Boolean, onClick: () -> Uni
         if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         Motion.short(), label = "tabTint"
     )
-    // The label is small text: on the accent pill the accent colour is under 4.5:1 in the light theme, so a
-    // selected label uses the main text colour and the icon, pill and weight carry the selection.
-    val labelColor by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        Motion.short(), label = "tabLabel"
-    )
+    val labelColor = tint
     Column(
         modifier
             .height(TAB_HEIGHT)
             .pressScale(source, pressedScale = 0.94f)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(12.dp))
             .selectable(
                 selected = selected,
                 interactionSource = source,

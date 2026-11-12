@@ -29,7 +29,6 @@ object LockType {
 }
 
 data class UserPreferences(
-    val theme: String = "system",
     val currency: String = "HUF",
     val appLockType: String = LockType.OFF,
     val hasPin: Boolean = false,
@@ -54,7 +53,6 @@ sealed interface PinCheck {
 class UserPreferencesRepository(private val context: Context) {
 
     private object Keys {
-        val THEME = stringPreferencesKey("theme")
         val CURRENCY = stringPreferencesKey("currency")
         val APP_LOCK_TYPE = stringPreferencesKey("app_lock_type")
         val PIN_VERIFIER = stringPreferencesKey("pin_verifier_v2")
@@ -75,7 +73,6 @@ class UserPreferencesRepository(private val context: Context) {
 
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
-            theme = prefs[Keys.THEME] ?: "system",
             currency = prefs[Keys.CURRENCY] ?: "HUF",
             appLockType = prefs[Keys.APP_LOCK_TYPE] ?: LockType.OFF,
             hasPin = prefs.hasPin(),
@@ -83,10 +80,6 @@ class UserPreferencesRepository(private val context: Context) {
             notificationDisclosureAccepted = prefs[Keys.NOTIFICATION_DISCLOSURE] ?: false,
             hasStocksApiKey = !prefs[Keys.STOCKS_API_KEY].isNullOrBlank()
         )
-    }
-
-    suspend fun setTheme(theme: String) {
-        context.dataStore.edit { it[Keys.THEME] = theme }
     }
 
     suspend fun setCurrency(currency: String) {

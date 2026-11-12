@@ -31,12 +31,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableLongStateOf
 import com.teppe21.finances.core.ui.FloatingTabBar
 import com.teppe21.finances.core.ui.Motion
@@ -139,27 +137,17 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Android 15+ enforces edge-to-edge for targetSdk 35+; opting in on every API level keeps the
-        // insets handling identical everywhere. The theme-aware style is applied once preferences load.
-        enableEdgeToEdge()
+        // insets handling identical everywhere. The app is dark only, so the bar icons are always light.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(NAV_BAR_SCRIM)
+        )
         super.onCreate(savedInstanceState)
         setContent {
             val prefs by app.preferencesRepository.preferencesFlow.collectAsState(initial = null)
             val unlocked by app.appLock.unlocked.collectAsState()
 
-            val isDark = when (prefs?.theme) {
-                "light" -> false
-                "dark" -> true
-                else -> isSystemInDarkTheme()
-            }
             val lockEnabled = prefs?.lockEnabled == true
-
-            DisposableEffect(isDark) {
-                enableEdgeToEdge(
-                    statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { isDark },
-                    navigationBarStyle = SystemBarStyle.auto(NAV_BAR_LIGHT_SCRIM, NAV_BAR_DARK_SCRIM) { isDark }
-                )
-                onDispose { }
-            }
 
             LaunchedEffect(lockEnabled) {
                 // Keep financial screens out of screenshots and the Recents preview while the lock is on.
@@ -167,7 +155,7 @@ class MainActivity : FragmentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
 
-            FinancesTheme(darkTheme = isDark) {
+            FinancesTheme {
                 val current = prefs
                 when {
                     // Preferences not loaded yet: show nothing rather than briefly showing data.
@@ -191,8 +179,7 @@ class MainActivity : FragmentActivity() {
 
     private companion object {
         // Same scrims as the androidx.activity defaults, used behind three-button navigation.
-        val NAV_BAR_LIGHT_SCRIM = AndroidColor.argb(0xe6, 0xFF, 0xFF, 0xFF)
-        val NAV_BAR_DARK_SCRIM = AndroidColor.argb(0x80, 0x1b, 0x1b, 0x1b)
+        val NAV_BAR_SCRIM = AndroidColor.argb(0x80, 0x1b, 0x1b, 0x1b)
     }
 }
 

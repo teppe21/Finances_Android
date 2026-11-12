@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,7 +45,6 @@ import com.teppe21.finances.data.fx.FxSyncState
 import com.teppe21.finances.data.local.preferences.LockType
 import com.teppe21.finances.data.local.preferences.PinCheck
 import com.teppe21.finances.core.ui.DialogColumn
-import com.teppe21.finances.core.ui.ChipFlow
 import com.teppe21.finances.core.ui.CurrencyChips
 import com.teppe21.finances.core.ui.SectionCard
 import com.teppe21.finances.core.ui.pressClickable
@@ -96,16 +94,6 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { Spacer(Modifier.height(4.dp)) }
-
-        item {
-            SectionCard(title = stringResource(R.string.settings_appearance)) {
-                ChipFlow {
-                    listOf("system" to R.string.settings_theme_system, "light" to R.string.settings_theme_light, "dark" to R.string.settings_theme_dark).forEach { (key, label) ->
-                        FilterChip(selected = prefs.theme == key, onClick = { viewModel.setTheme(key) }, label = { Text(stringResource(label)) })
-                    }
-                }
-            }
-        }
 
         item {
             SectionCard(title = stringResource(R.string.currency)) {

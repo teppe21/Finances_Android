@@ -82,12 +82,11 @@ class LayoutUiTest {
     @get:Rule
     val rule = createComposeRule()
 
-    /** Composes [content] in a column [widthDp] wide at [fontScale], optionally in another [locale] and the dark theme. */
+    /** Composes [content] in a column [widthDp] wide at [fontScale] and optionally in another [locale]. */
     private fun setScaled(
         fontScale: Float,
         widthDp: Int = 360,
         locale: Locale? = null,
-        dark: Boolean = false,
         content: @Composable () -> Unit
     ) {
         rule.setContent {
@@ -100,7 +99,7 @@ class LayoutUiTest {
                 LocalConfiguration provides configuration,
                 LocalDensity provides Density(density.density, fontScale)
             ) {
-                FinancesTheme(darkTheme = dark) {
+                FinancesTheme {
                     Surface { Box(Modifier.width(widthDp.dp)) { content() } }
                 }
             }
@@ -405,7 +404,7 @@ class LayoutUiTest {
 
     @Test
     fun amountsStayWholeInTheDarkThemeAtScale15() {
-        setScaled(fontScale = 1.5f, widthDp = 300, dark = true) {
+        setScaled(fontScale = 1.5f, widthDp = 300) {
             ListRow(title = longMerchant, subtitle = "1 transaction", amount = hugeAmount)
         }
         assertWholeOnOneLine(rule.onNodeWithText(hugeAmount, useUnmergedTree = true), "the amount")

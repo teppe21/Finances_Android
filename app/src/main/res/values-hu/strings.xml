@@ -61,10 +61,6 @@
     <string name="analytics_people_received">Másoktól kapva</string>
 
     <!-- Settings -->
-    <string name="settings_appearance">Megjelenés</string>
-    <string name="settings_theme_system">Rendszer</string>
-    <string name="settings_theme_light">Világos</string>
-    <string name="settings_theme_dark">Sötét</string>
     <string name="settings_display_currency">Megjelenítési pénznem</string>
     <string name="settings_exchange_rates">Árfolyamok</string>
     <string name="settings_last_fetched">Utolsó lekérés: %1$s</string>

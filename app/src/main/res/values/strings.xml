@@ -204,10 +204,6 @@
     <string name="analytics_people_received">Received from people</string>
 
     <!-- Settings -->
-    <string name="settings_appearance">Appearance</string>
-    <string name="settings_theme_system">System</string>
-    <string name="settings_theme_light">Light</string>
-    <string name="settings_theme_dark">Dark</string>
     <string name="settings_display_currency">Display currency</string>
     <string name="settings_exchange_rates">Exchange rates</string>
     <string name="settings_last_fetched">Last fetched %1$s</string>

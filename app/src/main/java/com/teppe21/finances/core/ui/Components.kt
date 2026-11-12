@@ -7,6 +7,7 @@ import com.teppe21.finances.core.theme.Spacing
 import com.teppe21.finances.core.theme.Radii
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,7 +72,8 @@ fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = Radii.card,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Column(modifier = Modifier.padding(Spacing.l)) {
             if (title != null) {
