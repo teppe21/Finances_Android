@@ -91,6 +91,56 @@ class NotificationRecognitionTest {
     }
 
     @Test
+    fun `hungarian wallet lines are recognised without the word with`() {
+        val lines = listOf(
+            "804,00 Ft \u2013 Revolut Mastercard \u2022\u20221413",
+            "804 Ft, Revolut Mastercard \u2022\u20221413",
+            "804\u00A0Ft a k\u00F6vetkez\u0151vel: Revolut Mastercard \u2022\u20221413",
+            "804\u202FFt \u2013 Revolut Mastercard \u2022\u20221413"
+        )
+        for (line in lines) {
+            val t = accepted(recognize(wallet, "75. SZ. ABC \u00C1RUH\u00C1Z", line))
+            assertEquals(line, -80400L, t.amountMinor)
+            assertEquals("Revolut", t.suggestedInstitution)
+            assertEquals("1413", t.cardLast4)
+            assertTrue("unverified wording must stay in review", t.confidence < 0.9f)
+        }
+        assertEquals(-1250000L, accepted(recognize(wallet, "SPAR", "12\u00A0500\u00A0Ft, George Visa \u2022\u20225678")).amountMinor)
+        assertEquals("Erste Bank", accepted(recognize(wallet, "SPAR", "804 Ft, George Visa")).suggestedInstitution)
+    }
+
+    @Test
+    fun `wallet line with two amounts is still rejected`() {
+        assertEquals(
+            NotificationStatusCode.REJECTED_NON_TRANSACTION,
+            rejectedCode(recognize(wallet, "SPAR", "804 Ft, 900 Ft \u2013 Revolut Mastercard \u2022\u20221413"))
+        )
+    }
+
+    @Test
+    fun `erste purchase and incoming credit in hungarian`() {
+        val erste = "hu.erstebank.george.hungary"
+        val buy = accepted(recognize(erste, "Sikeres k\u00E1rty\u00E1s v\u00E1s\u00E1rl\u00E1s", "\u00D6sszeg: -4\u00A0500 Ft. Hely: SPAR. K\u00E1rtya: *1234."))
+        assertEquals(-450000L, buy.amountMinor)
+        assertEquals("SPAR", buy.merchant)
+        assertEquals("Erste Bank", buy.suggestedInstitution)
+        assertTrue(buy.confidence < 0.9f)
+        val credit = accepted(recognize(erste, "J\u00F3v\u00E1\u00EDr\u00E1s \u00E9rkezett", "\u00D6sszeg: +150\u00A0000 Ft.\nEgyenleg: 200\u00A0000 Ft."))
+        assertEquals(15000000L, credit.amountMinor)
+        assertEquals(TransactionDirection.INCOME, credit.direction)
+        val spend = accepted(recognize(erste, "K\u00F6lt\u00E9s", "\u00D6sszeg: 2\u00A0000 Ft.\nFelhaszn\u00E1lhat\u00F3: 90\u00A0000 Ft."))
+        assertEquals(-200000L, spend.amountMinor)
+    }
+
+    @Test
+    fun `hungarian erste security code is rejected`() {
+        assertEquals(
+            NotificationStatusCode.REJECTED_SECURITY_MESSAGE,
+            rejectedCode(recognize("hu.erstebank.george.hungary", "George biztons\u00E1gi k\u00F3d", "Az \u00D6n k\u00F3dja: 482913. Ne adja ki senkinek!"))
+        )
+    }
+
+    @Test
     fun `otp card purchase is parsed but needs review until fixtures are verified`() {
         val t = accepted(recognize(otp, "Sikeres kártyás vásárlás", "Összeg: -4.500 Ft. Hely: McDonald's. Kártya: *1234."))
         assertEquals(-450000L, t.amountMinor)

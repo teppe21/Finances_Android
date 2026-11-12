@@ -16,25 +16,27 @@ data class MoneyMention(
 
 object MoneyMentions {
 
+    // Java's \s misses U+00A0/U+202F, Android's does not; spell them out so both agree.
+    private const val GAP = "[\\s\\u00A0\\u202F]?"
     private const val NUMBER =
-        "[+\\-−]?\\s?(?:\\d{1,3}(?:[ .,'\\u00A0\\u202F]\\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?)"
+        "[+\\-−]?$GAP(?:\\d{1,3}(?:[ .,'\\u00A0\\u202F]\\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?)"
     private const val CODE = "HUF|EUR|USD|GBP|CHF|Ft"
     private const val SYMBOL = "€|\\$|£"
 
     // "HUF804", "€12.50", "EUR 1 200,00"
     private val PREFIX = Regex(
-        "(?<![\\p{L}\\p{N}])($CODE|$SYMBOL)\\s?($NUMBER)(?![\\d])",
+        "(?<![\\p{L}\\p{N}])($CODE|$SYMBOL)$GAP($NUMBER)(?![\\d])",
         RegexOption.IGNORE_CASE
     )
 
     // "14 500 Ft", "12,99 EUR", "-4.500 Ft", "25.50€"
     private val SUFFIX = Regex(
-        "(?<![\\p{L}\\p{N}.,])($NUMBER)\\s?($CODE|$SYMBOL)(?![\\p{L}])",
+        "(?<![\\p{L}\\p{N}.,])($NUMBER)$GAP($CODE|$SYMBOL)(?![\\p{L}])",
         RegexOption.IGNORE_CASE
     )
 
     private val BALANCE_CUES = listOf(
-        "balance", "egyenleg", "elerheto", "available", "szamlaegyenleg", "keret", "limit"
+        "balance", "egyenleg", "elerheto", "felhasznalhato", "available", "szamlaegyenleg", "keret", "limit"
     )
 
     fun normalizeCurrency(token: String): String? = when (token.trim().uppercase()) {

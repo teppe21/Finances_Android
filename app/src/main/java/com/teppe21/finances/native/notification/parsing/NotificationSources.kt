@@ -98,6 +98,7 @@ object SupportedSources {
         "revolut" to "Revolut",
         "otp" to "OTP Bank",
         "erste" to "Erste Bank",
+        "george" to "Erste Bank",
         "mbh" to "MBH Bank",
         "wise" to "Wise"
     )
