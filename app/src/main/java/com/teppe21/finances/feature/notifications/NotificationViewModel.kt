@@ -11,6 +11,7 @@ import com.teppe21.finances.domain.model.NotificationEvent
 import com.teppe21.finances.domain.model.NotificationStatusCode
 import com.teppe21.finances.domain.model.RawNotification
 import com.teppe21.finances.domain.model.Transaction
+import com.teppe21.finances.native.notification.BankNotificationListenerService
 import com.teppe21.finances.native.notification.NotificationHelper
 import com.teppe21.finances.native.notification.parsing.NotificationRecognizer
 import com.teppe21.finances.native.notification.parsing.NotificationSource
@@ -35,8 +36,19 @@ data class NotificationUiState(
     /** institution -> account id */
     val mappings: Map<String, String> = emptyMap(),
     val recentEvents: List<NotificationEvent> = emptyList(),
-    val reviewCount: Int = 0
+    val reviewCount: Int = 0,
+    val listenerConnected: Boolean = false
 )
+
+enum class HealthAction { NONE, FINISH_SETUP, RECONNECT }
+
+/** Which fix, if any, the health section offers for the three capture conditions. */
+fun healthAction(accessGranted: Boolean, setupFinished: Boolean, listenerConnected: Boolean): HealthAction = when {
+    !accessGranted -> HealthAction.NONE
+    !setupFinished -> HealthAction.FINISH_SETUP
+    !listenerConnected -> HealthAction.RECONNECT
+    else -> HealthAction.NONE
+}
 
 /** Result of the in-app sample test; nothing is stored. */
 /** What the sample run or a failed settings launch showed; the screen turns it into text. */
@@ -68,14 +80,15 @@ class NotificationViewModel : ViewModel() {
     }
 
     val uiState: StateFlow<NotificationUiState> = combine(
-        accessGranted,
+        combine(accessGranted, BankNotificationListenerService.connected) { a, c -> a to c },
         prefs.preferencesFlow,
         app.accountRepository.getAllAccountsFlow(),
         mappings,
         combine(app.notificationRepository.getRecentEventsFlow(30), app.transactionRepository.getPendingTransactionsFlow()) { e, p -> e to p.size }
-    ) { granted, p, accounts, maps, eventsAndReview ->
+    ) { access, p, accounts, maps, eventsAndReview ->
         NotificationUiState(
-            accessGranted = granted,
+            accessGranted = access.first,
+            listenerConnected = access.second,
             disclosureAccepted = p.notificationDisclosureAccepted,
             accounts = accounts,
             mappings = maps,
@@ -95,6 +108,8 @@ class NotificationViewModel : ViewModel() {
             openSystemSettings(context)
         }
     }
+
+    fun reconnectListener(context: Context) = NotificationHelper.requestRebind(context)
 
     fun openSystemSettings(context: Context) {
         app.appLock.expectExternalActivity()
@@ -121,6 +136,7 @@ class NotificationViewModel : ViewModel() {
         val raw = when (kind) {
             "promo" -> RawNotification("com.revolut.revolut", "7 days left to earn", "Get HUF22,500 for each eligible friend you refer. T&Cs apply.", null, now)
             "otp" -> RawNotification("hu.otpbank.smartbank", "OTP Bank", "Az Ön belépési kódja: 981245. Ne adja ki senkinek!", null, now)
+            "wallet" -> RawNotification("com.google.android.apps.walletnfcrel", "Sample Cafe", "HUF804.00 with Revolut Mastercard ••1413", null, now)
             else -> RawNotification("com.revolut.revolut", "Sample Grocery", "You spent HUF4,590\nHUF balance: HUF120,000.00", null, now)
         }
         _sample.value = when (val r = NotificationRecognizer().recognize(raw)) {

@@ -22,21 +22,11 @@ object Spacing {
 
 /** One radius family: small controls, rows inside cards, cards, sheets. */
 object Radii {
-    val small = RoundedCornerShape(8.dp)
-    val control = RoundedCornerShape(12.dp)
-    val row = RoundedCornerShape(16.dp)
-    val card = RoundedCornerShape(20.dp)
-    val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-}
-
-/**
- * Depth. Cards are flat (their tone separates them from the background), and only floating
- * chrome (the tab bar, sheets, dialogs) is raised.
- */
-object Elevation {
-    val flat = 0.dp
-    val raised = 2.dp
-    val floating = 8.dp
+    val small = RoundedCornerShape(6.dp)
+    val control = RoundedCornerShape(10.dp)
+    val row = RoundedCornerShape(12.dp)
+    val card = RoundedCornerShape(14.dp)
+    val sheet = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 }
 
 object Sizes {

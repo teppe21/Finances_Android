@@ -100,6 +100,7 @@ import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.CategoryBreakdown
+import com.teppe21.finances.feature.dashboard.BalanceTrendCard
 import com.teppe21.finances.feature.dashboard.MonthlyTrendsChartCard
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -226,6 +227,13 @@ fun AnalyticsScreen(
                     currency = state.currency,
                     modifier = Modifier.animateItemPlacement(Motion.medium())
                 )
+            }
+        }
+
+        // Not tied to the period filter: the whole balance history.
+        if (state.balanceSeries.isNotEmpty()) {
+            item(key = "balance-trend") {
+                BalanceTrendCard(state.balanceSeries, state.currency, Modifier.animateItemPlacement(Motion.medium()))
             }
         }
 

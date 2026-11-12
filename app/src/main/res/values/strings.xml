@@ -45,6 +45,8 @@
     <string name="source">Source</string>
     <string name="delete_confirm_title">Delete transaction?</string>
     <string name="delete_confirm_msg">This transaction will be removed permanently.</string>
+    <string name="edit_transaction_action">Edit</string>
+    <string name="edit_transaction">Edit transaction</string>
 
     <!-- Sorting -->
     <string name="sort_by">Sort by</string>
@@ -204,10 +206,6 @@
     <string name="analytics_people_received">Received from people</string>
 
     <!-- Settings -->
-    <string name="settings_appearance">Appearance</string>
-    <string name="settings_theme_system">System</string>
-    <string name="settings_theme_light">Light</string>
-    <string name="settings_theme_dark">Dark</string>
     <string name="settings_display_currency">Display currency</string>
     <string name="settings_exchange_rates">Exchange rates</string>
     <string name="settings_last_fetched">Last fetched %1$s</string>
@@ -378,6 +376,18 @@
     <string name="notif_recent">Recent processing results</string>
     <string name="notif_recent_desc">Only the app, time and outcome are kept (for 30 days). Notification text is never stored.</string>
     <string name="notif_recent_empty">Nothing processed yet.</string>
+    <string name="notif_status_listener">Listener</string>
+    <string name="notif_health_granted">Granted</string>
+    <string name="notif_health_not_granted">Not granted</string>
+    <string name="notif_health_finished">Finished</string>
+    <string name="notif_health_not_finished">Not finished</string>
+    <string name="notif_health_connected">Connected</string>
+    <string name="notif_health_not_connected">Not connected</string>
+    <string name="notif_health_setup_banner">Android access is on, but setup is not finished, so notifications are being ignored. Finish setup to start recognizing payments.</string>
+    <string name="notif_health_setup_action">Finish setup</string>
+    <string name="notif_health_reconnect_banner">Access and setup are fine, but Android has not connected the listener. Try reconnecting; if it stays disconnected, turn Finances off and on again in Android notification access.</string>
+    <string name="notif_health_reconnect">Reconnect</string>
+    <string name="notif_sample_wallet">Wallet</string>
     <string name="notif_stop_title">Stop using notifications?</string>
     <string name="notif_stop_body">Finances will stop processing notifications immediately. To also remove the Android permission, turn Finances off on the notification access screen that opens next.</string>
     <string name="notif_stop_confirm">Stop and open settings</string>
@@ -548,11 +558,11 @@
         <item quantity="one">%1$d data point from %2$s. Times shown in %3$s.</item>
         <item quantity="other">%1$d data points from %2$s. Times shown in %3$s.</item>
     </plurals>
-    <string name="stock_range_1d">1 day</string>
-    <string name="stock_range_1w">1 week</string>
-    <string name="stock_range_1m">1 month</string>
-    <string name="stock_range_3m">3 months</string>
-    <string name="stock_range_1y">1 year</string>
+    <string name="stock_range_1d">1D</string>
+    <string name="stock_range_1w">1W</string>
+    <string name="stock_range_1m">1M</string>
+    <string name="stock_range_3m">3M</string>
+    <string name="stock_range_1y">1Y</string>
     <string name="stock_status_live">Real-time</string>
     <string name="stock_status_delayed">Delayed</string>
     <string name="stock_status_last_close">Last close</string>
@@ -648,4 +658,10 @@
     <string name="policy_contact">Questions about this policy: %1$s</string>
     <string name="policy_contact_missing">Contact details have not been configured for this build.</string>
     <string name="analytics_summary">Summary</string>
+    <string name="balance_trend_title">Balance</string>
+    <string name="range_all">All</string>
+    <string name="balance_chart_description">Balance chart, %1$s: from %2$s to %3$s, low %4$s, high %5$s. Touch and drag to inspect.</string>
+    <string name="net_short">Net</string>
+    <string name="chart_other">Other</string>
+    <string name="category_vs_last_month">%1$s vs last month</string>
 </resources>

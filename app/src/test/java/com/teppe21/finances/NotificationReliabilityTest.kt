@@ -1,5 +1,7 @@
 package com.teppe21.finances
 
+import com.teppe21.finances.feature.notifications.HealthAction
+import com.teppe21.finances.feature.notifications.healthAction
 import com.teppe21.finances.native.notification.RebindPolicy
 import com.teppe21.finances.native.notification.SerialWorkQueue
 import kotlinx.coroutines.CompletableDeferred
@@ -205,5 +207,15 @@ class RebindPolicyTest {
         p.onConnected()
         clock.advance(500L)
         assertNull(p.nextDelayMillis())
+    }
+}
+
+class HealthActionTest {
+    @Test
+    fun `offers the fix that matches the first broken step`() {
+        assertEquals(HealthAction.NONE, healthAction(false, false, false))
+        assertEquals(HealthAction.FINISH_SETUP, healthAction(true, false, false))
+        assertEquals(HealthAction.RECONNECT, healthAction(true, true, false))
+        assertEquals(HealthAction.NONE, healthAction(true, true, true))
     }
 }

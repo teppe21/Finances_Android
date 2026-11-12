@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.core.app.NotificationManagerCompat
 
 /**
@@ -16,6 +17,15 @@ object NotificationHelper {
     fun isNotificationAccessGranted(context: Context): Boolean {
         val enabledPackages = NotificationManagerCompat.getEnabledListenerPackages(context)
         return enabledPackages.contains(context.packageName)
+    }
+
+    /** Asks Android to rebind the listener; a no-op unless access is granted. */
+    fun requestRebind(context: Context) {
+        try {
+            NotificationListenerService.requestRebind(ComponentName(context, BankNotificationListenerService::class.java))
+        } catch (_: Exception) {
+            // Best effort: Android also rebinds on its own.
+        }
     }
 
     fun openNotificationListenerSettings(context: Context): Boolean {

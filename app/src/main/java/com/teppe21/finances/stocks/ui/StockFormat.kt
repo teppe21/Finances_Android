@@ -123,7 +123,7 @@ fun changeColor(value: BigDecimal?): Color = when {
 
 @Composable
 fun statusColor(status: DataStatus): Color = when (status) {
-    DataStatus.LIVE -> MaterialTheme.finances.marketUp
+    DataStatus.LIVE -> MaterialTheme.finances.accent
     DataStatus.DELAYED, DataStatus.LAST_CLOSE -> MaterialTheme.colorScheme.onSurfaceVariant
     DataStatus.STALE, DataStatus.RATE_LIMITED -> MaterialTheme.finances.warning
     else -> MaterialTheme.colorScheme.error

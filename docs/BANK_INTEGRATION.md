@@ -18,7 +18,7 @@ The settings intent tries the per-app detail screen (Android 11+), then the gene
 | Google Wallet | `com.google.android.apps.walletnfcrel` | real samples | yes, when the card issuer maps to one account |
 | OTP Bank | `hu.otpbank.smartbank`, `hu.otpbank.mobilbank` | synthetic samples | no, review queue |
 | Wise | `com.transferwise.android` | synthetic samples | no, review queue |
-| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank` | none | no, review queue |
+| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank`, `pegasus.project.ebh.mobile.android.bundle.mobilebank` | none | no, review queue |
 | MBH Bank | `hu.mbhbank.app`, `hu.takarek.mobilbank` | none | no, review queue |
 
 "Real samples" means the parser tests use notification text captured from those apps (for example `Coop` / `You spent HUF804` / `HUF balance: HUF42,285.97`, and `75. SZ. ABC ÁRUHÁZ` / `HUF804.00 with Revolut Mastercard ••1413`). The Hungarian bank and Wise package names and patterns were carried over from the earlier version and still need checking against real notifications.
@@ -28,10 +28,10 @@ The generic parser of earlier versions, which accepted CIB, Raiffeisen, UniCredi
 ## Processing steps
 
 1. **Routing.** `SupportedSources.forPackage(packageName)` must return a source. Titles, icons and app labels are never used for routing. Unsupported packages are dropped before their text is read and no record is written.
-2. **Extraction.** Title, text and big text only; group summary notifications are skipped.
+2. **Extraction.** Title, text and big text, plus the inbox text lines only when text and big text are empty; sub text is never read. Group summary notifications are skipped. Known limit: for an inbox-style notification with several lines only the first transaction line is recorded.
 3. **Security filter.** Words such as code, passcode, password, verification, login, approve, "belépési kód", "jóváhagy" reject the notification (`REJECTED_SECURITY_MESSAGE`). A soft cue ("security", "biztonság") plus a bare 4 to 8 digit number also rejects.
 4. **Promotional filter.** Strong cues (refer, invite, eligible friend, T&Cs, days left, giveaway, "ajánlj", "nyeremény", ...) reject immediately. Weak cues (bonus, reward, cashback, offer, ...) reject when there is no payment wording, and also reject incoming credits, so a cashback "You received HUF500" is not recorded as income. A merchant name containing a weak cue ("Bonus Pizza") does not block a real card payment.
-5. **Source parser.** Each source requires its own payment wording: "You spent", "Elköltöttél", "Fizetés a következőnek", "You sent", "sent you", "refund"; a wallet line of the form `<amount> with <card>`; Hungarian bank words such as "vásárlás", "terhelés", "jóváírás" with an "Összeg:" label. The amount is the first currency amount after the payment wording; lines mentioning balance, available amount or limit are ignored. A Hungarian bank message with several unlabelled amounts is rejected rather than guessed.
+5. **Source parser.** Each source requires its own payment wording: "You spent", "Elköltöttél", "Fizetés a következőnek", "You sent", "sent you", "refund"; a wallet line with exactly one amount plus a card reference (masked tail like `••1413` or a known issuer name), independent of the connecting word ("with", "–", Hungarian wording); the English `with` form is verified, the Hungarian wallet and Erste wording is still unverified against real notifications and capped to the review queue; Hungarian bank words such as "vásárlás", "terhelés", "jóváírás" with an "Összeg:" label. The amount is the first currency amount after the payment wording; lines mentioning balance, available amount or limit are ignored. A Hungarian bank message with several unlabelled amounts is rejected rather than guessed.
 6. **Validation.** Expenses and outgoing transfers must be negative, income and refunds positive, and amounts above 100 million in major units are treated as misreads.
 7. **Account matching.** HIGH: the user mapped the bank to an account. MEDIUM: exactly one active account has that institution. LOW: anything else; the transaction is stored unassigned and pending. Wallet payments use the institution of the card issuer named in the notification.
 8. **Duplicate detection.** See below.

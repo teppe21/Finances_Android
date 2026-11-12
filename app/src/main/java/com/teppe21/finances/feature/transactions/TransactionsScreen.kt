@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,6 +52,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -66,7 +69,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -101,6 +103,15 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.core.utils.DateFormatter
 import com.teppe21.finances.domain.model.Transaction
 import com.teppe21.finances.domain.model.TransactionDirection
+import com.teppe21.finances.domain.usecase.TransactionEdit
+import com.teppe21.finances.domain.usecase.pickerMillisToDate
+import com.teppe21.finances.domain.usecase.toPickerMillis
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -115,6 +126,7 @@ fun TransactionsScreen(
     val haptics = LocalHapticFeedback.current
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
     var categorizing by remember { mutableStateOf<Transaction?>(null) }
+    var editing by remember { mutableStateOf<Transaction?>(null) }
 
     val listState = rememberLazyListState()
     // The search field stays put while it has focus, so typing never scrolls it out from under the keyboard.
@@ -195,7 +207,6 @@ fun TransactionsScreen(
         LazyColumn(
             state = listState,
             contentPadding = headerPadding,
-            verticalArrangement = Arrangement.spacedBy(Spacing.m - Spacing.xxs),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = Spacing.l)
@@ -264,15 +275,29 @@ fun TransactionsScreen(
                                 )
                             }
                         }
-                        items(state.filteredTransactions, key = { it.id }) { tx ->
-                            TransactionRow(
-                                transaction = tx,
-                                displayCurrency = state.currency,
-                                convertedAmountMinor = state.convertedAmounts[tx.id],
-                                categoryName = state.categories.firstOrNull { it.id == tx.categoryId }?.let { categoryLabel(it) },
-                                onClick = { viewModel.selectTransaction(tx) },
-                                modifier = Modifier.animateItemPlacement(Motion.medium())
-                            )
+                        // Flat rows split by hairlines; day headers only when the list is in date order.
+                        val byDate = state.sortOrder == TransactionSortOrder.NEWEST || state.sortOrder == TransactionSortOrder.OLDEST
+                        itemsIndexed(state.filteredTransactions, key = { _, tx -> tx.id }) { i, tx ->
+                            val previous = state.filteredTransactions.getOrNull(i - 1)
+                            Column(Modifier.animateItemPlacement(Motion.medium())) {
+                                if (byDate && previous?.date != tx.date) {
+                                    Text(
+                                        text = DateFormatter.format(tx.date),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = Spacing.m, bottom = Spacing.xs)
+                                    )
+                                } else if (previous != null) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
+                                TransactionRow(
+                                    transaction = tx,
+                                    displayCurrency = state.currency,
+                                    convertedAmountMinor = state.convertedAmounts[tx.id],
+                                    categoryName = state.categories.firstOrNull { it.id == tx.categoryId }?.let { categoryLabel(it) },
+                                    onClick = { viewModel.selectTransaction(tx) }
+                                )
+                            }
                         }
             }
             item { Spacer(modifier = Modifier.height(88.dp)) }
@@ -283,7 +308,7 @@ fun TransactionsScreen(
         FloatingActionButton(
             onClick = { showAddModal = true },
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 16.dp, end = 16.dp)
@@ -365,6 +390,7 @@ fun TransactionsScreen(
                     accountName = state.accounts.firstOrNull { it.id == selected.accountId }?.let { accountLabel(it) } ?: stringResource(R.string.account_not_assigned),
                     onDelete = { transactionToDelete = selected },
                     onChangeCategory = { categorizing = selected },
+                    onEdit = { editing = selected },
                     onClose = { viewModel.selectTransaction(null) }
                 )
             }
@@ -396,6 +422,19 @@ fun TransactionsScreen(
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     viewModel.addManualTransaction(accId, amtMinor, curr, dir, desc, merch, catId, date)
                     showAddModal = false
+                }
+            )
+        }
+
+        editing?.let { tx ->
+            AddTransactionDialog(
+                accounts = state.accounts,
+                categories = state.categories,
+                existing = tx,
+                onDismiss = { editing = null },
+                onConfirm = { accId, amtMinor, curr, dir, desc, merch, catId, date ->
+                    editing = null
+                    viewModel.editTransaction(tx, TransactionEdit(accId, date, amtMinor, curr, dir, desc, merch, catId))
                 }
             )
         }
@@ -436,6 +475,7 @@ fun TransactionDetailContent(
     accountName: String,
     onDelete: () -> Unit,
     onChangeCategory: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
     onClose: () -> Unit
 ) {
     val isTransfer = transaction.direction.isTransfer
@@ -528,6 +568,13 @@ fun TransactionDetailContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        // The dialog only knows expense and income; transfers and refunds keep their kind.
+        if (onEdit != null && (transaction.direction == TransactionDirection.EXPENSE || transaction.direction == TransactionDirection.INCOME)) {
+            OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth(), shape = Radii.control) {
+                Text(stringResource(R.string.edit_transaction_action))
+            }
+        }
+
         Button(
             onClick = onDelete,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.finances.expense),
@@ -560,11 +607,14 @@ fun DetailRow(label: String, value: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionDialog(
     accounts: List<com.teppe21.finances.domain.model.Account>,
     categories: List<com.teppe21.finances.domain.model.Category>,
     defaultCurrency: String = "HUF",
+    /** When set the dialog edits this transaction: fields start from it and it keeps its account and date. */
+    existing: Transaction? = null,
     onDismiss: () -> Unit,
     onConfirm: (
         accountId: String,
@@ -577,21 +627,68 @@ fun AddTransactionDialog(
         date: LocalDate
     ) -> Unit
 ) {
-    var amountText by remember { mutableStateOf("") }
+    var amountText by remember { mutableStateOf(existing?.let { Money.toMajor(kotlin.math.abs(it.amountMinor)).toPlainString() } ?: "") }
     val manualEntryLabel = stringResource(R.string.manual_entry)
-    var selectedCurrency by remember { mutableStateOf(defaultCurrency) }
-    var descriptionText by remember { mutableStateOf("") }
-    var merchantText by remember { mutableStateOf("") }
-    var isExpense by remember { mutableStateOf(true) }
-    var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id ?: "acc_otp") }
-    var selectedCategoryId by remember { mutableStateOf("food") }
+    var selectedCurrency by remember { mutableStateOf(existing?.currency ?: defaultCurrency) }
+    var descriptionText by remember { mutableStateOf(existing?.description ?: "") }
+    var merchantText by remember { mutableStateOf(existing?.merchant ?: "") }
+    var isExpense by remember { mutableStateOf(existing?.direction != TransactionDirection.INCOME) }
+    var selectedAccountId by remember { mutableStateOf(existing?.accountId ?: accounts.firstOrNull()?.id ?: "acc_otp") }
+    var selectedCategoryId by remember { mutableStateOf(if (existing == null) "food" else existing.categoryId) }
+    var date by remember { mutableStateOf(existing?.date ?: LocalDate.now()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var accountMenu by remember { mutableStateOf(false) }
     val parsedAmount = Money.parseUserInput(amountText)?.takeIf { it > 0 }
+
+    if (showDatePicker) {
+        val today = LocalDate.now()
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = date.toPickerMillis(),
+            // The add flow only books today, so edits cannot move a transaction into the future either.
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = !pickerMillisToDate(utcTimeMillis).isAfter(today)
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { date = pickerMillisToDate(it) }
+                    showDatePicker = false
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.cancel)) } }
+        ) { DatePicker(state = pickerState) }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.add_transaction)) },
+        title = { Text(stringResource(if (existing == null) R.string.add_transaction else R.string.edit_transaction)) },
         text = {
             DialogColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (existing != null) {
+                    // Edit only: the add flow always books today on the first account.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.date) + ":", style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = { showDatePicker = true }) { Text(DateFormatter.format(date)) }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.account) + ":", style = MaterialTheme.typography.bodyMedium)
+                        Column {
+                            TextButton(onClick = { accountMenu = true }) {
+                                Text(accounts.firstOrNull { it.id == selectedAccountId }?.let { accountLabel(it) } ?: stringResource(R.string.account_not_assigned))
+                            }
+                            DropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
+                                accounts.filter { it.isActive || it.id == existing.accountId }.forEach { acc ->
+                                    DropdownMenuItem(text = { Text(accountLabel(acc)) }, onClick = {
+                                        selectedAccountId = acc.id
+                                        accountMenu = false
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val expenseColor by animateColorAsState(
                         if (isExpense) MaterialTheme.finances.expense else MaterialTheme.colorScheme.surfaceVariant,
@@ -686,7 +783,7 @@ fun AddTransactionDialog(
                     val minor = parsedAmount ?: return@Button
                     val dir = if (isExpense) TransactionDirection.EXPENSE else TransactionDirection.INCOME
                     val desc = descriptionText.ifBlank { merchantText.ifBlank { manualEntryLabel } }
-                    onConfirm(selectedAccountId, if (isExpense) -minor else minor, selectedCurrency, dir, desc, merchantText.ifBlank { null }, selectedCategoryId, LocalDate.now())
+                    onConfirm(selectedAccountId, if (isExpense) -minor else minor, selectedCurrency, dir, desc, merchantText.ifBlank { null }, selectedCategoryId, date)
                 },
                 enabled = parsedAmount != null && accounts.isNotEmpty()
             ) {

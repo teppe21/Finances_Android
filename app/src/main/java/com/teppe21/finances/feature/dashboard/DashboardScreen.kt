@@ -43,7 +43,7 @@ import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -74,7 +74,21 @@ import com.teppe21.finances.core.ui.AmountText
 import com.teppe21.finances.core.theme.CategoryColorProvider
 import com.teppe21.finances.core.ui.EmptyState
 import com.teppe21.finances.core.ui.InfoBanner
+import com.teppe21.finances.core.ui.ChipFlow
+import com.teppe21.finances.core.ui.GroupedBarChart
+import com.teppe21.finances.core.ui.LineChart
 import com.teppe21.finances.core.ui.Motion
+import com.teppe21.finances.core.theme.amount
+import com.teppe21.finances.core.theme.amountLarge
+import com.teppe21.finances.domain.usecase.BalancePoint
+import com.teppe21.finances.domain.usecase.BalanceRange
+import com.teppe21.finances.domain.usecase.inRange
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.heading
 import com.teppe21.finances.core.ui.animatedFraction
 import com.teppe21.finances.core.ui.pressClickable
 import com.teppe21.finances.core.ui.SectionCard
@@ -83,7 +97,6 @@ import com.teppe21.finances.core.utils.CurrencyFormatter
 import com.teppe21.finances.domain.model.CategoryBreakdown
 import com.teppe21.finances.domain.model.MonthlyTrend
 import java.time.YearMonth
-import kotlin.math.max
 
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -138,7 +151,7 @@ private fun DashboardContent(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.l)
     ) {
         item { Spacer(Modifier.height(4.dp)) }
 
@@ -151,6 +164,10 @@ private fun DashboardContent(
                 month = state.month,
                 modifier = place()
             )
+        }
+
+        if (state.balanceSeries.isNotEmpty()) {
+            item(key = "balance-trend") { BalanceTrendCard(state.balanceSeries, state.currency, place()) }
         }
 
         if (state.reviewCount > 0) {
@@ -202,7 +219,7 @@ private fun DashboardContent(
             if (state.categoryBreakdown.isNotEmpty()) {
                 item(key = "breakdown") { CategoryBreakdownCard(
                     state.categoryBreakdown.map { b -> state.categories.firstOrNull { it.id == b.categoryId }?.let { b.copy(categoryName = categoryLabel(it, resources)) } ?: b },
-                    state.currency, state.month, place()
+                    state.previousCategoryTotals, state.currency, state.month, place()
                 ) }
             }
             item(key = "recent-header") {
@@ -211,7 +228,7 @@ private fun DashboardContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(stringResource(R.string.recent_activity), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    CardLabel(stringResource(R.string.recent_activity))
                     TextButton(onClick = onNavigateToTransactions) { Text(stringResource(R.string.see_all)) }
                 }
             }
@@ -401,43 +418,115 @@ private fun QuickActionTile(modifier: Modifier, item: QuickActionItem, stacked: 
     }
 }
 
+/** Small, quiet card heading: the numbers below it are what should stand out. */
 @Composable
-fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    SectionCard(modifier = modifier, title = stringResource(R.string.six_months_trends)) {
-        val maxVal = max(trends.maxOfOrNull { max(it.incomeMinor, it.expenseMinor) } ?: 0L, 1L)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp)
-                .semantics {
-                    contentDescription = trends.joinToString("; ") {
-                        context.getString(R.string.trend_point, DateFormatter.monthShort(YearMonth.parse(it.month)), CurrencyFormatter.format(it.incomeMinor, currency), CurrencyFormatter.format(it.expenseMinor, currency))
-                    }
-                },
-            verticalAlignment = Alignment.Bottom
-        ) {
-            trends.forEach { item ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(
-                        modifier = Modifier.height(84.dp),
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Bar(item.incomeMinor.toFloat() / maxVal, MaterialTheme.finances.income)
-                        Bar(item.expenseMinor.toFloat() / maxVal, MaterialTheme.finances.expense)
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        DateFormatter.monthShort(YearMonth.parse(item.month)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+internal fun CardLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.semantics { heading() }
+    )
+}
+
+private fun BalanceRange.labelRes(): Int = when (this) {
+    BalanceRange.WEEK -> R.string.stock_range_1w
+    BalanceRange.MONTH -> R.string.stock_range_1m
+    BalanceRange.QUARTER -> R.string.stock_range_3m
+    BalanceRange.YEAR -> R.string.stock_range_1y
+    BalanceRange.ALL -> R.string.range_all
+}
+
+/** Total balance over time. While a finger is on the chart the header shows that day's balance and date. */
+@Composable
+fun BalanceTrendCard(series: List<BalancePoint>, currency: String, modifier: Modifier = Modifier) {
+    var range by rememberSaveable { mutableStateOf(BalanceRange.MONTH) }
+    var inspected by remember { mutableStateOf<Int?>(null) }
+    val shown = remember(series, range) { series.inRange(range) }
+    val values = remember(shown) { shown.map { it.balanceMinor.toFloat() } }
+    if (shown.isEmpty()) return
+    val point = inspected?.let { shown.getOrNull(it) }
+    val change = shown.last().balanceMinor - shown.first().balanceMinor
+    val rangeLabel = stringResource(range.labelRes())
+    val description = stringResource(
+        R.string.balance_chart_description, rangeLabel,
+        CurrencyFormatter.format(shown.first().balanceMinor, currency), CurrencyFormatter.format(shown.last().balanceMinor, currency),
+        CurrencyFormatter.format(shown.minOf { it.balanceMinor }, currency), CurrencyFormatter.format(shown.maxOf { it.balanceMinor }, currency)
+    )
+    SectionCard(modifier = modifier) {
+        CardLabel(stringResource(R.string.balance_trend_title))
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            CurrencyFormatter.formatSigned((point ?: shown.last()).balanceMinor, currency),
+            style = MaterialTheme.typography.amountLarge,
+            maxLines = 1
+        )
+        Text(
+            if (point != null) DateFormatter.format(point.date) else CurrencyFormatter.formatSigned(change, currency),
+            style = MaterialTheme.typography.bodySmall.tabular(),
+            color = when {
+                point != null -> MaterialTheme.colorScheme.onSurfaceVariant
+                change >= 0 -> MaterialTheme.finances.income
+                else -> MaterialTheme.finances.expense
+            }
+        )
+        Spacer(Modifier.height(Spacing.m))
+        LineChart(
+            values = values,
+            color = MaterialTheme.colorScheme.primary,
+            contentDescription = description,
+            modifier = Modifier.fillMaxWidth().height(140.dp),
+            onInspect = { inspected = it }
+        )
+        Spacer(Modifier.height(Spacing.s))
+        ChipFlow {
+            BalanceRange.values().forEach { r ->
+                FilterChip(selected = range == r, onClick = { range = r; inspected = null }, label = { Text(stringResource(r.labelRes())) })
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    }
+}
+
+@Composable
+fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifier: Modifier = Modifier) {
+    if (trends.isEmpty()) return
+    val context = LocalContext.current
+    var picked by remember(trends.size) { mutableIntStateOf(trends.lastIndex) }
+    val current = trends[picked.coerceIn(0, trends.lastIndex)]
+    val labels = remember(trends) { trends.map { DateFormatter.monthShort(YearMonth.parse(it.month)) } }
+    SectionCard(modifier = modifier) {
+        CardLabel(stringResource(R.string.six_months_trends))
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            DateFormatter.monthYear(YearMonth.parse(current.month)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        // Wraps instead of shrinking: an amount is never cut.
+        ChipFlow {
+            TrendFigure(stringResource(R.string.income), CurrencyFormatter.format(current.incomeMinor, currency), MaterialTheme.finances.income)
+            TrendFigure(stringResource(R.string.expenses), CurrencyFormatter.format(current.expenseMinor, currency), MaterialTheme.finances.expense)
+            TrendFigure(
+                stringResource(R.string.net_short), CurrencyFormatter.formatSigned(current.balanceMinor, currency),
+                if (current.balanceMinor >= 0) MaterialTheme.finances.income else MaterialTheme.finances.expense
+            )
+        }
+        Spacer(Modifier.height(Spacing.l))
+        GroupedBarChart(
+            labels = labels,
+            first = trends.map { it.incomeMinor.toFloat() },
+            second = trends.map { it.expenseMinor.toFloat() },
+            firstColor = MaterialTheme.finances.income,
+            secondColor = MaterialTheme.finances.expense,
+            selectedIndex = picked,
+            onSelect = { picked = it },
+            contentDescription = trends.joinToString("; ") {
+                context.getString(R.string.trend_point, DateFormatter.monthShort(YearMonth.parse(it.month)), CurrencyFormatter.format(it.incomeMinor, currency), CurrencyFormatter.format(it.expenseMinor, currency))
+            }
+        )
+        Spacer(Modifier.height(Spacing.m))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
             Legend(stringResource(R.string.income), MaterialTheme.finances.income)
             Legend(stringResource(R.string.expenses), MaterialTheme.finances.expense)
         }
@@ -445,17 +534,11 @@ fun MonthlyTrendsChartCard(trends: List<MonthlyTrend>, currency: String, modifie
 }
 
 @Composable
-private fun Bar(ratio: Float, color: androidx.compose.ui.graphics.Color) {
-    // Zero stays visibly zero: no artificial minimum height. The bar grows to its value; the
-    // exact figures are in the content description and never animate.
-    val height = (80f * animatedFraction(ratio.coerceIn(0f, 1f), "trendBar")).dp
-    Box(
-        Modifier
-            .width(8.dp)
-            .height(height)
-            .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-            .background(color)
-    )
+private fun TrendFigure(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.amount, color = color, maxLines = 1)
+    }
 }
 
 @Composable
@@ -467,43 +550,76 @@ private fun Legend(label: String, color: androidx.compose.ui.graphics.Color) {
     }
 }
 
+/** Top five categories plus the rest as "Other", each as a share bar and, when last month had spending, its change. */
 @Composable
 private fun CategoryBreakdownCard(
     breakdown: List<CategoryBreakdown>,
+    previousTotals: Map<String, Long>,
     currency: String,
     month: YearMonth,
     modifier: Modifier = Modifier
 ) {
-    SectionCard(modifier = modifier, title = stringResource(R.string.dashboard_spending_month, DateFormatter.monthYear(month))) {
+    val rest = breakdown.drop(5)
+    SectionCard(modifier = modifier) {
+        CardLabel(stringResource(R.string.dashboard_spending_month, DateFormatter.monthYear(month)))
+        Spacer(Modifier.height(Spacing.s))
         breakdown.take(5).forEach { cat ->
-            val color = CategoryColorProvider.getColor(cat.categoryId, cat.color)
-            val shown = animatedFraction((cat.percentage / 100f).coerceIn(0f, 1f), "categoryShare")
-            Column(Modifier.padding(vertical = 5.dp).semantics(mergeDescendants = true) {}) {
-                // The figure is measured first and never truncated; the name takes what is left (two
-                // lines) or the figure moves under it at a large font scale.
-                AmountRowLayout(
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-                            Spacer(Modifier.width(8.dp))
-                            Text(cat.categoryName, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    },
-                    amount = {
-                        AmountText(
-                            "${CurrencyFormatter.format(cat.totalMinor, currency)} · ${CurrencyFormatter.formatPercent(cat.percentage)}",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular()
-                        )
-                    }
-                )
-                Spacer(Modifier.height(4.dp))
-                LinearProgressIndicator(
-                    progress = { shown },
-                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                    color = color,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+            val previous = previousTotals[cat.categoryId] ?: 0L
+            ShareRow(
+                name = cat.categoryName,
+                color = CategoryColorProvider.getColor(cat.categoryId, cat.color),
+                totalMinor = cat.totalMinor,
+                percentage = cat.percentage,
+                currency = currency,
+                // Whole-percent change on Long minor units; a category with no spending last month has no baseline.
+                changePercent = if (previous > 0) ((cat.totalMinor - previous) * 100 / previous).toInt() else null
+            )
+        }
+        if (rest.isNotEmpty()) {
+            ShareRow(
+                name = stringResource(R.string.chart_other),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                totalMinor = rest.sumOf { it.totalMinor },
+                percentage = rest.sumOf { it.percentage.toDouble() }.toFloat(),
+                currency = currency,
+                changePercent = null
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareRow(name: String, color: androidx.compose.ui.graphics.Color, totalMinor: Long, percentage: Float, currency: String, changePercent: Int?) {
+    val shown = animatedFraction((percentage / 100f).coerceIn(0f, 1f), "categoryShare")
+    Column(Modifier.padding(vertical = Spacing.s).semantics(mergeDescendants = true) {}) {
+        // The figure is measured first and never truncated; the name takes what is left (two
+        // lines) or the figure moves under it at a large font scale.
+        AmountRowLayout(
+            label = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+                    Spacer(Modifier.width(8.dp))
+                    Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            },
+            amount = {
+                AmountText(
+                    "${CurrencyFormatter.format(totalMinor, currency)} · ${CurrencyFormatter.formatPercent(percentage)}",
+                    style = MaterialTheme.typography.amount
                 )
             }
+        )
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)) {
+            Box(Modifier.fillMaxWidth(shown).fillMaxHeight().background(color))
+        }
+        if (changePercent != null) {
+            Text(
+                stringResource(R.string.category_vs_last_month, (if (changePercent > 0) "+" else "") + "$changePercent%"),
+                style = MaterialTheme.typography.labelSmall.tabular(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xs)
+            )
         }
     }
 }

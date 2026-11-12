@@ -50,11 +50,11 @@ With Android notification access (granted only after an in-app disclosure and an
 
 | App | Package | Status |
 | --- | --- | --- |
-| Revolut | `com.revolut.revolut` | Patterns tested with real notification text |
+| Revolut | `com.revolut.revolut` | Only the English "<amount> with <card>" shape is tested against real notification text; Hungarian Wallet and Erste wording is unverified and always goes to the review queue |
 | Google Wallet | `com.google.android.apps.walletnfcrel` | Patterns tested with real notification text |
 | OTP Bank | `hu.otpbank.smartbank`, `hu.otpbank.mobilbank` | Recognized transactions go to the review queue |
 | Wise | `com.transferwise.android` | Recognized transactions go to the review queue |
-| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank` | Recognized transactions go to the review queue |
+| Erste Bank (George) | `hu.erstebank.george.hungary`, `hu.erstebank.mobilebank`, `pegasus.project.ebh.mobile.android.bundle.mobilebank` | Recognized transactions go to the review queue |
 | MBH Bank | `hu.mbhbank.app`, `hu.takarek.mobilbank` | Recognized transactions go to the review queue |
 
 Notifications from every other app are dropped before their text is read. For supported apps, security messages (login codes, approval requests) and promotions (referral offers, cashback, rewards) are rejected, and a transaction is only created when the text contains source-specific payment wording plus a readable amount. Balance lines are never used as the amount. Raw notification text is not stored; only the recognized transaction and a sanitized status code (for example `REJECTED_PROMOTIONAL`) are kept, the status records for 30 days.
@@ -130,7 +130,7 @@ Single-module app with a light layering: Compose screens and ViewModels in `feat
 
 ## Testing
 
-JVM unit tests in `app/src/test` (224) cover categorization and transfer detection (with a harness over synthetic bank statements), notification recognition and rejection, the notification pipeline including deduplication and account matching, the bounded notification queue and rebind policy, exact money parsing, currency conversion and statistics, CSV and receipt parsing, OCR orientation and resource lifecycle helpers, the ViewModels, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Instrumented tests in `app/src/androidTest` (59) cover the Room DAOs, default-data seeding, the migrations to the current schema, the main Compose flows and layout guards at large font scales, in Hungarian and in dark theme. See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has been run.
+JVM unit tests in `app/src/test` (224) cover categorization and transfer detection (with a harness over synthetic bank statements), notification recognition and rejection, the notification pipeline including deduplication and account matching, the bounded notification queue and rebind policy, exact money parsing, currency conversion and statistics, CSV and receipt parsing, OCR orientation and resource lifecycle helpers, the ViewModels, the PIN verifier and lockout policy, and the Finnhub provider, freshness labels and watchlist repository. Instrumented tests in `app/src/androidTest` (59) cover the Room DAOs, default-data seeding, the migrations to the current schema, the main Compose flows and layout guards at large font scales, at large font scales (the app is currently dark-only and English-only; the Hungarian translations are kept in the repo but not built). See [docs/TESTING.md](docs/TESTING.md) for what each suite covers and what has been run.
 
 ## Build
 

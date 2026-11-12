@@ -7,38 +7,22 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// Warm editorial palette. Every colour used by the app comes from here via
+// Dark-only, single-accent palette. Every colour used by the app comes from here via
 // MaterialTheme.colorScheme or MaterialTheme.finances; screens do not define their own.
+// Green and red mean money in / out and market up / down, and nothing else.
 
-// Light
-val Paper = Color(0xFFFAF7F2)          // background
-val PaperSurface = Color(0xFFF3EEE5)   // surfaces / rows, one step below the background
-val Ink = Color(0xFF2B2B2B)            // main text
-val InkSecondary = Color(0xFF6B645C)   // secondary text (5.4:1 on Paper)
-val Hairline = Color(0xFFE2DACD)       // borders and dividers
-val Terracotta = Color(0xFFC15F3C)     // brand accent: indicators, selected states (not text)
-val TerracottaDeep = Color(0xFFA94E2E) // filled primary actions; white on it is 5.5:1 (white on Terracotta is 4.2:1)
-val IncomeGreen = Color(0xFF2B7549)      // 4.9:1 on PaperSurface (the earlier 2E7D4F was 4.4:1, under the 4.5:1 text minimum)
-val ExpenseRed = Color(0xFFB03A2E)
-val WarningOchre = Color(0xFF8A5A00)
-val TransferSlate = Color(0xFF4F5D75)
-val MarketUp = Color(0xFF2B6F77)       // market movement, deliberately not the income/expense colours
-val MarketDown = Color(0xFF7A4A74)
-
-// Dark (separately chosen, not an inversion)
-val NightPaper = Color(0xFF1C1A17)
-val NightSurface = Color(0xFF26231F)
-val NightInk = Color(0xFFEDE6DB)
-val NightInkSecondary = Color(0xFFB5AA9A)
-val NightHairline = Color(0xFF3A3630)
-val NightTerracotta = Color(0xFFE08A66)
-val NightOnTerracotta = Color(0xFF2B1A12)
-val NightIncome = Color(0xFF6CC794)
-val NightExpense = Color(0xFFEE8478)
-val NightWarning = Color(0xFFE0A93B)
-val NightTransfer = Color(0xFF9BAAC4)
-val NightMarketUp = Color(0xFF6FC3CC)
-val NightMarketDown = Color(0xFFC796C0)
+val Background = Color(0xFF0B0D10)
+val Surface = Color(0xFF14171B)        // cards, rows, bars: one step above the background
+val SurfaceHigh = Color(0xFF1C2026)    // selected chips, banners
+val Hairline = Color(0xFF282D34)       // borders and dividers
+val TextPrimary = Color(0xFFF2F4F7)
+val TextSecondary = Color(0xFF9AA3AF)
+val Accent = Color(0xFF4A8FFF)         // the one accent; 6.2:1 on Background, 5.7:1 on Surface
+val OnAccent = Background              // 6.2:1 on Accent (white would be 3.0:1)
+val AccentContainer = Color(0xFF14284A)
+val Income = Color(0xFF3DD68C)
+val Expense = Color(0xFFFF6B6B)
+val Warning = Color(0xFFE0A93B)
 
 /** Semantic colours that Material 3's ColorScheme has no slot for. */
 @Immutable
@@ -53,29 +37,18 @@ data class FinancesColors(
     val marketDown: Color
 )
 
-val LightFinancesColors = FinancesColors(
-    income = IncomeGreen,
-    expense = ExpenseRed,
-    success = IncomeGreen,
-    warning = WarningOchre,
-    transfer = TransferSlate,
-    accent = Terracotta,
-    marketUp = MarketUp,
-    marketDown = MarketDown
-)
-
 val DarkFinancesColors = FinancesColors(
-    income = NightIncome,
-    expense = NightExpense,
-    success = NightIncome,
-    warning = NightWarning,
-    transfer = NightTransfer,
-    accent = NightTerracotta,
-    marketUp = NightMarketUp,
-    marketDown = NightMarketDown
+    income = Income,
+    expense = Expense,
+    success = Accent,
+    warning = Warning,
+    transfer = TextSecondary,
+    accent = Accent,
+    marketUp = Income,
+    marketDown = Expense
 )
 
-val LocalFinancesColors = staticCompositionLocalOf { LightFinancesColors }
+val LocalFinancesColors = staticCompositionLocalOf { DarkFinancesColors }
 
 val MaterialTheme.finances: FinancesColors
     @Composable

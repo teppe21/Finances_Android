@@ -61,10 +61,6 @@
     <string name="analytics_people_received">Másoktól kapva</string>
 
     <!-- Settings -->
-    <string name="settings_appearance">Megjelenés</string>
-    <string name="settings_theme_system">Rendszer</string>
-    <string name="settings_theme_light">Világos</string>
-    <string name="settings_theme_dark">Sötét</string>
     <string name="settings_display_currency">Megjelenítési pénznem</string>
     <string name="settings_exchange_rates">Árfolyamok</string>
     <string name="settings_last_fetched">Utolsó lekérés: %1$s</string>
@@ -235,6 +231,18 @@
     <string name="notif_recent">Legutóbbi feldolgozási eredmények</string>
     <string name="notif_recent_desc">Csak az app, az időpont és az eredmény marad meg (30 napig). Az értesítés szövege sosem tárolódik.</string>
     <string name="notif_recent_empty">Még nincs feldolgozott értesítés.</string>
+    <string name="notif_status_listener">Figyelő</string>
+    <string name="notif_health_granted">Megadva</string>
+    <string name="notif_health_not_granted">Nincs megadva</string>
+    <string name="notif_health_finished">Kész</string>
+    <string name="notif_health_not_finished">Nincs kész</string>
+    <string name="notif_health_connected">Csatlakoztatva</string>
+    <string name="notif_health_not_connected">Nincs csatlakoztatva</string>
+    <string name="notif_health_setup_banner">Az Android-hozzáférés be van kapcsolva, de a beállítás nincs befejezve, ezért az értesítéseket figyelmen kívül hagyjuk. Fejezd be a beállítást a fizetések felismeréséhez.</string>
+    <string name="notif_health_setup_action">Beállítás befejezése</string>
+    <string name="notif_health_reconnect_banner">A hozzáférés és a beállítás rendben van, de az Android nem csatlakoztatta a figyelőt. Próbáld újracsatlakoztatni; ha így is megszakad, kapcsold ki és be a Finances appot az Android értesítés-hozzáférésénél.</string>
+    <string name="notif_health_reconnect">Újracsatlakozás</string>
+    <string name="notif_sample_wallet">Wallet</string>
     <string name="notif_stop_title">Leállítod az értesítések használatát?</string>
     <string name="notif_stop_body">A Finances azonnal leállítja az értesítések feldolgozását. Az Android-engedély eltávolításához kapcsold ki a Finances appot a következőként megnyíló értesítés-hozzáférési képernyőn.</string>
     <string name="notif_stop_confirm">Leállítás és beállítások</string>
@@ -543,6 +551,8 @@
     <string name="source">Forrás</string>
     <string name="delete_confirm_title">Törlöd a tranzakciót?</string>
     <string name="delete_confirm_msg">A tranzakció véglegesen törlődik.</string>
+    <string name="edit_transaction_action">Szerkesztés</string>
+    <string name="edit_transaction">Tranzakció szerkesztése</string>
     <string name="sort_by">Rendezés</string>
     <string name="sort_newest">Legújabb elöl</string>
     <string name="sort_oldest">Legrégebbi elöl</string>
@@ -621,4 +631,10 @@
     <string name="settings">Beállítások</string>
     <string name="currency">Pénznem</string>
     <string name="analytics_summary">Összegzés</string>
+    <string name="balance_trend_title">Egyenleg</string>
+    <string name="range_all">Mind</string>
+    <string name="balance_chart_description">Egyenlegdiagram, %1$s: %2$s értékről %3$s értékre, minimum %4$s, maximum %5$s. Érintse meg és húzza az ujját a részletekhez.</string>
+    <string name="net_short">Nettó</string>
+    <string name="chart_other">Egyéb</string>
+    <string name="category_vs_last_month">%1$s az előző hónaphoz képest</string>
 </resources>

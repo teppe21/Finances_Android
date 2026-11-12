@@ -55,7 +55,7 @@ class ComponentUiTest {
     fun addTransactionRequiresAValidAmountBeforeSaving() {
         var saved: Triple<String, Long, TransactionDirection>? = null
         rule.setContent {
-            FinancesTheme(darkTheme = false) {
+            FinancesTheme {
                 AddTransactionDialog(
                     accounts = listOf(bank),
                     categories = listOf(food),
@@ -78,7 +78,7 @@ class ComponentUiTest {
     fun addTransactionSavesAnExpenseAsANegativeAmount() {
         var saved: Triple<String, Long, TransactionDirection>? = null
         rule.setContent {
-            FinancesTheme(darkTheme = false) {
+            FinancesTheme {
                 AddTransactionDialog(
                     accounts = listOf(bank),
                     categories = listOf(food),
@@ -96,7 +96,7 @@ class ComponentUiTest {
     @Test
     fun emptyStateShowsItsMessage() {
         rule.setContent {
-            FinancesTheme(darkTheme = false) { EmptyState("Nothing to review", "Recognized transactions will appear here.") }
+            FinancesTheme { EmptyState("Nothing to review", "Recognized transactions will appear here.") }
         }
         rule.onNodeWithText("Nothing to review").assertIsDisplayed()
         rule.onNodeWithText("Recognized transactions will appear here.").assertIsDisplayed()
@@ -107,7 +107,7 @@ class ComponentUiTest {
         var continued = false
         var declined = false
         rule.setContent {
-            FinancesTheme(darkTheme = false) {
+            FinancesTheme {
                 NotificationDisclosureDialog(onNotNow = { declined = true }, onContinue = { continued = true })
             }
         }
@@ -145,7 +145,7 @@ class ReviewFlowUiTest {
             markProcessed = { processed += it },
             clock = { Instant.EPOCH }
         )
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = vm) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = vm) } }
 
         rule.onNodeWithText("Coffee a").assertIsDisplayed()
         rule.onNodeWithText("Confirm").performClick()
@@ -173,7 +173,7 @@ class ReviewFlowUiTest {
             deleteTransaction = { deleted += it; items.value = emptyList() },
             markProcessed = { }
         )
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = vm) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = vm) } }
 
         rule.onNodeWithText("Discard").performClick()
         rule.waitUntil(5_000) { deleted.isNotEmpty() }
@@ -190,7 +190,7 @@ class ReviewFlowUiTest {
             deleteTransaction = { },
             markProcessed = { }
         )
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = vm) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = vm) } }
 
         rule.onNodeWithText("Choose the account this belongs to.").assertIsDisplayed()
         rule.onNodeWithText("Confirm").assertIsNotEnabled()
@@ -208,7 +208,7 @@ class ReviewFlowUiTest {
             deleteTransaction = { },
             markProcessed = { }
         )
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = vm) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = vm) } }
         rule.onNodeWithText("Nothing to review").assertIsDisplayed()
     }
 
@@ -230,7 +230,7 @@ class ReviewFlowUiTest {
     fun aQuickSwipeRightConfirmsTheTransaction() {
         val items = MutableStateFlow(listOf(pending("s1")))
         val updated = mutableListOf<Transaction>()
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated)) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = viewModel(items, updated)) } }
 
         rule.onNodeWithTag("review-card-s1").performTouchInput { swipeRight(durationMillis = 120) }
 
@@ -243,7 +243,7 @@ class ReviewFlowUiTest {
     fun aQuickSwipeLeftDiscardsTheTransaction() {
         val items = MutableStateFlow(listOf(pending("s2")))
         val deleted = mutableListOf<String>()
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, deleted = deleted)) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = viewModel(items, deleted = deleted)) } }
 
         rule.onNodeWithTag("review-card-s2").performTouchInput { swipeLeft(durationMillis = 120) }
 
@@ -256,7 +256,7 @@ class ReviewFlowUiTest {
         val items = MutableStateFlow(listOf(pending("s3")))
         val updated = mutableListOf<Transaction>()
         val deleted = mutableListOf<String>()
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated, deleted)) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = viewModel(items, updated, deleted)) } }
 
         rule.onNodeWithTag("review-card-s3").performTouchInput {
             swipeRight(startX = left + 10f, endX = left + width * 0.15f, durationMillis = 900)
@@ -272,7 +272,7 @@ class ReviewFlowUiTest {
     fun withoutAnAccountASwipeToConfirmResistsAndNothingHappens() {
         val items = MutableStateFlow(listOf(pending("s4", accountId = "")))
         val updated = mutableListOf<Transaction>()
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated)) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = viewModel(items, updated)) } }
 
         rule.onNodeWithTag("review-card-s4").performTouchInput { swipeRight(durationMillis = 120) }
         rule.waitForIdle()
@@ -285,7 +285,7 @@ class ReviewFlowUiTest {
     fun undoBringsADiscardedTransactionBack() {
         val items = MutableStateFlow(listOf(pending("s5")))
         val restored = mutableListOf<Transaction>()
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, restored = restored)) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = viewModel(items, restored = restored)) } }
 
         rule.onNodeWithText("Discard").performClick()
         rule.waitUntil(5_000) { rule.onAllNodesWithTextCount("Discarded. Nothing was added.") > 0 }
@@ -300,7 +300,7 @@ class ReviewFlowUiTest {
     fun undoPutsAConfirmedTransactionBackInTheQueue() {
         val items = MutableStateFlow(listOf(pending("s6")))
         val updated = mutableListOf<Transaction>()
-        rule.setContent { FinancesTheme(darkTheme = false) { ReviewScreen(viewModel = viewModel(items, updated)) } }
+        rule.setContent { FinancesTheme { ReviewScreen(viewModel = viewModel(items, updated)) } }
 
         rule.onNodeWithText("Confirm").performClick()
         rule.waitUntil(5_000) { rule.onAllNodesWithTextCount("Confirmed. It now counts toward your totals.") > 0 }
@@ -384,7 +384,7 @@ class UncategorizedFlowUiTest {
             createRuleAndApply = { c, k -> ruleRequest = c to k; setOf("a", "b") },
             setCategory = { txs, c -> setRequest = txs.map { it.id }.toSet() to c }
         )
-        rule.setContent { FinancesTheme(darkTheme = false) { com.teppe21.finances.feature.categories.UncategorizedScreen(vm) } }
+        rule.setContent { FinancesTheme { com.teppe21.finances.feature.categories.UncategorizedScreen(vm) } }
 
         rule.onNodeWithText("Sample Gadget Shop").assertIsDisplayed()
         rule.onNodeWithText("2 transactions").assertIsDisplayed()
@@ -404,7 +404,7 @@ class UncategorizedFlowUiTest {
         val vm = com.teppe21.finances.feature.categories.UncategorizedViewModel(
             MutableStateFlow(emptyList()), MutableStateFlow(categories), { 3 }, { _, _ -> null }, { _, _ -> }
         )
-        rule.setContent { FinancesTheme(darkTheme = false) { com.teppe21.finances.feature.categories.UncategorizedScreen(vm) } }
+        rule.setContent { FinancesTheme { com.teppe21.finances.feature.categories.UncategorizedScreen(vm) } }
         rule.onNodeWithText("Nothing left to sort").assertIsDisplayed()
         rule.onNodeWithText("Re-apply rules").performClick()
         rule.onNodeWithText("3 transactions updated").assertIsDisplayed()

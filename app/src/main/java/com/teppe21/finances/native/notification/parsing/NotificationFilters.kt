@@ -13,7 +13,8 @@ object SecurityFilter {
         "approve", "approval", "authorise", "authorize", "confirm in the app", "confirm the payment",
         "kod", "kodja", "kodod", "jelszo", "egyszer hasznalatos", "ellenorzo",
         "hitelesit*", "jovahagy*", "bejelentkez*", "belepes*", "belepesi", "uj eszkoz",
-        "biztonsagi kod", "megerosites szukseges", "erositsd meg", "erositse meg"
+        "biztonsagi kod", "megerosites szukseges", "erositsd meg", "erositse meg",
+        "megerosit*", "azonosit*", "kodot", "koddal", "confirm it's you", "confirm it’s you", "confirm your"
     )
 
     private val CODE_PATTERN = Regex("(?<![\\d.,])\\d{4,8}(?![\\d.,])")

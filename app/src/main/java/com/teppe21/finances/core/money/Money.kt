@@ -11,6 +11,9 @@ import java.math.RoundingMode
 object Money {
     const val STORAGE_SCALE = 2
 
+    /** Largest amount accepted from a user, in minor units (100 million major). NotificationRecognizer uses the same literal. */
+    const val MAX_INPUT_MINOR = 100_000_000_00L
+
     /** Throws ArithmeticException if the amount does not fit in a Long (never wraps silently). */
     fun toMinor(major: BigDecimal): Long {
         val unscaled = major.setScale(STORAGE_SCALE, RoundingMode.HALF_UP).unscaledValue()
@@ -23,14 +26,14 @@ object Money {
 
     /**
      * Parses a number typed by the user, e.g. "1250", "12.5", "12,50", "1 234,56".
-     * Returns null for blank, malformed, or more than two fractional digits.
+     * Returns null for blank, malformed, more than two fractional digits, or above [MAX_INPUT_MINOR].
      */
     fun parseUserInput(raw: String): Long? {
         val compact = raw.trim().replace(" ", "").replace(" ", "")
         if (compact.isEmpty()) return null
         if (!compact.matches(Regex("[0-9]+([.,][0-9]{1,2})?"))) return null
         val major = compact.replace(',', '.').toBigDecimalOrNull() ?: return null
-        return toMinor(major)
+        return toMinor(major.min(BigDecimal.valueOf(MAX_INPUT_MINOR + 1, STORAGE_SCALE))).takeIf { it <= MAX_INPUT_MINOR }
     }
 }
 

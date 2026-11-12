@@ -68,7 +68,12 @@ object SupportedSources {
         displayName = "Erste Bank (George)",
         institution = "Erste Bank",
         type = SourceType.BANK,
-        packages = setOf("hu.erstebank.george.hungary", "hu.erstebank.mobilebank"),
+        // The pegasus name is Erste MobilBank as installed on the owner's phone (seen via adb, 2026-11-12).
+        packages = setOf(
+            "hu.erstebank.george.hungary",
+            "hu.erstebank.mobilebank",
+            "pegasus.project.ebh.mobile.android.bundle.mobilebank"
+        ),
         parser = HungarianBankParser("Erste Bank"),
         verifiedFixtures = false
     )
@@ -98,6 +103,7 @@ object SupportedSources {
         "revolut" to "Revolut",
         "otp" to "OTP Bank",
         "erste" to "Erste Bank",
+        "george" to "Erste Bank",
         "mbh" to "MBH Bank",
         "wise" to "Wise"
     )
