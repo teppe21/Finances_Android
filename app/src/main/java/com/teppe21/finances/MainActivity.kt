@@ -116,7 +116,6 @@ import com.teppe21.finances.feature.analytics.AnalyticsScreen
 import com.teppe21.finances.feature.categories.CategoriesScreen
 import com.teppe21.finances.feature.dashboard.DashboardScreen
 import com.teppe21.finances.feature.importcsv.CsvImportScreen
-import com.teppe21.finances.core.utils.DisplayLocale
 import com.teppe21.finances.feature.categories.UncategorizedScreen
 import com.teppe21.finances.feature.more.MoreScreen
 import com.teppe21.finances.feature.notifications.NotificationAutomationScreen
@@ -143,8 +142,6 @@ class MainActivity : FragmentActivity() {
         // insets handling identical everywhere. The theme-aware style is applied once preferences load.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Dates and amounts follow the language the resources resolved to (English or Hungarian).
-        DisplayLocale.set(resources.configuration.locales[0])
         setContent {
             val prefs by app.preferencesRepository.preferencesFlow.collectAsState(initial = null)
             val unlocked by app.appLock.unlocked.collectAsState()

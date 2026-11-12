@@ -41,8 +41,8 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        // The UI is in English and Hungarian; drop other locales contributed by libraries.
-        resourceConfigurations += listOf("en", "hu")
+        // English-only for now; values-hu stays in the repo and comes back by adding "hu" here and in locales_config.xml.
+        resourceConfigurations += listOf("en")
 
         // Only set these after the policy is publicly reachable and the contact is real.
         buildConfigField("String", "PRIVACY_POLICY_URL", quoted(providers.gradleProperty("finances.privacyPolicyUrl").orNull ?: ""))

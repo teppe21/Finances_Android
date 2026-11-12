@@ -62,6 +62,7 @@ import com.teppe21.finances.feature.analytics.SpendingDonutChartCard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -219,6 +220,7 @@ class LayoutUiTest {
     fun englishTabBarLabelsAreNotClippedAtScale15() = assertTabLabelsFit(listOf("Overview", "Transactions", "Analytics", "More"))
 
     @Test
+    @Ignore("Hungarian UI is disabled for now (English-only build)")
     fun hungarianTabBarLabelsAreNotClippedAtScale15() = assertTabLabelsFit(listOf("Áttekintés", "Tranzakciók", "Elemzések", "Továbbiak"))
 
     // ---- chips ------------------------------------------------------------------------------------
@@ -336,6 +338,7 @@ class LayoutUiTest {
     fun englishDashboardShortcutsKeepTheUsersFontSizeAtScale15() = assertQuickActionsReadable(1.5f, Locale.ENGLISH)
 
     @Test
+    @Ignore("Hungarian UI is disabled for now (English-only build)")
     fun hungarianDashboardShortcutsKeepTheUsersFontSizeAtScale15() = assertQuickActionsReadable(1.5f, Locale("hu", "HU"))
 
     @Test
@@ -344,6 +347,7 @@ class LayoutUiTest {
     }
 
     @Test
+    @Ignore("Hungarian UI is disabled for now (English-only build)")
     fun hungarianDashboardShortcutsAreReadableAtScale20() = assertQuickActionsReadable(2.0f, Locale("hu", "HU"))
 
     // ---- search and filters header on Transactions --------------------------------------------------
@@ -382,6 +386,7 @@ class LayoutUiTest {
     // ---- Hungarian and dark -----------------------------------------------------------------------
 
     @Test
+    @Ignore("Hungarian UI is disabled for now (English-only build)")
     fun aTransferRowIsHungarianUnderTheHungarianLocaleAndItsDetailsAreNotCut() {
         setScaled(fontScale = 1.5f, locale = Locale("hu", "HU")) {
             TransactionRow(
