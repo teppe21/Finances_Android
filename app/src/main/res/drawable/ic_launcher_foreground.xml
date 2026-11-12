@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A receipt: charcoal outline and item lines, one terracotta line for the total.
+<!-- A rising balance line over a grey baseline, in the app's single blue accent.
      Kept inside the 72x72 safe zone of the 108x108 adaptive icon canvas. Source: docs/icon/ic_launcher.svg -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -7,19 +7,17 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:pathData="M36,26 H72 V82 L66,76 L60,82 L54,76 L48,82 L42,76 L36,82 Z"
-        android:strokeColor="#2B2B2B"
+        android:pathData="M32,76 H76"
+        android:strokeColor="#282D34"
         android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M32,64 L46,50 L56,58 L74,38"
+        android:strokeColor="#4A8FFF"
+        android:strokeWidth="5"
         android:strokeLineJoin="round"
         android:strokeLineCap="round" />
     <path
-        android:pathData="M43,38 H65 M43,47 H57"
-        android:strokeColor="#2B2B2B"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M43,61 H65"
-        android:strokeColor="#C15F3C"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
+        android:pathData="M69,38 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"
+        android:fillColor="#F2F4F7" />
 </vector>
