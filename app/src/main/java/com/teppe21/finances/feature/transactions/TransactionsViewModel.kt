@@ -13,6 +13,8 @@ import com.teppe21.finances.data.local.preferences.UserPreferences
 import com.teppe21.finances.domain.fx.RateTable
 import com.teppe21.finances.domain.usecase.DetectRecurringTransactionsUseCase
 import com.teppe21.finances.domain.usecase.IngestionInput
+import com.teppe21.finances.domain.usecase.TransactionEdit
+import com.teppe21.finances.domain.usecase.UpdateTransactionUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -57,6 +59,7 @@ class TransactionsViewModel(
     private val recurringUseCase: DetectRecurringTransactionsUseCase,
     private val ingest: suspend (IngestionInput) -> Unit,
     private val delete: suspend (Transaction) -> Unit,
+    private val update: suspend (Transaction, TransactionEdit) -> Unit = { _, _ -> },
     private val recategorize: suspend (List<Transaction>, String) -> Unit = { _, _ -> },
     private val createRuleAndApply: suspend (categoryId: String, keyword: String) -> Set<String>? = { _, _ -> null }
 ) : ViewModel() {
@@ -73,6 +76,7 @@ class TransactionsViewModel(
         recurringUseCase = app.detectRecurringUseCase,
         ingest = { app.ingestTransactionUseCase.execute(it) },
         delete = { app.transactionRepository.deleteTransaction(it) },
+        update = { tx, edit -> UpdateTransactionUseCase(app.transactionRepository).execute(tx, edit) },
         recategorize = { txs, c -> app.recategorizer.setCategory(txs, c) },
         createRuleAndApply = { c, k -> app.recategorizer.createRuleAndApply(c, k) }
     )
@@ -257,6 +261,10 @@ class TransactionsViewModel(
             ruleKeyword?.let { createRuleAndApply(categoryId, it) }
             recategorize(listOf(tx), categoryId)
         }
+    }
+
+    fun editTransaction(tx: Transaction, edit: TransactionEdit) {
+        viewModelScope.launch { update(tx, edit) }
     }
 
     fun deleteTransaction(tx: Transaction) {
