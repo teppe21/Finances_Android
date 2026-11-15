@@ -234,4 +234,12 @@ class NotificationRecognitionTest {
         assertNull(SupportedSources.forPackage("com.google.android.apps.nbu.paisa.user"))
         assertNull(SupportedSources.forPackage(null))
     }
+
+    @Test
+    fun `listener accepts only google wallet`() {
+        assertTrue(SupportedSources.GOOGLE_WALLET in SupportedSources.LISTENED)
+        assertTrue(SupportedSources.ERSTE !in SupportedSources.LISTENED)
+        assertTrue(SupportedSources.OTP !in SupportedSources.LISTENED)
+        assertTrue(SupportedSources.REVOLUT !in SupportedSources.LISTENED)
+    }
 }

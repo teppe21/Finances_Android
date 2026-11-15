@@ -90,6 +90,9 @@ object SupportedSources {
 
     val ALL: List<NotificationSource> = listOf(REVOLUT, GOOGLE_WALLET, OTP, WISE, ERSTE, MBH)
 
+    // Only Google Wallet for now: banks post the same purchase too, so listening to both doubles it.
+    val LISTENED: Set<NotificationSource> = setOf(GOOGLE_WALLET)
+
     private val byPackage: Map<String, NotificationSource> =
         ALL.flatMap { source -> source.packages.map { it to source } }.toMap()
 
