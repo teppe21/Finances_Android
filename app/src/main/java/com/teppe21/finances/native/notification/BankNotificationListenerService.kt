@@ -88,7 +88,7 @@ class BankNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
         val packageName = sbn.packageName ?: return
-        if (SupportedSources.forPackage(packageName) == null) return
+        if (SupportedSources.forPackage(packageName) !in SupportedSources.LISTENED) return
         val notification = sbn.notification ?: return
         // Group summaries repeat the content of their children.
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
